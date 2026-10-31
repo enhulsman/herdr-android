@@ -5,9 +5,7 @@
 **Decisions still yours:**
 1. GitHub repo visibility (needed at M0). Public: Obtainium works with no token,
    anyone can read the code. Private: Obtainium needs a read-only GitHub token on
-   the phone. Pick: private until the maintainers have answered, then decide.
-2. The maintainer post: drafted in your voice after this spec, shown to you word
-   for word, posted by you.
+   the phone. Pick: private for now; decide again once the app works.
 
 **What you get, each milestone ending with a check on your phone:**
 - **M0** An empty app that installs and updates itself through Obtainium from a

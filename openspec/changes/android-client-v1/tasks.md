@@ -6,7 +6,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 
 ## 0. Before code
 
-- [ ] 0.1 Draft the maintainer post (five questions in `decisions.md`) in Ezra's voice; Ezra reviews it verbatim and posts it
+- [x] 0.1 ~~Maintainer post~~ dropped 2026-10-31: maintainers rarely answer Discussions (see `decisions.md`)
 - [ ] 0.2 Visual design: `/design-brief` from the canvas and reference shots, renders, `design-tokens.json` signed off
 - [ ] 0.3 Ezra decides repo visibility; create the GitHub repo; tag ruleset, `main` protection, `release` environment with required reviewer
 

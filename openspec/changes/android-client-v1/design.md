@@ -27,8 +27,7 @@ Facts cited as `file:line` refer to the upstream clones read on 2026-10-31
   notices: frame codec (`app/src/hc.rs:14-20,229-245`), RPC routing and compat
   check (`hc.rs:149-213,254-437`), `EventLines` (`hc.rs:33-147`), the attention
   model (`model.rs:86-95,437-525`), layout types (`layout.rs`, `mirror.rs`). RPC
-  types come from `research/hc.openrpc-0.1.15.json`. Upstreaming `herdr-proto` is
-  one of the maintainer questions.
+  types come from `research/hc.openrpc-0.1.15.json`.
 - **Terminal engine: libghostty-vt** at the herdr-core pin `1e5cdb8`, built by Zig
   0.16.0 (checksum-pinned) for `aarch64-linux-android` and `x86_64-linux-android`,
   passing `-Dtarget` explicitly (herdr-core's `zig_target()` drops the Android ABI).
@@ -166,10 +165,10 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
 
 ## 7. Open questions
 
-For the maintainers (one post, see `decisions.md`): third-party client welcome and
-their mobile plans; client-owned flat doc names as a stable contract; viewer
-presence or last-input time on Terminal; push support in core; upstreaming
-`herdr-proto`.
+Upstream: no questions asked (maintainers rarely answer Discussions; see
+`decisions.md`). The spec assumes no upstream change and relies, unconfirmed, on
+the client-owned flat doc name `hdroid-push` and on a grace delay instead of
+viewer presence.
 
 For spikes: M0 device smoke test (libghostty on the Pixel); M0 russh with a
 Keystore signing callback; M0 push end to end (VAPID need, binary body through

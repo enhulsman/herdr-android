@@ -1,0 +1,12 @@
+# Upstream clones and local build output (research only)
+research/src/
+research/build-android/
+# Mac screenshots show client project names: never commit
+reference-shots/herdr-paste-*.png
+# Build
+.gradle/
+build/
+target/
+local.properties
+*.keystore
+*.jks

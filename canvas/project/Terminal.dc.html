@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent terminal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#96b2d7}a:hover{color:#b9cde6}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #131518; color: #eeeeef; font-family: Geist, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden;">
+
+  <header style="background: #101114; border-bottom: 1px solid rgba(255,255,255,.094);">
+    <div style="display: flex; align-items: center; gap: 4px; padding: 8px 8px 4px 4px;">
+      <a href="Main.dc.html" aria-label="Back to agents" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #eeeeef;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </a>
+      <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0;">
+        <span style="font-size: 16px; font-weight: 500;">retry pickup</span>
+        <span style="font-size: 12.5px; color: #98999b;">atlas · workstation · main</span>
+      </div>
+      <span style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; background: rgba(118,168,255,.12); color: #76a8ff; font-size: 12.5px; font-weight: 500;">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="rgba(118,168,255,.25)" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg>Working</span>
+      <button aria-label="More actions" style="width: 44px; height: 44px; border: none; background: transparent; color: #98999b; display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="18.5" r="1.6"></circle></svg>
+      </button>
+    </div>
+    <nav aria-label="Tabs in atlas" style="display: flex; gap: 2px; padding: 0 10px;">
+      <a href="#t1" style="display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 12px; color: #eeeeef; text-decoration: none; font-size: 13.5px; border-bottom: 2px solid #eeeeef;">
+        <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>retry pickup</a>
+      <a href="#t2" style="display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 12px; color: #98999b; text-decoration: none; font-size: 13.5px; border-bottom: 2px solid transparent;">tests<span aria-label="Done" style="width: 6px; height: 6px; border-radius: 50%; background: #4cc48c;"></span></a>
+      <a href="#t3" style="display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 12px; color: #98999b; text-decoration: none; font-size: 13.5px; border-bottom: 2px solid transparent;">shell</a>
+    </nav>
+  </header>
+
+  <div style="flex-grow: 1; position: relative; overflow: hidden;">
+    <pre style="margin: 0; padding: 14px 14px 0; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.62; color: #d2d4d9; white-space: pre;"><span style="color: #98999b;">❯ add a retry to the ntfy pickup and test it</span>
+
+<span style="color: #eeeeef;">● Update(pickup/notify.py)</span>
+  <span style="color: #98999b;">└ 3 additions, 1 removal</span>
+<span style="display: block; background: rgba(220,100,110,.22);">  41 -    send(msg)</span><span style="display: block; background: rgba(120,190,120,.18);">  41 +    for attempt in range(3):</span><span style="display: block; background: rgba(120,190,120,.18);">  42 +        if send(msg): break</span><span style="display: block; background: rgba(120,190,120,.18);">  43 +        time.sleep(2 ** attempt)</span>
+<span style="color: #eeeeef;">● Bash(pytest tests/test_notify.py -q)</span>
+  <span style="color: #98999b;">└ 42 passed, 3 running</span>
+
+<span style="color: #96b2d7;">✻ Testing retry backoff… (1m 12s)</span></pre>
+
+    <span style="position: absolute; top: 10px; right: 10px; height: 26px; padding: 0 9px; border-radius: 8px; background: rgba(16,17,20,.82); border: 1px solid rgba(255,255,255,.094); color: #98999b; font-size: 11.5px; display: flex; align-items: center; gap: 6px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>Watching · 118 cols</span>
+
+    <div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; gap: 6px;">
+      <span style="width: 18px; height: 5px; border-radius: 3px; background: #eeeeef;"></span>
+      <span style="width: 5px; height: 5px; border-radius: 3px; background: #4a4d55;"></span>
+    </div>
+  </div>
+
+  <div style="background: #101114; border-top: 1px solid rgba(255,255,255,.094); padding: 8px 10px 20px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; font-family: 'JetBrains Mono', monospace;">
+      <button style="height: 38px; border-radius: 9px; border: none; background: #1d1f23; color: #d2d4d9; font-family: inherit; font-size: 12px;">esc</button>
+      <button style="height: 38px; border-radius: 9px; border: none; background: #1d1f23; color: #d2d4d9; font-family: inherit; font-size: 12px;">tab</button>
+      <button style="height: 38px; border-radius: 9px; border: none; background: #1d1f23; color: #d2d4d9; font-family: inherit; font-size: 12px;">ctrl</button>
+      <button aria-label="Up" style="height: 38px; border-radius: 9px; border: none; background: #1d1f23; color: #d2d4d9; font-family: inherit; font-size: 13px;">↑</button>
+      <button aria-label="Down" style="height: 38px; border-radius: 9px; border: none; background: #1d1f23; color: #d2d4d9; font-family: inherit; font-size: 13px;">↓</button>
+      <button aria-label="Enter" style="height: 38px; border-radius: 9px; border: none; background: #1d1f23; color: #d2d4d9; font-family: inherit; font-size: 13px;">⏎</button>
+      <button aria-label="Interrupt" style="height: 38px; border-radius: 9px; border: none; background: rgba(242,163,60,.14); color: #f2a33c; font-family: inherit; font-size: 12px;">^C</button>
+    </div>
+    <div style="display: flex; align-items: flex-end; gap: 8px;">
+      <button aria-label="Attach a file" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; border: 1px solid rgba(255,255,255,.094); background: transparent; color: #98999b; display: flex; align-items: center; justify-content: center;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-height: 44px; box-sizing: border-box; padding: 6px 6px 6px 14px; border-radius: 14px; background: #17191d; border: 1px solid rgba(255,255,255,.094);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="composer" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Message retry pickup</label>
+          <input id="composer" value="also cap the backoff at 10s" style="flex-grow: 1; min-width: 0; border: none; background: transparent; color: #eeeeef; font-family: inherit; font-size: 15px; outline: none;">
+          <button aria-label="Send when idle" style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; border: none; background: #eeeeef; color: #101114; display: flex; align-items: center; justify-content: center;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <span style="padding-left: 54px; font-size: 12px; color: #98999b;">Sends when it is idle · hold ⌨ to type into the terminal</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

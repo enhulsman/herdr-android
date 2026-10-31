@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Answer from a notification</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#96b2d7}a:hover{color:#b9cde6}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0b0c0e; color: #eeeeef; font-family: Geist, system-ui, sans-serif; display: flex; flex-direction: column; gap: 10px; padding: 56px 12px 24px;">
+  <div style="padding: 0 10px 18px; display: flex; flex-direction: column; gap: 2px;">
+    <span style="font-size: 54px; font-weight: 300; letter-spacing: -0.03em; line-height: 1;">21:14</span>
+    <span style="font-size: 14px; color: #98999b;">Saturday 31 October</span>
+  </div>
+
+  <article aria-label="docs nav needs you" style="border-radius: 22px; background: #1b1d21; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #98999b;">
+      <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: #eeeeef; color: #101114; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 500; display: flex; align-items: center; justify-content: center;">&gt;_</span>
+      <span>Herdr · workstation</span><span style="margin-left: auto;">now</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 3px;">
+      <span style="font-size: 15px; font-weight: 600;">docs nav needs you</span>
+      <span style="font-size: 14px; color: #d2d4d9;">Permission · Bash: <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">git push origin main</span></span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+      <button style="height: 40px; border-radius: 999px; border: none; background: #f2a33c; color: #17130c; font-family: inherit; font-size: 14px; font-weight: 600;">Allow</button>
+      <button style="height: 40px; border-radius: 999px; border: none; background: #2c2e31; color: #eeeeef; font-family: inherit; font-size: 14px;">Deny</button>
+      <button style="height: 40px; border-radius: 999px; border: none; background: #2c2e31; color: #eeeeef; font-family: inherit; font-size: 14px;">Reply</button>
+    </div>
+  </article>
+
+  <article aria-label="kite physics has a question" style="border-radius: 22px; background: #1b1d21; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #98999b;">
+      <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: #eeeeef; color: #101114; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 500; display: flex; align-items: center; justify-content: center;">&gt;_</span>
+      <span>Herdr · workstation</span><span style="margin-left: auto;">2m</span>
+    </div>
+    <span style="font-size: 15px; font-weight: 600;">kite physics is waiting</span>
+    <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #131518;">
+      <span style="font-size: 11.5px; color: #98999b;">Screen, last lines</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.55; color: #d2d4d9; white-space: pre-line;">Which wind model for the kites?
+❯ 1. Perlin gusts
+  2. Steady breeze with noise</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 14px; border-radius: 999px; background: #2c2e31;">
+      <span style="flex-grow: 1; font-size: 14px; color: #eeeeef;">1</span>
+      <span style="width: 32px; height: 32px; border-radius: 50%; background: #eeeeef; color: #101114; display: flex; align-items: center; justify-content: center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+      </span>
+    </div>
+  </article>
+
+  <article aria-label="Agents done" style="border-radius: 22px; background: #16181b; padding: 14px; display: flex; align-items: center; gap: 12px;">
+    <span role="img" aria-label="Done" style="width: 10px; height: 10px; border-radius: 50%; background: #4cc48c; margin-left: 4px;"></span>
+    <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1;">
+      <span style="font-size: 14.5px; font-weight: 500;">3 agents done</span>
+      <span style="font-size: 13px; color: #98999b;">tests, og tags, readme</span>
+    </div>
+    <span style="font-size: 12px; color: #98999b;">5m</span>
+  </article>
+
+  <p style="margin: auto 10px 0; font-size: 12.5px; line-height: 1.5; color: #98999b;">Allow and Deny appear only when the agent says it is asking permission. Otherwise you see its screen, labelled as such, and reply.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

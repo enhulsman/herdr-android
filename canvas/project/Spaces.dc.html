@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spaces across machines</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#96b2d7}a:hover{color:#b9cde6}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #101114; color: #eeeeef; font-family: Geist, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden;">
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 6px 20px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span aria-hidden="true" style="width: 26px; height: 26px; border-radius: 7px; background: #eeeeef; color: #101114; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500;">&gt;_</span>
+      <h1 style="margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em;">Herdr</h1>
+    </div>
+    <button aria-label="Search agents and spaces" style="width: 44px; height: 44px; border: none; background: transparent; color: #98999b; display: flex; align-items: center; justify-content: center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+    </button>
+  </header>
+  <div style="padding: 6px 16px 8px;">
+    <div role="tablist" aria-label="View" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 3px; border-radius: 12px; background: #17191d; border: 1px solid rgba(255,255,255,.094);">
+      <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 36px; border-radius: 9px; color: #98999b; font-size: 14px; display: flex; align-items: center; justify-content: center; text-decoration: none;">Agents</a>
+      <button role="tab" aria-selected="true" style="height: 36px; border: none; border-radius: 9px; background: #2c2e31; color: #eeeeef; font-family: inherit; font-size: 14px; font-weight: 500;">Spaces</button>
+    </div>
+  </div>
+
+  <main style="flex-grow: 1; overflow: hidden; padding: 0 8px;">
+    <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px 0 12px; margin-top: 6px; color: #98999b; font-size: 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8"></path></svg>
+      <span style="flex-grow: 1;">workstation</span>
+      <span role="img" aria-label="Connected" style="width: 7px; height: 7px; border-radius: 50%; background: #4cc48c;"></span>
+      <button aria-label="New space on workstation" style="width: 36px; height: 36px; border: none; background: transparent; color: #98999b; font-size: 18px;">+</button>
+    </div>
+
+    <div style="border-radius: 14px; background: rgba(255,255,255,.055); padding: 2px 0 6px;">
+      <div style="display: flex; align-items: center; gap: 12px; height: 50px; padding: 0 14px 0 12px;">
+        <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; background: #e0703a; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">H</span>
+        <span style="flex-grow: 1; font-size: 15px; font-weight: 500;">atlas</span>
+        <span style="font-size: 12.5px; color: #98999b;">main</span><span role="img" aria-label="Uncommitted changes" style="width: 6px; height: 6px; border-radius: 50%; background: #d8be87;"></span>
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" role="img" aria-label="Working"><circle cx="8" cy="8" r="5.5" stroke="#2c2e31" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg>
+      </div>
+      <a href="Terminal.dc.html" style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 46px; color: #d2d4d9; text-decoration: none; font-size: 14px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+        <span style="flex-grow: 1;">retry pickup</span><span style="font-size: 12px; color: #98999b;">2 panes</span></a>
+      <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px 0 46px; color: #d2d4d9; font-size: 14px;">
+        <span aria-hidden="true" style="width: 13px; height: 13px; border-radius: 3px; background: #f0f0f2;"></span>
+        <span style="flex-grow: 1;">tests</span><span role="img" aria-label="Done" style="width: 7px; height: 7px; border-radius: 50%; background: #4cc48c;"></span></div>
+      <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px 0 46px; color: #98999b; font-size: 14px;">
+        <span aria-hidden="true" style="width: 13px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">$</span>
+        <span style="flex-grow: 1;">shell</span></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 14px 0 12px;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; background: #1f9e89; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">D</span>
+      <span style="flex-grow: 1; font-size: 15px;">docs-site</span>
+      <span style="font-size: 12.5px; color: #98999b;">main</span>
+      <span style="height: 20px; padding: 0 7px; border-radius: 5px; background: rgba(242,163,60,.15); color: #f2a33c; font-size: 11.5px; font-weight: 600; display: flex; align-items: center;">Needs you</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 16px 0 12px;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; background: #4f7ee8; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">V</span>
+      <span style="flex-grow: 1; font-size: 15px;">vlieger</span>
+      <span style="font-size: 12.5px; color: #98999b;">main</span>
+      <span role="img" aria-label="Done" style="width: 7px; height: 7px; border-radius: 50%; background: #4cc48c;"></span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px 0 12px; margin-top: 8px; color: #98999b; font-size: 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="11" rx="2"></rect><path d="M1.5 19h21"></path></svg>
+      <span style="flex-grow: 1;">laptop</span>
+      <span role="img" aria-label="Connected" style="width: 7px; height: 7px; border-radius: 50%; background: #4cc48c;"></span>
+      <button aria-label="New space on laptop" style="width: 36px; height: 36px; border: none; background: transparent; color: #98999b; font-size: 18px;">+</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 16px 0 12px;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; background: #8b6cf0; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">R</span>
+      <span style="flex-grow: 1; font-size: 15px;">notes</span>
+      <span style="font-size: 12.5px; color: #98999b;">main</span>
+      <span role="img" aria-label="Idle" style="width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #696a6d;"></span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px 0 12px; margin-top: 8px; color: #98999b; font-size: 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"></rect><rect x="4" y="14" width="16" height="6" rx="1.5"></rect></svg>
+      <span style="flex-grow: 1;">vps</span>
+      <span style="font-size: 12px;">reconnecting…</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 16px 0 12px; opacity: 0.55;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; background: #3fae5f; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">P</span>
+      <span style="flex-grow: 1; font-size: 15px;">health-pipeline</span>
+      <span style="font-size: 12.5px; color: #98999b;">as of 20:51</span>
+    </div>
+  </main>
+
+  <div style="padding: 8px 16px 22px;">
+    <button style="width: 100%; height: 48px; border-radius: 14px; border: 1px dashed rgba(255,255,255,.16); background: transparent; color: #98999b; font-family: inherit; font-size: 14.5px;">Add a machine over SSH</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

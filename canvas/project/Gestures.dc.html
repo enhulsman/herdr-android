@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gesture and feature map</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#96b2d7}a:hover{color:#b9cde6}
+</style>
+</helmet>
+<div style="width: 760px; height: 760px; box-sizing: border-box; background: #101114; color: #eeeeef; font-family: Geist, system-ui, sans-serif; padding: 36px 40px; display: flex; flex-direction: column; gap: 22px;">
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em;">From the Mac app to your thumb</h1>
+    <p style="margin: 0; font-size: 14px; color: #98999b;">Same spaces, tabs and agents; the phone watches by default and never resizes your desk.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px;">
+    <div style="display: flex; flex-direction: column;">
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Agents sidebar</span><span>Home list; tap opens</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Next agent</span><span>Swipe title bar up or down: next one that needs you</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Tabs</span><span>Swipe the tab strip sideways</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Split panes</span><span>One pane at a time; pinch out for tiles</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Peek sub-agent</span><span>Bottom sheet; Keep as tab</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Address t7</span><span>Tap it in terminal text to peek</span></div>
+    </div>
+    <div style="display: flex; flex-direction: column;">
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Typing</span><span>Composer; sends when the agent is idle</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Raw keys</span><span>Key row; hold ⌨ to type into the terminal</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Stop</span><span>Long-press esc: interrupt, with result toast</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Copy</span><span>Long-press for native text selection</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Paste image</span><span>Share sheet: Send to agent</span></div>
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.094); font-size: 13.5px;"><span style="color: #98999b;">Zoom</span><span>Pinch the terminal; landscape for width</span></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+    <div style="border-radius: 14px; background: #17191d; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+      <h2 style="margin: 0; font-size: 14px; font-weight: 600;">Left on the desktop</h2>
+      <p style="margin: 0; font-size: 13.5px; line-height: 1.55; color: #98999b;">Splitting and swapping panes, layouts and mods, the command palette. Unfolded screens show the real splits.</p>
+    </div>
+    <div style="border-radius: 14px; background: #1d1912; border: 1px solid rgba(242,163,60,.28); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+      <h2 style="margin: 0; font-size: 14px; font-weight: 600; color: #f2a33c;">Open: alerts with the app closed</h2>
+      <p style="margin: 0; font-size: 13.5px; line-height: 1.55; color: #d2d4d9;">herdr-core has no push. Either a small relay on the VPS sends Blocked and Done through ntfy, or the app keeps a connection open in the background.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

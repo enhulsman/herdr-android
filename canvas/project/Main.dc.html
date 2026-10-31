@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Herdr home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#96b2d7}a:hover{color:#b9cde6}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #101114; color: #eeeeef; font-family: Geist, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 6px 20px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span aria-hidden="true" style="width: 26px; height: 26px; border-radius: 7px; background: #eeeeef; color: #101114; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500;">&gt;_</span>
+      <h1 style="margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em;">Herdr</h1>
+    </div>
+    <div style="display: flex; gap: 2px;">
+      <button aria-label="Search agents and spaces" style="width: 44px; height: 44px; border: none; background: transparent; color: #98999b; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+      </button>
+      <button aria-label="Machines and settings" style="width: 44px; height: 44px; border: none; background: transparent; color: #98999b; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"></rect><rect x="4" y="14" width="16" height="6" rx="1.5"></rect><path d="M8 7h.01M8 17h.01"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <div style="padding: 6px 16px 4px;">
+    <div role="tablist" aria-label="View" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 3px; border-radius: 12px; background: #17191d; border: 1px solid rgba(255,255,255,.094);">
+      <button role="tab" aria-selected="true" style="height: 36px; border: none; border-radius: 9px; background: #2c2e31; color: #eeeeef; font-family: inherit; font-size: 14px; font-weight: 500;">Agents</button>
+      <button role="tab" aria-selected="false" style="height: 36px; border: none; border-radius: 9px; background: transparent; color: #98999b; font-family: inherit; font-size: 14px;">Spaces</button>
+    </div>
+  </div>
+
+  <section aria-label="Needs you" style="margin: 12px 16px 4px; border-radius: 16px; background: linear-gradient(#1d1912, #191612); border: 1px solid rgba(242,163,60,.28); padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+      <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 500;">docs nav</span>
+        <span style="font-size: 12.5px; color: #98999b;">docs-site · workstation</span>
+      </div>
+      <span style="height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(242,163,60,.15); color: #f2a33c; font-size: 12px; font-weight: 600; display: flex; align-items: center;">Needs you</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,.28);">
+      <span style="font-size: 11.5px; font-weight: 500; color: #f2a33c; letter-spacing: 0.02em;">Permission</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.5; color: #d2d4d9;">Bash  git push origin main</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+      <button style="height: 40px; border-radius: 10px; border: none; background: #f2a33c; color: #17130c; font-family: inherit; font-size: 14px; font-weight: 600;">Allow</button>
+      <button style="height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #eeeeef; font-family: inherit; font-size: 14px;">Deny</button>
+      <a href="Terminal.dc.html" style="height: 40px; box-sizing: border-box; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); color: #eeeeef; font-size: 14px; display: flex; align-items: center; justify-content: center; text-decoration: none;">Open</a>
+    </div>
+  </section>
+
+  <main style="flex-grow: 1; overflow: hidden; padding: 4px 8px 0;">
+    <h2 style="margin: 14px 12px 4px; font-size: 12px; font-weight: 500; color: #98999b; display: flex; justify-content: space-between;"><span>atlas</span><span>workstation</span></h2>
+    <a href="Terminal.dc.html" style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px; border-radius: 12px; background: rgba(255,255,255,.055); text-decoration: none; color: #eeeeef;">
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+      <span style="flex-grow: 1; font-size: 15px;">retry pickup</span>
+      <span style="font-size: 12.5px; color: #98999b;">4m</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Working" role="img"><circle cx="8" cy="8" r="5.5" stroke="#2c2e31" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg>
+    </a>
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px 0 34px;">
+      <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: #f0f0f2; color: #1f62d0; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 500; display: flex; align-items: center; justify-content: center;">&gt;_</span>
+      <span style="flex-grow: 1; font-size: 15px;">review retry</span>
+      <span style="font-size: 12.5px; color: #98999b;">1m</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Working" role="img"><circle cx="8" cy="8" r="5.5" stroke="#2c2e31" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg>
+    </div>
+
+    <h2 style="margin: 12px 12px 4px; font-size: 12px; font-weight: 500; color: #98999b; display: flex; justify-content: space-between;"><span>vlieger</span><span>workstation</span></h2>
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+      <span style="flex-grow: 1; font-size: 15px;">kite physics</span>
+      <span style="font-size: 12.5px; color: #98999b;">12m</span>
+      <span role="img" aria-label="Done" style="width: 8px; height: 8px; margin: 0 4px; border-radius: 50%; background: #4cc48c;"></span>
+    </div>
+
+    <h2 style="margin: 12px 12px 4px; font-size: 12px; font-weight: 500; color: #98999b; display: flex; justify-content: space-between;"><span>notes</span><span>laptop</span></h2>
+    <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px;">
+      <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: #f0f0f2; color: #1f62d0; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 500; display: flex; align-items: center; justify-content: center;">&gt;_</span>
+      <span style="flex-grow: 1; font-size: 15px; color: #d2d4d9;">overzicht copy</span>
+      <span style="font-size: 12.5px; color: #98999b;">1h</span>
+      <span role="img" aria-label="Idle" style="width: 8px; height: 8px; margin: 0 3px; border-radius: 50%; border: 1.5px solid #696a6d;"></span>
+    </div>
+  </main>
+
+  <div style="padding: 10px 16px 22px; background: linear-gradient(rgba(16,17,20,0), #101114 30%);">
+    <button style="width: 100%; height: 52px; border-radius: 16px; border: 1px solid rgba(255,255,255,.094); background: #17191d; color: #98999b; font-family: inherit; font-size: 15px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 16px; text-align: left;">
+      <span style="flex-grow: 1;">New task in atlas…</span>
+      <span style="height: 36px; padding: 0 12px; border-radius: 11px; background: #2c2e31; color: #eeeeef; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>Claude
+      </span>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

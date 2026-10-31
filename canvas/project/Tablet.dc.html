@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unfolded layout</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#96b2d7}a:hover{color:#b9cde6}
+</style>
+</helmet>
+<div style="width: 900px; height: 760px; box-sizing: border-box; background: #131518; color: #eeeeef; font-family: Geist, system-ui, sans-serif; display: flex; overflow: hidden;">
+  <aside style="width: 280px; flex-shrink: 0; background: #101114; border-right: 1px solid rgba(255,255,255,.094); display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 18px 18px 12px;">
+      <span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 7px; background: #eeeeef; color: #101114; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;">&gt;_</span>
+      <span style="font-size: 17px; font-weight: 600;">Herdr</span>
+    </div>
+    <div style="margin: 0 12px 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 3px; border-radius: 10px; background: #17191d;">
+      <span style="height: 32px; border-radius: 8px; background: #2c2e31; font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center;">Agents</span>
+      <span style="height: 32px; font-size: 13px; color: #98999b; display: flex; align-items: center; justify-content: center;">Spaces</span>
+    </div>
+    <div style="padding: 0 8px; display: flex; flex-direction: column;">
+      <span style="padding: 10px 10px 4px; font-size: 12px; color: #98999b;">docs-site</span>
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; border-radius: 10px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+        <span style="flex-grow: 1; font-size: 14px;">docs nav</span>
+        <span style="height: 19px; padding: 0 6px; border-radius: 5px; background: rgba(242,163,60,.15); color: #f2a33c; font-size: 11px; font-weight: 600; display: flex; align-items: center;">Needs you</span>
+      </div>
+      <span style="padding: 10px 10px 4px; font-size: 12px; color: #98999b;">atlas</span>
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; border-radius: 10px; background: rgba(255,255,255,.09);">
+        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+        <span style="flex-grow: 1; font-size: 14px;">retry pickup</span><span style="font-size: 12px; color: #98999b;">4m</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" role="img" aria-label="Working"><circle cx="8" cy="8" r="5.5" stroke="#2c2e31" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px 0 30px;">
+        <span aria-hidden="true" style="width: 15px; height: 15px; border-radius: 4px; background: #f0f0f2;"></span>
+        <span style="flex-grow: 1; font-size: 14px;">review retry</span><span style="font-size: 12px; color: #98999b;">1m</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" role="img" aria-label="Working"><circle cx="8" cy="8" r="5.5" stroke="#2c2e31" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg>
+      </div>
+      <span style="padding: 10px 10px 4px; font-size: 12px; color: #98999b;">vlieger</span>
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" fill="#D97757" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></svg>
+        <span style="flex-grow: 1; font-size: 14px;">kite physics</span><span style="font-size: 12px; color: #98999b;">12m</span>
+        <span role="img" aria-label="Done" style="width: 7px; height: 7px; margin: 0 3px; border-radius: 50%; background: #4cc48c;"></span>
+      </div>
+    </div>
+  </aside>
+
+  <section style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 14px; background: #101114; border-bottom: 1px solid rgba(255,255,255,.094);">
+      <span style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 9px; background: #2c2e31; font-size: 13.5px;">retry pickup
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="#3a3c40" stroke-width="2"></circle><path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#76a8ff" stroke-width="2" stroke-linecap="round"></path></svg></span>
+      <span style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; font-size: 13.5px; color: #98999b;">tests<span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: #4cc48c;"></span></span>
+      <span style="height: 34px; padding: 0 12px; font-size: 13.5px; color: #98999b; display: flex; align-items: center;">shell</span>
+      <span style="margin-left: auto; font-size: 12.5px; color: #98999b;">atlas · workstation</span>
+    </div>
+    <div style="flex-grow: 1; display: grid; grid-template-columns: 3fr 2fr; gap: 8px; padding: 8px;">
+      <pre style="margin: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.2); background: #17191d; padding: 12px 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.62; color: #d2d4d9; white-space: pre-wrap; overflow: hidden;"><span style="color: #98999b;">Claude Code  ~/src/atlas</span>
+
+<span style="color: #98999b;">❯ add a retry to the ntfy pickup</span>
+
+● Update(pickup/notify.py)
+<span style="display: block; background: rgba(220,100,110,.22);">41 -   send(msg)</span><span style="display: block; background: rgba(120,190,120,.18);">41 +   for attempt in range(3):</span><span style="display: block; background: rgba(120,190,120,.18);">42 +       if send(msg): break</span><span style="display: block; background: rgba(120,190,120,.18);">43 +       time.sleep(2 ** attempt)</span>
+● Bash(pytest -q)
+  └ 42 passed, 3 running
+
+<span style="color: #96b2d7;">✻ Testing retry backoff… (1m 12s)</span></pre>
+      <pre style="margin: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.094); background: #17191d; padding: 12px 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.62; color: #d2d4d9; white-space: pre-wrap; overflow: hidden;"><span style="color: #98999b;">Codex  review retry</span>
+
+<span style="color: #98999b;">› review the retry</span>
+
+• Explored
+  └ Read notify.py
+• Backoff never caps.
+
+<span style="color: #96b2d7;">◦ Writing findings…</span></pre>
+    </div>
+    <div style="display: flex; gap: 8px; padding: 0 8px 12px;">
+      <div style="flex-grow: 1; height: 46px; box-sizing: border-box; display: flex; align-items: center; padding: 0 6px 0 14px; border-radius: 13px; background: #17191d; border: 1px solid rgba(255,255,255,.094); color: #98999b; font-size: 14.5px;">
+        <span style="flex-grow: 1;">Message retry pickup…</span>
+        <span style="width: 34px; height: 34px; border-radius: 10px; background: #eeeeef; color: #101114; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></span>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":900,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

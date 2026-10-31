@@ -1,140 +1,176 @@
 # Design: herdr for Android, version 1
 
 Facts cited as `file:line` refer to the upstream clones read on 2026-10-31
-(`research/source-findings-2026-10-31.md` holds the full citations).
+(`research/source-findings-2026-10-31.md`, `docs/council/council-2026-10-31.md`).
 
 ## 1. Shape
 
 ```
- Phone                                             Each machine (WSL, Mac)
+ Phone                                             WSL (any OpenSSH machine)
  ┌───────────────────────────────┐                 ┌──────────────────────────┐
- │ Kotlin / Compose UI           │                 │ herdr-core 0.1.15        │
- │  screens, notifications,      │  SSH over       │   ▲ local connect        │
+ │ Kotlin / Compose UI           │                 │ herdr-core (pinned)      │
+ │  screens, notifications,      │  SSH over       │   ▲ existing core only   │
  │  Keystore key, UnifiedPush    │  Tailscale      │   │                      │
- │        │ uniffi               │ ─────────────▶  │ herdr-push (user svc)    │
- │ Rust core (libherdr_mobile)   │  forced command │   │ encrypted POST       │
- │  ssh, frame codec, RPC,       │  herdr-core     └───┼──────────────────────┘
+ │        │ uniffi + frame path  │ ─────────────▶  │ herdr-push (systemd)     │
+ │ Rust core (libherdr_mobile)   │  forced command │   │ encrypted POST,      │
+ │  ssh, frame codec, RPC,       │  herdr-core     └───┼── token, allowlist ──┘
  │  event state, attention,      │  connect            ▼
- │  layout doc, libghostty-vt    │ ◀── UnifiedPush ── ntfy (VPS) 
+ │  layout doc, libghostty-vt    │ ◀── UnifiedPush ── ntfy (VPS)
  └───────────────────────────────┘
 ```
 
-- **One Rust crate, two binaries' worth of code.** `crates/herdr-proto` (frame
-  codec, JSON-RPC client, event-stream state, attention model, layout doc types)
-  is shared by the app's Rust core (`crates/herdr-mobile`, built as an Android
-  `.so` with uniffi bindings) and by `herdr-push` (a Linux/macOS binary).
-- **Not a dependency on the `herdr-core` crate.** It is unpublished and pulls in
-  the server and Zig. Copy and adapt the small pure pieces instead, with their
-  Apache-2.0 notices: frame codec (`app/src/hc.rs:14-20,229-245`), RPC routing and
-  compat check (`hc.rs:149-213,254-437`), `EventLines` (`hc.rs:33-147`), the
-  attention model (`model.rs:86-95,437-525`), the layout types (`layout.rs`,
-  `mirror.rs`). RPC param types are generated or hand-written from
-  `research/hc.openrpc-0.1.15.json`. Confidence: high.
-- **Terminal engine: libghostty-vt** at the herdr-core pin `1e5cdb8`, built by
-  Zig 0.16.0 for `aarch64-linux-android` (verified to build and link on
-  2026-10-31; not yet run on a device). `-Dtarget` is passed explicitly because
-  herdr-core's `zig_target()` drops the Android ABI. Fallback if it fails on a
-  device: Termux `terminal-emulator`/`terminal-view` (Apache-2.0).
-- **Drawing:** the Rust core turns libghostty-vt state into a frame of styled cell
-  runs (as the Mac's `vt.rs` does, minus its GPUI ties); Kotlin draws runs on a
-  Compose `Canvas` with a monospace font and a glyph cache. Target: 60 fps at
-  200x60 cells on the phone. Confidence: moderate; measure in M2.
+- **Shared crate.** `crates/herdr-proto` (frame codec, JSON-RPC client, event
+  state, the attention model, layout doc types) is used by the app's Rust core
+  (`crates/herdr-mobile`, an Android `.so`) and by `herdr-push`.
+- **Not a dependency on the `herdr-core` crate** (unpublished; pulls in the server
+  and Zig). The small pure pieces are copied and adapted with their Apache-2.0
+  notices: frame codec (`app/src/hc.rs:14-20,229-245`), RPC routing and compat
+  check (`hc.rs:149-213,254-437`), `EventLines` (`hc.rs:33-147`), the attention
+  model (`model.rs:86-95,437-525`), layout types (`layout.rs`, `mirror.rs`). RPC
+  types come from `research/hc.openrpc-0.1.15.json`. Upstreaming `herdr-proto` is
+  one of the maintainer questions.
+- **Terminal engine: libghostty-vt** at the herdr-core pin `1e5cdb8`, built by Zig
+  0.16.0 (checksum-pinned) for `aarch64-linux-android` and `x86_64-linux-android`,
+  passing `-Dtarget` explicitly (herdr-core's `zig_target()` drops the Android ABI).
+  Bindings regenerated against the `1e5cdb8` headers (herdr-app's `vt.rs` targets
+  `291fd05`). Verified to build and link on 2026-10-31; the M0 device smoke test
+  decides between it and the fallback, Termux `terminal-emulator`/`terminal-view`
+  (Apache-2.0).
+- **The Rust/Kotlin boundary.** uniffi carries control and state: calls, events,
+  snapshots. Terminal frames take a separate path: the Rust core packs only the
+  rows that changed (rows cached by id, as in `vt.rs`) into one direct
+  `ByteBuffer` per frame, which Kotlin draws on a Compose `Canvas` with a
+  monospace font and a glyph cache. Target: p95 frame time at most 16.7 ms for a
+  200x60 terminal under continuous output on the Pixel.
 
 ## 2. Connecting
 
-- **Direct, one connection per machine.** The phone has no local core, so it
-  does what the desktop core does for remote machines: SSH (in Rust, `russh`)
-  running the same remote command, including the `~/.local/bin`
-  fallback (`core/src/machines.rs:212-226`). Then `hello {framed:true}` and the
-  compat check against the pinned schema.
-- **No hub.** Connecting to one core that has added the others would make the
-  phone depend on a laptop that sleeps. Each machine is connected on its own;
-  terminals a core lists for machines *it* added (`machine/t7`) are skipped so
-  nothing appears twice. Open question Q1.
-- **Phone key:** ECDSA P-256 generated in the Android Keystore (hardware-backed,
-  never exportable), used through a signing callback from Rust. Fallback if russh
-  cannot sign through a callback: Ed25519 key in app-private storage, wrapped by a
-  Keystore key. Confidence: moderate (spike in M1).
-- **authorized_keys line per machine** (installed by Ezra, shown by the app):
-  `restrict,command="<the remote command>" ecdsa-sha2-nistp256 ... herdr-android`.
-  Honest scope: this removes pty, port and agent forwarding and any other
-  command, but herdr-core's `machine.exec` is itself a shell, so the key is still
-  shell-equivalent on that machine. The app never calls `machine.exec` except for
-  the read-only git commands of `changes-view`.
-- **Host keys:** first connect shows the fingerprint for confirmation; a later
-  mismatch refuses to connect.
-- **Reconnect:** 1 s retry with backoff to 30 s, resubscribe events, reattach the
-  open terminal with `resumed:true`, refetch docs after `missed`
+- **Direct, one connection per machine; no hub.** In v1 that is WSL only (the
+  phone cannot SSH into the Mac). The app runs, over SSH (Rust `russh`), the same
+  remote command the desktop core uses, including the `~/.local/bin` fallback
+  (`core/src/machines.rs:212-226`); then `hello {framed: true}` and the compat
+  check. Terminals a core lists for machines it added itself (`machine/t7`,
+  documented in `ListResult`; machine names cannot contain `/`) are skipped.
+- **Phone key:** ECDSA P-256 in the Android Keystore, non-exportable, requiring
+  user authentication (fingerprint or device credential) valid for 30 minutes,
+  used through a signing callback from Rust. Fallbacks, decided by the M0 spike
+  and the M1 phone check: an Ed25519 key in app-private storage wrapped by a
+  Keystore key with the same authentication rule; or, if the prompt is too
+  intrusive, an unbound key plus an app lock after 15 minutes in the background.
+  The chosen key type is written into this design before M1.
+- **authorized_keys:** one line per machine, generated by the app:
+  `restrict,command="<remote command, quoted>" ecdsa-sha2-nistp256 ... herdr-android`.
+  This requires OpenSSH on the machine (WSL: OpenSSH via mirrored networking);
+  Tailscale SSH ignores `authorized_keys` and is not supported. Honest scope: it
+  removes pty, forwarding and other commands, but herdr-core's `machine.exec` is
+  itself a shell, so the key is shell-equivalent on that machine.
+- **Host keys:** confirmed by fingerprint on first connect; a later mismatch
+  refuses to connect.
+- **Transport limits:** per-call timeouts (10 s; `terminal.interrupt` 15 s); a
+  timed-out call that may have reached the terminal is reported as "outcome
+  unknown", never "failed". CREDIT is returned as data is consumed on attach and
+  event channels (256 KiB initial credit, `wire.rs:23`). No frame for 45 s
+  (the core sends a heartbeat event every 15 s) means reconnect; SSH keepalive
+  15 s. Frames over 16 MiB are rejected before allocation (`wire.rs:8`). Up to
+  64 KiB of shell noise before the first JSON line is skipped.
+- **Reconnect:** 1 s retry backing off to 30 s, resubscribe events, reattach the
+  open terminal into a fresh VT, refetch docs after `missed`
   (`window.rs:600-692`).
+- **Lifecycle:** connections close 60 s after the app leaves the foreground;
+  alerts cover the time in between.
+- **Versions:** an older core than supported is refused; a newer core than the
+  newest tested shows "untested herdr-core version". CI runs the protocol suite
+  against the pinned version and the latest release.
 
 ## 3. The size rule
 
-A herdr-core terminal has one size, set by its most recently active non-observe
-viewer (`core/src/viewers.rs:289-311`). The desktop never uses `observe`.
+A terminal has one size, set by its most recently active non-observe viewer
+(`core/src/viewers.rs:289-311`); every DATA, RESIZE or FOCUS from a viewer makes
+it the leader and applies its stored size (`viewers.rs:44-50`). herdr's desktop
+behaves the same way between screens.
 
-- The phone attaches with `observe:true` by default and draws the terminal at its
-  real `cols`x`rows`, scaled to fit width; it never sends RESIZE, FOCUS or input
-  on that attach.
-- Answers from the composer and keys row go through RPC (`terminal.send`,
-  `terminal.keys`, `terminal.interrupt`), which does not make the phone a viewer
-  that sets the size.
-- **Direct typing** reattaches non-observe. Before the first keystroke the app
-  asks once per terminal: *Keep their size* (RESIZE with the current size) or
-  *Use phone size*. On 0.1.15 a FACTS frame also counts as activity
-  (`v0.1.15 viewers.rs:213-215`; removed in 0.1.16): the phone sends no FACTS on
-  observe attaches.
+- **Watching** attaches with `observe: true`, never sends input, RESIZE, FOCUS or
+  FACTS, and draws the terminal at its real size, scaled to fit width. On a
+  `size` event for the open terminal the app discards its VT and reattaches.
+- **Typing** (first keystroke, keys-row key or compose paste) reattaches as an
+  active viewer at the phone's size. The terminal reflows to the phone; the desk
+  takes its size back on its own next input. Leaving the terminal screen detaches.
+- **Display facts:** the phone sends `display` with null fields, which leaves the
+  desk's colours in place (`ghostty-vt/src/lib.rs:561-574` skips `None`); the
+  cell-size branch is confirmed in an M2 test.
+- **Headless terminals** (no desk viewer) run at 200x120 by default
+  (`config.rs:41-42`); watching them is small text until the first keystroke.
+- After an observe attach the app compares `terminal.get` size with the size
+  before; a change is logged as a diagnostic.
 
-## 4. Shared layout
+## 4. Shared layout (v1.1)
 
 The `herdr-app` document (`{spaces:[{id,name,folder,tabs:[{id,name,root:Node}]}]}`)
-is read with `doc.get` and followed through `doc` events. The phone never writes
-it: the newest write wins and fields a client does not know are dropped
-(`mirror_sync.rs`). Phone-only view state (open terminal, zoom, seen) is stored
-on the phone.
+is read with `doc.get`, followed through `doc` events filtered by name, parsed
+leniently per tab and node (`serde_json::Value`; unknown nodes and mod panes are
+placeholders; a malformed tab is skipped). The phone never writes it. Focus is
+not in the shared doc (`mirror.rs:38-60`): opening a tab picks the first terminal
+pane in tree order, preferring blocked, then done-unseen. Terminal addresses in
+the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
 
 ## 5. Alerts
 
-- **`herdr-push`** runs per machine as a user service (systemd on WSL, launchd on
-  the Mac). It connects to its local core, subscribes to events, and on a
-  transition into `blocked` or `done` sends one web-push-encrypted message
-  (RFC 8291, aes128gcm) to each registered phone endpoint.
-- **Registration through a core document.** The phone writes
-  `herdr-android/push` on each machine: `{endpoint, p256dh, auth}` per phone.
-  The watcher follows that doc. No extra port, no inbound connection to the
-  watcher.
-- **Payload:** `{v:1, machine, terminal, name, state, kind?, at}`; never screen
-  text or `msg`. ntfy sees ciphertext only.
-- **Watcher liveness:** the watcher writes `herdr-android/push-status`
-  `{seen_at, version}` every 5 minutes; the app shows a warning on that machine
-  when it is connected but the watcher is silent for over 15 minutes.
-- **ntfy:** one anonymous write-only grant per phone endpoint topic, as for
-  MollySocket. The ntfy app's default server must be `https://ntfy.example.org`
-  before the app registers.
+- **`herdr-push`** runs on WSL as a systemd user service. It connects only to an
+  existing core (session and socket from its config file, never autostart) and
+  reports "no core" or "zero terminals" instead of idling silently.
+- **Rules** come from `herdr-proto::attention`, shared with the app: blocked
+  includes `error`; done is busy (working/blocked/error) to non-busy; records with
+  a `parent` are suppressed; terminals not placed in a pane are suppressed unless
+  the layout cannot be read, in which case they alert. A grace delay (default
+  30 s, configurable) applies to both "Needs you" and "Finished" and is cancelled
+  if the state moves on. The last alerted `(state, turn)` per terminal is
+  persisted; on start the watcher alerts for blocked terminals never alerted,
+  and after `missed` it diffs a fresh snapshot against that record.
+- **Registration:** the phone writes `hdroid-push` on each machine:
+  `{phones: [{endpoint, p256dh, auth, test?}]}`. Doc names satisfy herdr-core's
+  name rule (`addr.rs:6-14`: 1-32 of `a-z 0-9 - _ .`, no `/`).
+- **Delivery:** the watcher POSTs only to endpoints whose scheme and host match
+  its allowlist (`https://ntfy.example.org`), https only, no redirects, 10 s timeout,
+  4 KiB body cap; the ntfy access token (write-only, `up*`) is sent only there.
+- **Payload,** encrypted with RFC 8291 aes128gcm (`ece` crate; on the phone, the
+  UnifiedPush connector's built-in web-push keys and decryption):
+  `{v, type: alert|cleared|canary|test, machine, terminal?, name?, state?, kind?, at}`.
+  Never screen text or `msg`.
+- **Health:** a canary push every 6 hours; the phone records the last push of
+  any kind per machine and a local periodic check posts a quiet "Alert health"
+  notice after 13 hours of silence. The watcher writes `hdroid-push-status`
+  (`{version, last_accepted_at, last_accept_status, per-endpoint status, notes}`)
+  on change or every 30 minutes; the app shows "accepted by ntfy" status, never
+  "delivered".
 
 ## 6. Release and tests
 
-- Tag `v*` → GitHub Actions builds the Rust core (cargo-ndk, Zig 0.16.0), the
-  APK (arm64-v8a), runs all tests, then a `sign-and-release` job in the protected
-  environment `release` waits for Ezra's approval, signs with `apksigner`, and
-  attaches the APK to the GitHub release. Obtainium tracks the repo. Actions are
-  pinned by commit SHA; the key backup lives in Bitwarden.
-- Tests: Rust unit tests (codec, event state, attention, doc types, push
-  encryption against RFC 8291 test vectors); protocol tests against a scratch
-  herdr-core 0.1.15 with its own `HC_SESSION` and XDG paths; Compose screenshot
-  tests (Roborazzi, JVM, no emulator) compared to the signed-off designs; one
-  emulator job (x86_64 image) that loads the real `.so` and renders a terminal.
-- minSdk 31, target the current SDK; ABIs arm64-v8a (release) and x86_64 (tests).
+- Tag `v*` → build job (full-history checkout; fails if the tag's commit is not
+  on `main`) builds the Rust core, the unsigned APK (arm64-v8a), `herdr-push`,
+  runs all tests and `cargo-deny`, and uploads artifacts with SHA-256 sums.
+  The `sign-and-release` job runs in the protected environment `release`: no
+  checkout, downloads the artifacts, verifies the sums, runs a pinned `apksigner`
+  and signs `herdr-push` (detached signature), then publishes the release.
+- **The control is Ezra's approval,** done from the phone after checking in the
+  GitHub web UI that the tag's commit is on protected `main` and `.github/` is
+  unchanged since the previous tag. Tag rulesets and workflow protection are
+  defence in depth only (bypassable with the owner's credentials).
+- `Cargo.lock` committed, Gradle dependency verification metadata, actions pinned
+  by SHA. `versionCode = major*10000 + minor*100 + patch`, tested to increase.
+  The signing certificate fingerprint is recorded in the repo.
+- Tests: Rust unit tests; protocol tests against scratch cores (pinned and latest)
+  with their own `HC_SESSION` and XDG dirs; cell-grid goldens from herdr-app's VT
+  pipeline at the same Ghostty pin over recorded synthetic streams; Roborazzi
+  goldens recorded after Ezra signs off the screens; an emulator job loading the
+  real `.so`; device-only checks (frame time, instant open, Keystore) at phone checks.
 
 ## 7. Open questions
 
-- **Q1** (maintainers): does `terminal.list` on a core with added machines
-  include their terminals by default, and is the `machine/` prefix a reliable way
-  to tell them apart?
-- **Q2** (maintainers): is a client-owned document name like
-  `herdr-android/push` acceptable, or is there a reserved namespace?
-- **Q3** (spike, M1): can russh authenticate with a signature produced by the
-  Android Keystore through a callback?
-- **Q4** (spike, M2): does libghostty-vt run correctly on the device, and does
-  Compose Canvas drawing hold 60 fps at 200x60?
-- **Q5** (M4): does the self-hosted ntfy require VAPID for UnifiedPush endpoints
-  from this app, as Molly required it?
+For the maintainers (one post, see `decisions.md`): third-party client welcome and
+their mobile plans; client-owned flat doc names as a stable contract; viewer
+presence or last-input time on Terminal; push support in core; upstreaming
+`herdr-proto`.
+
+For spikes: M0 device smoke test (libghostty on the Pixel); M0 russh with a
+Keystore signing callback; M0 push end to end (VAPID need, binary body through
+ntfy to the connector).

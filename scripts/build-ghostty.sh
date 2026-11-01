@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Usage: scripts/build-ghostty.sh <aarch64-linux-android|x86_64-linux-android>
+# Builds libghostty-vt into build/ghostty/<abi>/ (static and shared library plus
+# headers). herdr-mobile links the static one when built with its `vt` feature.
+#
+# Usage: scripts/build-ghostty.sh <aarch64-linux-android|x86_64-linux-android|x86_64-linux-gnu>
+#   aarch64-linux-android -> arm64-v8a (phones), x86_64-linux-android -> x86_64
+#   (emulator), x86_64-linux-gnu -> host (Rust tests on this machine).
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <aarch64-linux-android|x86_64-linux-android>" >&2
+  echo "usage: $0 <aarch64-linux-android|x86_64-linux-android|x86_64-linux-gnu>" >&2
   exit 2
 }
 
@@ -12,6 +17,7 @@ target=$1
 case "$target" in
   aarch64-linux-android) abi=arm64-v8a ;;
   x86_64-linux-android) abi=x86_64 ;;
+  x86_64-linux-gnu) abi=host ;;
   *) usage ;;
 esac
 
@@ -60,4 +66,5 @@ cd "$ghostty"
 out="$repo/build/ghostty/$abi"
 mkdir -p "$out/include"
 cp -L zig-out/lib/libghostty-vt.so "$out/libghostty-vt.so"
+cp zig-out/lib/libghostty-vt.a "$out/libghostty-vt.a"
 cp -R include/ghostty "$out/include/"

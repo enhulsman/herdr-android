@@ -28,6 +28,9 @@ patch version.
 
 ## One-time setup (M0.4)
 
+`scripts/setup-release-keys.sh generate`, then `... upload <folder>`, does all of
+this; the script's header says how.
+
 - Environment `release`, deployment policy: selected branches, `main` only. The
   signing workflow is triggered by `workflow_run` and so runs on `main`; a tag
   policy would block it, and a workflow from any other branch or tag cannot

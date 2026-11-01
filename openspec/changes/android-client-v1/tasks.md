@@ -24,7 +24,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 ## M1. Connect and list agents
 
 - [x] M1.1 Tests: frame codec, RPC client, compat check, `EventLines`, attention table, timeouts, CREDIT, frame cap, dead link, shell noise, plain-to-framed switch
-- [ ] M1.2 Tests: protocol suite against scratch cores, pinned and latest; throwaway-sshd test of the `authorized_keys` line
+- [x] M1.2 Tests: protocol suite against scratch cores, pinned and latest; throwaway-sshd test of the `authorized_keys` line
 - [ ] M1.3 Machines screen: key, restricted line, host key confirm, reconnect, lifecycle, export/import
 - [ ] M1.4 Agents home: attention order, kinds, progress, names, "Other terminals", "as of", duplicate skipping
 - [ ] M1.5 Phone check: WSL agents listed; refused-command check on WSL; fingerprint UX judged (keep C or fall back to B); dim text and paper status colours judged outdoors (keep the Mac values or switch to the AA values in `design-tokens.json`)

@@ -12,10 +12,10 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 
 ## M0. Release loop and early spikes
 
-- [ ] M0.1 Gradle project (Kotlin, Compose, minSdk 31), Cargo workspace (`herdr-proto`, `herdr-mobile`, `herdr-push`), uniffi bridge returning a version string
+- [x] M0.1 Gradle project (Kotlin, Compose, minSdk 31), Cargo workspace (`herdr-proto`, `herdr-mobile`, `herdr-push`), uniffi bridge returning a version string
 - [ ] M0.2 libghostty-vt build: Zig 0.16.0 pinned by checksum, Ghostty `1e5cdb8`, Android targets; bindings regenerated from its headers
-- [ ] M0.3 Workflow per the release spec: build job (main-ancestry check, tests, cargo-deny, sums), sign job without checkout in environment `release`; lockfiles and Gradle verification
-- [ ] M0.4 `release` environment (deployment policy: branch `main` only, see the release spec), signing key as its secret and in Bitwarden; certificate fingerprint committed
+- [x] M0.3 Workflow per the release spec: build job (main-ancestry check, tests, cargo-deny, sums), sign job without checkout in environment `release`; lockfiles and Gradle verification
+- [x] M0.4 `release` environment (deployment policy: branch `main` only, see the release spec), signing key as its secret and in Bitwarden; certificate fingerprint committed
 - [ ] M0.5 Spike A, device smoke test: load the `.so` on the Pixel, feed a recorded synthetic Claude Code stream, read the grid, draw one 200x60 frame. Fail -> switch to the Termux fallback and amend design.md before M1
 - [ ] M0.6 Spike B, russh signing through a Keystore key with 30-minute user authentication. Fail -> wrapped Ed25519 key; write the key type into design.md
 - [ ] M0.7 Spike C, push end to end: watcher-side `ece` encryption, POST with the `up*` token to ntfy, decrypt in the UnifiedPush connector on the phone; record whether VAPID is needed and that the binary body arrives intact

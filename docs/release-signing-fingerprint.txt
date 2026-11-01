@@ -2,5 +2,4 @@
 # prints it: 64 lowercase hex characters, no colons. The release workflow reads
 # the one line below that is not a comment and publishes nothing unless the signed
 # APK's certificate matches it.
-# M0.4: replace the next line with the real fingerprint.
-PLACEHOLDER-replace-in-M0.4
+c64a4bae52e0e8f840dcc670d94dac9e3f6986f509c2489e5b48f8b88157e8e6

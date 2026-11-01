@@ -1,0 +1,24 @@
+# cargo-deny, run in CI and before every release as
+# `cargo deny --locked check advisories licenses sources`.
+
+[graph]
+# The app's Android ABIs and the herdr-push host.
+targets = ["aarch64-linux-android", "x86_64-linux-android", "x86_64-unknown-linux-gnu"]
+
+[advisories]
+yanked = "deny"
+ignore = [
+  # basic-toml is unmaintained with no fix upstream. It reaches us only through
+  # uniffi's binding generator (askama templates, the `cli` feature), which runs
+  # at build time and ships in neither the app nor herdr-push.
+  { id = "RUSTSEC-2026-0374", reason = "build-time only, via uniffi-bindgen; uniffi 0.32.2 (latest) still depends on it" },
+]
+
+[licenses]
+allow = ["Apache-2.0", "MIT", "MPL-2.0", "Unicode-3.0"]
+# The workspace's own crates are unpublished and carry no license field yet.
+private = { ignore = true }
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

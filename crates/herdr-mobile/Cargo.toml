@@ -1,0 +1,12 @@
+[package]
+name = "herdr-mobile"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "herdr_mobile"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+uniffi.workspace = true

@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+# Kept equal to the repository's VERSION file; herdr-mobile's tests check it.
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+uniffi = { version = "=0.32.2", default-features = false }

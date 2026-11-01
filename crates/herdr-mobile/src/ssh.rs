@@ -128,6 +128,30 @@ pub fn ssh_public_key_line(spki_der: Vec<u8>, comment: String) -> Result<String,
     key.to_openssh().map_err(key_error)
 }
 
+/// What the app runs on a machine: the desktop core's remote command (herdr-core
+/// `machines.rs` `pipe()`, Unix, default session), verbatim. It finds
+/// `herdr-core` on PATH, else in `~/.local/bin`, and exits 127 with "herdr-core
+/// is not installed here" when neither exists.
+pub const REMOTE_COMMAND: &str = r#"sh -c 'p=$(command -v herdr-core) || p=$HOME/.local/bin/herdr-core; [ -x "$p" ] || { echo "herdr-core is not installed here" >&2; exit 127; }; exec "$p" connect'"#;
+
+/// The line to add to the machine's `~/.ssh/authorized_keys`: the key, limited
+/// by `restrict` (no pty, forwarding or agent) to [`REMOTE_COMMAND`], whatever
+/// command a connection asks for. OpenSSH unescapes only `\"` inside
+/// `command="..."`, which is all the command needs.
+#[uniffi::export]
+pub fn authorized_keys_line(spki_der: Vec<u8>, comment: String) -> Result<String, SshError> {
+    if comment.is_empty() || comment.contains(['\n', '\r']) {
+        return Err(SshError::Key {
+            detail: "the key comment must be one non-empty line".into(),
+        });
+    }
+    let key = ssh_public_key_line(spki_der, comment)?;
+    Ok(format!(
+        "restrict,command=\"{}\" {key}",
+        REMOTE_COMMAND.replace('"', "\\\"")
+    ))
+}
+
 /// Connects, authenticates with `signer`, runs one command and returns what it
 /// printed (the spike's whole SSH path). `host_key_fingerprint` pins the
 /// machine; `None` accepts any key and reports it, as a first connect would.
@@ -433,6 +457,45 @@ mod tests {
         assert_eq!(parsed.comment().as_str_lossy(), "herdr-android");
         assert!(line.starts_with("ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYA"));
         assert!(line.ends_with(" herdr-android"));
+    }
+
+    // herdr-core 0.1.15 `machines.rs` `pipe()` for a Unix machine and no
+    // session, with NOT_HERE filled in, copied by hand: a change upstream must
+    // be a deliberate change here.
+    const UPSTREAM_PIPE: &str = r#"sh -c 'p=$(command -v herdr-core) || p=$HOME/.local/bin/herdr-core; [ -x "$p" ] || { echo "herdr-core is not installed here" >&2; exit 127; }; exec "$p" connect'"#;
+
+    #[test]
+    fn remote_command_is_the_desktop_cores() {
+        assert_eq!(REMOTE_COMMAND, UPSTREAM_PIPE);
+        // authorized_keys only unescapes \" inside command="...": a backslash
+        // or newline in the command would not survive the quoting.
+        assert!(!REMOTE_COMMAND.contains(['\\', '\n', '\r']));
+    }
+
+    #[test]
+    fn authorized_keys_line_restricts_the_key_to_the_remote_command() {
+        let key = test_key(1);
+        let public = ssh_public_key_line(spki(&key), "herdr-android".into()).unwrap();
+        let line = authorized_keys_line(spki(&key), "herdr-android".into()).unwrap();
+        assert_eq!(
+            line,
+            format!(
+                "restrict,command=\"{}\" {public}",
+                UPSTREAM_PIPE.replace('"', "\\\"")
+            )
+        );
+        assert!(!line.contains('\n'));
+    }
+
+    #[test]
+    fn authorized_keys_line_refuses_comments_that_break_the_line() {
+        for comment in ["two\nlines", "cr\r", ""] {
+            assert!(
+                authorized_keys_line(spki(&test_key(1)), comment.into()).is_err(),
+                "{comment:?}"
+            );
+        }
+        assert!(authorized_keys_line(vec![0x30, 0x00], "herdr-android".into()).is_err());
     }
 
     #[test]

@@ -5,7 +5,10 @@ mod synthetic;
 #[cfg(feature = "vt")]
 mod vt;
 
-pub use ssh::{SignError, SshError, SshRun, SshSigner, ssh_public_key_line, ssh_run_spike};
+pub use ssh::{
+    REMOTE_COMMAND, SignError, SshError, SshRun, SshSigner, authorized_keys_line,
+    ssh_public_key_line, ssh_run_spike,
+};
 
 use std::sync::Arc;
 #[cfg(feature = "vt")]

@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The spike build type opens straight into the terminal spike (task M0.5). -->
+<!-- The spike build type opens straight into the terminal spike (task M0.5).
+     The key spike (task M0.6) is started over adb with the server as extras;
+     the push spike (task M0.7) over adb too. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application>
         <activity
@@ -15,6 +21,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".spike.KeySpikeActivity"
+            android:exported="true" />
+        <activity
+            android:name=".spike.PushSpikeActivity"
+            android:exported="true" />
+        <service
+            android:name=".spike.SpikePushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

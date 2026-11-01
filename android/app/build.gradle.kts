@@ -125,6 +125,8 @@ dependencies {
     implementation(libs.jna) {
         artifact { type = "aar" }
     }
+    // The push spike (task M0.7, src/spike/) only; the app takes it on in M3.
+    add("spikeImplementation", libs.unifiedpush.connector)
     testImplementation(libs.junit)
     // The jar carries JNA's dispatch library for the host JVM; the aar only has Android's.
     testImplementation(libs.jna)

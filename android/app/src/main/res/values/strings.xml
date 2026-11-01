@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The system prompt that opens the SSH key's 30-minute window. -->
+    <string name="unlock_key_title">Unlock the SSH key</string>
+    <string name="unlock_key_subtitle">To connect to your machines</string>
+</resources>

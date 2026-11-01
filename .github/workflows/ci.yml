@@ -41,18 +41,64 @@ jobs:
 
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --all-targets -- -D warnings
-      # The SSH tests (crates/herdr-mobile/tests/ssh_spike.rs) start a throwaway sshd.
+      # The SSH tests (crates/herdr-mobile/tests/sshd.rs) start a throwaway sshd.
       - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
       - run: cargo test --locked
         env:
           HERDR_REQUIRE_SSHD: "1"
       - run: scripts/test-check-release-tag.sh
       - run: scripts/test-release-sign-gate.sh
+      - run: scripts/test-fetch-herdr-core.sh
 
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: cargo-deny@0.20.2
       - run: cargo deny --locked check advisories licenses sources
+
+  # The protocol suite and the restricted-line test against released cores:
+  # the oldest supported (MIN_CORE, checksum pinned) and whatever is latest.
+  core:
+    name: core (${{ matrix.core }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        core: [min, latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: false
+
+      - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
+
+      - name: Fetch herdr-core
+        env:
+          CORE: ${{ matrix.core }}
+        run: |
+          if [[ $CORE == min ]]; then
+            CORE=$(sed -n 's/^pub const MIN_CORE: &str = "\(.*\)";/\1/p' crates/herdr-proto/src/compat.rs)
+          fi
+          bin=$(scripts/fetch-herdr-core.sh "$CORE")
+          "$bin" --version
+          echo "HERDR_CORE_BIN=$bin" >> "$GITHUB_ENV"
+
+      - name: Scratch-core and sshd tests
+        env:
+          HERDR_REQUIRE_CORE: "1"
+          HERDR_REQUIRE_SSHD: "1"
+        run: |
+          cargo test --locked -p herdr-proto --test scratch_core
+          cargo test --locked -p herdr-mobile --test sshd
 
   android:
     runs-on: ubuntu-24.04

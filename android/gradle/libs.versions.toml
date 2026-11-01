@@ -6,6 +6,11 @@ activityCompose = "1.13.0"
 jna = "5.19.1"
 junit = "4.13.2"
 unifiedpush = "3.3.5"
+robolectric = "4.17"
+# The android-all jar Robolectric 4.17 uses for SDK 35 (resolved by Gradle, so it is
+# verified). SDK 35, not 36: Robolectric needs Java 21 for 36 and the build runs on 17.
+robolectricAndroidAll = "15-robolectric-13954326-i7"
+roborazzi = "1.77.0"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
@@ -14,7 +19,12 @@ activity-compose = { module = "androidx.activity:activity-compose", version.ref 
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 junit = { module = "junit:junit", version.ref = "junit" }
 unifiedpush-connector = { module = "org.unifiedpush.android:connector", version.ref = "unifiedpush" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-android-all = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectricAndroidAll" }
+roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

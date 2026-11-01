@@ -79,7 +79,7 @@ jobs:
 
       - name: Unit tests and unsigned release APK
         working-directory: android
-        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease
+        run: ./gradlew :app:testDebugUnitTest :app:verifyRoborazziDebug :app:assembleRelease
 
       - name: herdr-push for Linux x86_64
         run: cargo build -p herdr-push --release --locked --target x86_64-unknown-linux-gnu

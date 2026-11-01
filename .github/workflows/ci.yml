@@ -93,4 +93,4 @@ jobs:
 
       - name: Unit tests and debug APK (builds the Rust core through scripts/build-rust-android.sh)
         working-directory: android
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug
+        run: ./gradlew :app:testDebugUnitTest :app:verifyRoborazziDebug :app:assembleDebug

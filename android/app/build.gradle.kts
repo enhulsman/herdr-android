@@ -3,6 +3,7 @@ import javax.inject.Inject
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
 }
 
 val repoRoot: Directory = rootProject.layout.projectDirectory.dir("..")
@@ -56,6 +57,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    // Robolectric tests (fonts, theme screenshots) read the merged resources.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
 
     // scripts/build-rust-android.sh writes here; each variant packages its own copy (BuildRust).
@@ -118,6 +124,13 @@ androidComponents {
     }
 }
 
+// The Android framework jar Robolectric runs the tests on. Resolved here, so it is
+// checked against verification-metadata.xml, instead of Robolectric fetching it
+// unverified at test time (robolectric.offline below).
+val robolectricAndroidAll: Configuration by configurations.creating {
+    isTransitive = false
+}
+
 dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)
@@ -128,6 +141,10 @@ dependencies {
     // The push spike (task M0.7, src/spike/) only; the app takes it on in M3.
     add("spikeImplementation", libs.unifiedpush.connector)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    add(robolectricAndroidAll.name, libs.robolectric.android.all)
     // The jar carries JNA's dispatch library for the host JVM; the aar only has Android's.
     testImplementation(libs.jna)
 }
@@ -142,8 +159,27 @@ val buildRustHost = tasks.register<Exec>("buildRustHost") {
     environment("CARGO_TARGET_DIR", repoRoot.dir("target").asFile.path)
     commandLine("cargo", "build", "-p", "herdr-mobile", "--locked")
 }
+
+val robolectricJars = tasks.register<Sync>("robolectricJars") {
+    from(robolectricAndroidAll)
+    into(layout.buildDirectory.dir("robolectric-jars"))
+}
+
+// Screenshot goldens (Roborazzi): record with recordRoborazziDebug, check with
+// verifyRoborazziDebug.
+roborazzi {
+    outputDir.set(layout.projectDirectory.dir("src/test/snapshots"))
+}
+
 tasks.withType<Test>().configureEach {
     dependsOn(buildRustHost)
     systemProperty("jna.library.path", repoRoot.dir("target/debug").asFile.path)
     systemProperty("herdr.version", appVersion)
+    // ThemeTokensTest compares the Kotlin theme with the signed-off tokens.
+    val designTokens = repoRoot.file("design-tokens.json")
+    inputs.file(designTokens).withPropertyName("designTokens").withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("herdr.designTokens", designTokens.asFile.path)
+    dependsOn(robolectricJars)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricJars.get().destinationDir.path)
 }

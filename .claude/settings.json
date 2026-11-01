@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(openspec validate *)",
+      "Bash(openspec status *)",
+      "Bash(openspec instructions *)",
+      "Bash(cargo deny --locked check *)",
+      "Bash(cargo deny check *)",
+      "Bash(cargo tree)",
+      "Bash(cargo tree *)",
+      "Bash(cargo metadata *)",
+      "Bash(gh run watch *)",
+      "Bash(git check-ignore *)",
+      "Bash(adb devices)",
+      "Bash(adb shell getprop *)"
+    ]
+  }
+}

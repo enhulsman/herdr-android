@@ -908,6 +908,7 @@ dependencies = [
  "herdr-proto",
  "p256",
  "russh",
+ "serde",
  "serde_json",
  "tokio",
  "uniffi",

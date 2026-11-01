@@ -21,7 +21,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use herdr_mobile::{
-    SignError, SshError, SshSigner, authorized_keys_line, ssh_public_key_line, ssh_run_spike,
+    AgentAttention, Hub, HubListener, HubSnapshot, MachineState, SignError, SshError, SshSigner,
+    authorized_keys_line, ssh_public_key_line, ssh_run_spike,
 };
 use p256::ecdsa::SigningKey;
 use p256::ecdsa::signature::Signer as _;
@@ -582,4 +583,257 @@ fn a_real_core_answers_hello_through_the_line() {
         herdr_proto::compat::check(&hello, version),
         herdr_proto::compat::Compat::Ok
     );
+}
+
+// The connection hub over the line (M1 step 4): the same `Hub` the app holds,
+// with its own runtime, against this sshd.
+
+struct CountingListener(AtomicU32);
+
+impl HubListener for CountingListener {
+    fn on_snapshot(&self, _: HubSnapshot) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+struct AppHub {
+    hub: Arc<Hub>,
+    listener: Arc<CountingListener>,
+}
+
+/// A hub with `sshd` as its one machine, resumed. Its storage sits in the
+/// sshd's scratch dir.
+fn app_hub(sshd: &Sshd, phone: &SigningKey, signer: Arc<SoftwareSigner>) -> AppHub {
+    let data = sshd.dir.join("app");
+    std::fs::create_dir(&data).unwrap();
+    let listener = Arc::new(CountingListener(AtomicU32::new(0)));
+    let hub = Hub::new(
+        data.display().to_string(),
+        spki(phone),
+        signer,
+        listener.clone(),
+    )
+    .unwrap();
+    hub.add_machine("workstation".into(), "127.0.0.1".into(), sshd.port, user())
+        .unwrap();
+    hub.resume();
+    AppHub { hub, listener }
+}
+
+fn machine_state(s: &HubSnapshot) -> MachineState {
+    s.machines[0].state.clone()
+}
+
+/// Polls the hub until `ok` holds, for up to 20 s.
+fn wait_for(sshd: &Sshd, hub: &Hub, what: &str, ok: impl Fn(&HubSnapshot) -> bool) -> HubSnapshot {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let s = hub.snapshot();
+        if ok(&s) {
+            return s;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "never {what}; last: {:#?}\nsshd: {}",
+            s,
+            sshd.log()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn the_hub_asks_for_the_host_key_and_enforces_it() {
+    let phone = key(20);
+    let Some(sshd) = sshd("hubkey", &app_line(&phone), &[], &[]) else {
+        return;
+    };
+    let signer = signer(phone.clone(), false);
+    let app = app_hub(&sshd, &phone, signer.clone());
+    let s = wait_for(&sshd, &app.hub, "asked for the host key", |s| {
+        matches!(machine_state(s), MachineState::HostKeyUnconfirmed { .. })
+    });
+    assert_eq!(
+        machine_state(&s),
+        MachineState::HostKeyUnconfirmed {
+            presented: sshd.host_key_fingerprint.clone()
+        }
+    );
+    assert_eq!(
+        signer.calls.load(Ordering::Relaxed),
+        0,
+        "signed before confirming"
+    );
+    assert!(
+        app.listener.0.load(Ordering::Relaxed) > 0,
+        "the listener heard nothing"
+    );
+
+    // A confirmed key that is not the machine's is refused, showing both.
+    app.hub
+        .confirm_host_key("workstation".into(), "SHA256:not-this-one".into())
+        .unwrap();
+    let s = wait_for(&sshd, &app.hub, "refused the changed key", |s| {
+        matches!(machine_state(s), MachineState::HostKeyMismatch { .. })
+    });
+    assert_eq!(
+        machine_state(&s),
+        MachineState::HostKeyMismatch {
+            confirmed: "SHA256:not-this-one".into(),
+            presented: sshd.host_key_fingerprint.clone(),
+        }
+    );
+    assert_eq!(signer.calls.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn the_hub_names_what_stops_a_connection() {
+    // No herdr-core on the machine.
+    let phone = key(21);
+    let Some(sshd) = sshd("hubmissing", &app_line(&phone), &[], &[]) else {
+        return;
+    };
+    let app = app_hub(&sshd, &phone, signer(phone.clone(), false));
+    app.hub
+        .confirm_host_key("workstation".into(), sshd.host_key_fingerprint.clone())
+        .unwrap();
+    wait_for(&sshd, &app.hub, "said herdr-core is missing", |s| {
+        machine_state(s) == MachineState::NotInstalled
+    });
+    drop(app);
+
+    // The key needs a fingerprint first.
+    let app = {
+        let data_fresh = sshd.dir.join("app");
+        let _ = std::fs::remove_dir_all(&data_fresh);
+        app_hub(&sshd, &phone, signer(phone.clone(), true))
+    };
+    app.hub
+        .confirm_host_key("workstation".into(), sshd.host_key_fingerprint.clone())
+        .unwrap();
+    wait_for(&sshd, &app.hub, "asked for the fingerprint", |s| {
+        machine_state(s) == MachineState::NeedsUserAuth
+    });
+    drop(app);
+
+    // The machine does not know this phone key.
+    let stranger = key(22);
+    let app = {
+        let _ = std::fs::remove_dir_all(sshd.dir.join("app"));
+        app_hub(&sshd, &stranger, signer(stranger.clone(), false))
+    };
+    app.hub
+        .confirm_host_key("workstation".into(), sshd.host_key_fingerprint.clone())
+        .unwrap();
+    wait_for(&sshd, &app.hub, "said the key is not accepted", |s| {
+        machine_state(s) == MachineState::KeyRejected
+    });
+}
+
+/// OSC 7501 for a shell's printf (see herdr-proto's scratch_core tests).
+fn report(fields: &str) -> String {
+    format!(r"printf '\033]7501;{fields}\033\\'")
+}
+
+#[test]
+fn the_hub_lists_a_real_cores_agents_and_closes_on_suspend() {
+    let Some(bin) = core_bin() else { return };
+    let phone = key(23);
+    let scratch = std::env::temp_dir().join(format!("hsh-{}", std::process::id()));
+    let env = vec![
+        ("HC_SESSION", "h".to_owned()),
+        ("XDG_RUNTIME_DIR", scratch.join("r").display().to_string()),
+        ("XDG_STATE_HOME", scratch.join("s").display().to_string()),
+        ("XDG_CONFIG_HOME", scratch.join("c").display().to_string()),
+    ];
+    let Some(sshd) = sshd("hubreal", &app_line(&phone), &[], &env) else {
+        return;
+    };
+    fresh_dir(&scratch).unwrap_or_else(|e| panic!("scratch dir {}: {e}", scratch.display()));
+    let local_bin = sshd.home().join(".local/bin");
+    std::fs::create_dir_all(&local_bin).unwrap();
+    std::fs::copy(&bin, local_bin.join("herdr-core")).unwrap();
+    let mut home_env = env.clone();
+    home_env.push(("HOME", sshd.home().display().to_string()));
+    let _stop = StopCore {
+        bin: local_bin.join("herdr-core"),
+        env: home_env,
+        scratch: scratch.clone(),
+    };
+
+    let app = app_hub(&sshd, &phone, signer(phone.clone(), false));
+    app.hub
+        .confirm_host_key("workstation".into(), sshd.host_key_fingerprint.clone())
+        .unwrap();
+    wait_for(&sshd, &app.hub, "connected", |s| {
+        matches!(machine_state(s), MachineState::Connected { .. })
+    });
+
+    // At the desk, an agent asks for permission.
+    let desk = tokio::runtime::Runtime::new().unwrap();
+    let blocked = report("state=blocked:kind=permission:app=claude:msg=UnVuIG5wbSB0ZXN0Pw==");
+    let desk_client = desk.block_on(async {
+        let session = raw_session(&sshd, &phone).await;
+        let channel = session.channel_open_session().await.unwrap();
+        channel.exec(true, "anything").await.unwrap();
+        let (mut r, mut w) = tokio::io::split(channel.into_stream());
+        let hello = herdr_proto::handshake::handshake(&mut r, &mut w)
+            .await
+            .unwrap();
+        let client =
+            herdr_proto::rpc::Client::start(std::io::Cursor::new(hello.leftover).chain(r), w);
+        let script = format!("{blocked}; sleep 60");
+        client
+            .call(
+                "terminal.run",
+                serde_json::json!({"argv": ["sh", "-c", script]}),
+            )
+            .await
+            .unwrap();
+        (session, client)
+    });
+    let s = wait_for(&sshd, &app.hub, "the agent needing you", |s| {
+        !s.agents.is_empty()
+    });
+    let row = &s.agents[0];
+    assert_eq!(row.attention, AgentAttention::NeedsYou);
+    assert_eq!(row.label, "Permission: Run npm test?");
+    assert_eq!(row.name, "Claude Code");
+    assert_eq!(row.machine, "workstation");
+    drop(desk_client);
+    desk.shutdown_timeout(Duration::from_secs(2));
+
+    // Pocketed: the hub's session ends on the machine. It started first; the
+    // desk's session is the second.
+    let log = sshd.log();
+    let hub_port = log
+        .lines()
+        .find(|l| l.starts_with("Starting session:"))
+        .and_then(|l| l.split(" port ").nth(1))
+        .and_then(|rest| rest.split_whitespace().next())
+        .expect("the hub's session in the sshd log")
+        .to_owned();
+    let closed = |log: &str| {
+        log.contains(&format!(
+            "Close session: user {} from 127.0.0.1 port {hub_port} ",
+            user()
+        ))
+    };
+    assert!(
+        !closed(&log),
+        "the hub's session ended before suspend: {log}"
+    );
+    app.hub.suspend();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !closed(&sshd.log()) {
+        assert!(
+            Instant::now() < deadline,
+            "the hub's session is still open: {}",
+            sshd.log()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let s = app.hub.snapshot();
+    assert_eq!(machine_state(&s), MachineState::Paused);
+    assert_eq!(s.agents.len(), 1, "rows stay, as of the last connection");
 }

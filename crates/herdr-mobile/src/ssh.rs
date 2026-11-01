@@ -230,34 +230,65 @@ fn key_error(e: impl std::fmt::Display) -> SshError {
     }
 }
 
-async fn run(
-    host: String,
+/// A signed-in SSH session.
+pub(crate) struct Session {
+    pub handle: Handle<HostKeyCheck>,
+    /// `SHA256:...` of the key the machine presented.
+    pub host_key_fingerprint: String,
+    /// How many times the signer was asked to sign.
+    pub signatures: Arc<AtomicU32>,
+}
+
+pub(crate) enum SessionError {
+    Ssh(SshError),
+    /// No host key is pinned and an unpinned one is not accepted: the machine
+    /// presented this one, and nothing was signed.
+    HostKeyUnconfirmed {
+        presented: String,
+    },
+}
+
+impl From<SshError> for SessionError {
+    fn from(e: SshError) -> Self {
+        SessionError::Ssh(e)
+    }
+}
+
+/// Connects and signs in with `signer`. `pinned` is the confirmed host key;
+/// without one, `accept_unpinned` decides whether any key will do (the
+/// spike) or the session stops before signing (the app's first connection).
+pub(crate) async fn open_session(
+    host: &str,
     port: u16,
-    user: String,
+    user: &str,
     key: PublicKey,
     pinned: Option<String>,
-    command: String,
+    accept_unpinned: bool,
     signer: Arc<dyn SshSigner>,
-) -> Result<SshRun, SshError> {
+) -> Result<Session, SessionError> {
     let presented = Arc::new(Mutex::new(None));
     let handler = HostKeyCheck {
         pinned: pinned.clone(),
+        accept_unpinned,
         presented: presented.clone(),
     };
     let config = Arc::new(client::Config {
         keepalive_interval: Some(Duration::from_secs(15)),
         ..Default::default()
     });
-    let connected = client::connect(config, (host.as_str(), port), handler).await;
+    let connected = client::connect(config, (host, port), handler).await;
     let presented_fingerprint = presented.lock().unwrap().clone();
-    let mut session = match connected {
-        Ok(session) => session,
+    let mut handle = match connected {
+        Ok(handle) => handle,
         Err(e) => {
             return Err(match (pinned, presented_fingerprint) {
                 (Some(pinned), Some(presented)) if pinned != presented => {
-                    SshError::HostKeyMismatch { presented }
+                    SshError::HostKeyMismatch { presented }.into()
                 }
-                _ => connect_error(e),
+                (None, Some(presented)) if !accept_unpinned => {
+                    SessionError::HostKeyUnconfirmed { presented }
+                }
+                _ => connect_error(e).into(),
             });
         }
     };
@@ -268,7 +299,7 @@ async fn run(
         signatures: Arc::new(AtomicU32::new(0)),
     };
     let signatures = callback.signatures.clone();
-    let auth = session
+    let auth = handle
         .authenticate_publickey_with(user, key, None, &mut callback)
         .await
         .map_err(|e| match e {
@@ -280,23 +311,48 @@ async fn run(
             },
         })?;
     if !auth.success() {
-        return Err(SshError::Rejected);
+        return Err(SshError::Rejected.into());
     }
+    Ok(Session {
+        handle,
+        host_key_fingerprint,
+        signatures,
+    })
+}
 
+async fn run(
+    host: String,
+    port: u16,
+    user: String,
+    key: PublicKey,
+    pinned: Option<String>,
+    command: String,
+    signer: Arc<dyn SshSigner>,
+) -> Result<SshRun, SshError> {
+    let mut session = open_session(&host, port, &user, key, pinned, true, signer)
+        .await
+        .map_err(|e| match e {
+            SessionError::Ssh(e) => e,
+            // Unreachable: any key is accepted here.
+            SessionError::HostKeyUnconfirmed { presented } => {
+                SshError::HostKeyMismatch { presented }
+            }
+        })?;
     let (output, exit_status) =
-        exec(&mut session, &command)
+        exec(&mut session.handle, &command)
             .await
             .map_err(|e| SshError::Connect {
                 detail: e.to_string(),
             })?;
     let _ = session
+        .handle
         .disconnect(russh::Disconnect::ByApplication, "", "en")
         .await;
     Ok(SshRun {
-        host_key_fingerprint,
+        host_key_fingerprint: session.host_key_fingerprint,
         output,
         exit_status,
-        signatures: signatures.load(Ordering::Relaxed),
+        signatures: session.signatures.load(Ordering::Relaxed),
     })
 }
 
@@ -320,8 +376,9 @@ async fn exec(
     Ok((String::from_utf8_lossy(&output).into_owned(), exit_status))
 }
 
-struct HostKeyCheck {
+pub(crate) struct HostKeyCheck {
     pinned: Option<String>,
+    accept_unpinned: bool,
     presented: Arc<Mutex<Option<String>>>,
 }
 
@@ -339,7 +396,7 @@ impl client::Handler for HostKeyCheck {
         let accepted = self
             .pinned
             .as_ref()
-            .is_none_or(|pinned| *pinned == fingerprint);
+            .map_or(self.accept_unpinned, |pinned| *pinned == fingerprint);
         *self.presented.lock().unwrap() = Some(fingerprint);
         Ok(accepted)
     }

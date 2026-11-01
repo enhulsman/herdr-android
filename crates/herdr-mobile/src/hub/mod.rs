@@ -31,7 +31,7 @@ use tokio::task::AbortHandle;
 use tokio::time::Instant;
 
 use crate::link::{DialError, Dialer, Exit, Target};
-use crate::machines::{ListError, MachineList};
+use crate::machines::{self, ListError, MachineList};
 
 #[cfg(test)]
 mod tests;
@@ -320,52 +320,92 @@ fn unreachable(detail: impl Into<String>) -> MachineState {
     }
 }
 
+const LOG_FILE: &str = "hub.log";
+/// The log is rotated to `hub.log.1` past this size.
+const LOG_MAX: u64 = 64 * 1024;
+
+/// Notes something worth knowing later, but not worth showing, in
+/// `hub.log` in app storage. Losing a line is fine.
+fn log(dir: &Path, line: &str) {
+    use std::io::Write;
+    let path = dir.join(LOG_FILE);
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > LOG_MAX) {
+        let _ = std::fs::rename(&path, dir.join(format!("{LOG_FILE}.1")));
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(f, "{} {line}", now_ms());
+    }
+}
+
 /// What loading the list file gave.
 struct Loaded {
     list: MachineList,
-    notice: Option<String>,
+    /// Why the list file must not be written, if so.
     frozen: Option<String>,
 }
 
-/// Loads the list. An unreadable file is moved aside, under a name no
-/// earlier copy has, so the app still starts and the notice says so; if it
-/// cannot be moved, the list file is left alone and not written at all.
+/// Loads the list without asking the person anything. An unreadable file is
+/// moved aside, under a name no earlier copy has, and the list the previous
+/// save kept takes its place; a missing file (a crash between a save's two
+/// renames) is restored the same way. If the broken file cannot be moved, it
+/// is never written over. What happened goes to the log.
 fn load_list(dir: &Path) -> Loaded {
     let path = dir.join(LIST_FILE);
-    let e = match MachineList::load(&path) {
-        Ok(list) => {
-            return Loaded {
-                list,
-                notice: None,
-                frozen: None,
-            };
+    let backup = machines::backup_path(&path);
+    let mut frozen = None;
+    if path.exists() {
+        let e = match MachineList::load(&path) {
+            Ok(list) => return Loaded { list, frozen },
+            Err(e) => e,
+        };
+        let aside = (1..)
+            .map(|n| match n {
+                1 => format!("{LIST_FILE}.broken"),
+                n => format!("{LIST_FILE}.broken-{n}"),
+            })
+            .find(|name| !dir.join(name).exists())
+            .expect("some name is free");
+        match std::fs::rename(&path, dir.join(&aside)) {
+            Ok(()) => log(
+                dir,
+                &format!("unreadable machine list ({e}), kept as {aside}"),
+            ),
+            Err(io) => {
+                log(
+                    dir,
+                    &format!("unreadable machine list ({e}) could not be set aside ({io})"),
+                );
+                frozen = Some(
+                    "Could not save the machine list: the previous one could not be read."
+                        .to_owned(),
+                );
+            }
         }
-        Err(e) => e,
-    };
-    let aside = (1..)
-        .map(|n| match n {
-            1 => format!("{LIST_FILE}.broken"),
-            n => format!("{LIST_FILE}.broken-{n}"),
-        })
-        .find(|name| !dir.join(name).exists())
-        .expect("some name is free");
-    match std::fs::rename(&path, dir.join(&aside)) {
-        Ok(()) => Loaded {
+    } else if !backup.exists() {
+        return Loaded {
             list: MachineList::default(),
-            notice: Some(format!(
-                "Could not read the machine list ({e}); it was kept as {aside}."
-            )),
-            frozen: None,
-        },
-        Err(io) => {
-            let why = format!(
-                "Could not read the machine list ({e}), nor set it aside ({io}); \
-                 machines cannot be changed until it is."
-            );
+            frozen,
+        };
+    }
+    match MachineList::load(&backup) {
+        Ok(list) if backup.exists() => {
+            log(dir, &format!("machine list restored from {LIST_FILE}.bak"));
+            if frozen.is_none()
+                && let Err(e) = list.save(&path)
+            {
+                log(dir, &format!("could not write the restored list back: {e}"));
+            }
+            Loaded { list, frozen }
+        }
+        Ok(_) | Err(_) => {
+            log(dir, "machine list could not be restored; starting empty");
             Loaded {
                 list: MachineList::default(),
-                notice: Some(why.clone()),
-                frozen: Some(why),
+                frozen,
             }
         }
     }
@@ -393,11 +433,7 @@ impl HubCore {
     /// Loads the list and seen turns from `dir` and starts suspended. Must be
     /// called inside the tokio runtime the hub's tasks run on.
     pub(crate) fn start(dir: PathBuf, dialer: Arc<dyn Dialer>) -> Arc<HubCore> {
-        let Loaded {
-            list,
-            notice,
-            frozen,
-        } = load_list(&dir);
+        let Loaded { list, frozen } = load_list(&dir);
         let tracker = load_seen(&dir);
         let saved_memory = tracker.memory().to_string();
         let live = list
@@ -412,7 +448,7 @@ impl HubCore {
             paused: true,
             next_epoch: 1,
             saved_memory,
-            notice,
+            notice: None,
             list_frozen: frozen,
         };
         let snapshot = build_snapshot(&state);

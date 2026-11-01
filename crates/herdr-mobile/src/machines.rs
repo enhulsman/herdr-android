@@ -76,6 +76,13 @@ struct Export {
     machines: Vec<Exported>,
 }
 
+/// Where [`MachineList::save`] keeps the previous list: `machines.json.bak`.
+pub fn backup_path(path: &Path) -> std::path::PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".bak");
+    path.with_file_name(name)
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MachineList {
     machines: Vec<Machine>,
@@ -143,7 +150,9 @@ impl MachineList {
         Ok(list)
     }
 
-    /// Writes the list so a crash leaves either the old or the new file.
+    /// Writes the list in full before it replaces the old file, which stays
+    /// as [`backup_path`]: after a crash or a broken file, the previous
+    /// list can be restored from it.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         use std::io::Write;
         let stored = Stored {
@@ -156,7 +165,15 @@ impl MachineList {
         f.write_all(&text)?;
         f.sync_all()?;
         drop(f);
-        std::fs::rename(&tmp, path)
+        if path.exists() {
+            std::fs::rename(path, backup_path(path))?;
+        }
+        std::fs::rename(&tmp, path)?;
+        // The renames themselves reach the disk with the directory.
+        if let Some(dir) = path.parent() {
+            std::fs::File::open(dir)?.sync_all()?;
+        }
+        Ok(())
     }
 
     pub fn machines(&self) -> &[Machine] {
@@ -308,6 +325,12 @@ mod tests {
         list.save(&path).unwrap();
         assert_eq!(MachineList::load(&path).unwrap(), list);
         assert!(!dir.join("machines.tmp").exists());
+        // Saving again keeps this version as the backup.
+        let mut next = list.clone();
+        next.remove("server").unwrap();
+        next.save(&path).unwrap();
+        assert_eq!(MachineList::load(&path).unwrap(), next);
+        assert_eq!(MachineList::load(&backup_path(&path)).unwrap(), list);
     }
 
     #[test]

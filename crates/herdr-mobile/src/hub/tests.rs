@@ -847,23 +847,88 @@ async fn a_restarted_hub_remembers_machines_and_unseen_finishes() {
     .await;
 }
 
+fn log_of(dir: &std::path::Path) -> String {
+    std::fs::read_to_string(dir.join("hub.log")).unwrap_or_default()
+}
+
+/// A list file as the app writes it, with one machine.
+fn list_with(name: &str) -> String {
+    let mut list = crate::machines::MachineList::default();
+    list.add(name, name, 22, "dev").unwrap();
+    list.get_mut(name).unwrap().host_key = Some("SHA256:kept".into());
+    let dir = scratch(&format!("list-{name}"));
+    list.save(&dir.join("machines.json")).unwrap();
+    let text = std::fs::read_to_string(dir.join("machines.json")).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    text
+}
+
+// A broken list is repaired from the copy the previous save kept, silently:
+// the person keeps their setup, the log says what happened.
 #[tokio::test(start_paused = true)]
-async fn a_broken_list_file_is_kept_aside_and_said() {
+async fn a_broken_list_is_restored_from_the_previous_save() {
     let dir = scratch("broken");
     std::fs::write(dir.join("machines.json"), "{ not json").unwrap();
+    std::fs::write(dir.join("machines.json.bak"), list_with(WS)).unwrap();
     let rig = rig_in(dir.clone());
     let s = rig.hub.snapshot();
-    assert!(s.machines.is_empty());
-    assert!(
-        s.notice
-            .as_deref()
-            .is_some_and(|n| n.contains("machine list")),
-        "{:?}",
-        s.notice
-    );
+    assert_eq!(s.notice, None, "nothing for the person to read");
+    assert_eq!(view(&s, WS).host_key.as_deref(), Some("SHA256:kept"));
+    // The broken file is kept, and the list is whole again on disk.
     assert_eq!(
         std::fs::read_to_string(dir.join("machines.json.broken")).unwrap(),
         "{ not json"
+    );
+    let on_disk = crate::machines::MachineList::load(&dir.join("machines.json")).unwrap();
+    assert!(on_disk.get(WS).is_some());
+    let log = log_of(&dir);
+    assert!(
+        log.contains("machines.json.broken") && log.contains("restored"),
+        "{log}"
+    );
+}
+
+// A crash between the two renames of a save leaves only the previous copy.
+#[tokio::test(start_paused = true)]
+async fn a_list_missing_after_a_crash_is_restored_from_the_previous_save() {
+    let dir = scratch("crash");
+    std::fs::write(dir.join("machines.json.bak"), list_with(WS)).unwrap();
+    let rig = rig_in(dir.clone());
+    let s = rig.hub.snapshot();
+    assert_eq!(s.notice, None);
+    assert!(s.machines.iter().any(|m| m.name == WS));
+}
+
+#[tokio::test(start_paused = true)]
+async fn each_save_keeps_the_previous_list() {
+    let dir = scratch("backup");
+    let rig = rig_in(dir.clone());
+    rig.hub.add_machine(WS, WS, 22, "dev").unwrap();
+    rig.hub.add_machine(SRV, SRV, 22, "dev").unwrap();
+    let bak = crate::machines::MachineList::load(&dir.join("machines.json.bak")).unwrap();
+    assert!(bak.get(WS).is_some());
+    assert!(bak.get(SRV).is_none(), "the backup is one save behind");
+}
+
+#[tokio::test(start_paused = true)]
+async fn with_nothing_to_restore_the_list_starts_empty_and_keeps_the_broken_file() {
+    let dir = scratch("lost");
+    std::fs::write(dir.join("machines.json"), "{ not json").unwrap();
+    std::fs::write(dir.join("machines.json.bak"), "also broken").unwrap();
+    let rig = rig_in(dir.clone());
+    let s = rig.hub.snapshot();
+    assert!(s.machines.is_empty());
+    assert_eq!(s.notice, None);
+    // A machine added now is saved, and the broken copy is still there.
+    rig.hub.add_machine(WS, WS, 22, "dev").unwrap();
+    assert_eq!(
+        std::fs::read_to_string(dir.join("machines.json.broken")).unwrap(),
+        "{ not json"
+    );
+    assert!(
+        log_of(&dir).contains("could not be restored"),
+        "{}",
+        log_of(&dir)
     );
 }
 
@@ -993,14 +1058,8 @@ async fn a_broken_list_that_cannot_be_set_aside_is_never_overwritten() {
     };
     let rig = rig_in(dir.clone());
     drop(ro);
-    let s = rig.hub.snapshot();
-    assert!(
-        s.notice
-            .as_deref()
-            .is_some_and(|n| n.contains("nor set it aside")),
-        "{:?}",
-        s.notice
-    );
+    // Nothing to read on screen (the log could not be written either).
+    assert_eq!(rig.hub.snapshot().notice, None);
     // Writable again, but the list stays frozen for this run.
     assert!(matches!(
         rig.hub.add_machine(WS, WS, 22, "dev"),
@@ -1027,14 +1086,7 @@ async fn each_broken_list_is_kept_under_its_own_name() {
         first.dir = scratch("twice-unused");
     }
     std::fs::write(dir.join("machines.json"), "second").unwrap();
-    let rig = rig_in(dir.clone());
-    assert!(
-        rig.hub
-            .snapshot()
-            .notice
-            .as_deref()
-            .is_some_and(|n| n.contains("machines.json.broken-2"))
-    );
+    let _rig = rig_in(dir.clone());
     let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
     assert_eq!(read("machines.json.broken"), "first");
     assert_eq!(read("machines.json.broken-2"), "second");

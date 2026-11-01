@@ -147,11 +147,14 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
 - **One private repository.** Tag `v*` → build job (full-history checkout; fails
   if the tag's commit is not on `main`) builds the Rust core, the unsigned APK
   (arm64-v8a), `herdr-push`, runs all tests and `cargo-deny`, and uploads artifacts
-  with SHA-256 sums. The `sign-and-release` job runs in the environment `release`
-  (deployment policy: tags `v*` only; the signing key is its secret, so a workflow
-  on any branch cannot read it): no checkout, downloads the artifacts, verifies the
-  sums, runs a pinned `apksigner` and signs `herdr-push` (detached signature), then
-  publishes the release.
+  with SHA-256 sums. A separate signing workflow, triggered by `workflow_run`, runs
+  as it is on `main` (so a tag cannot supply its own version), one run at a time, in
+  the environment `release` (deployment policy: `main` only; the signing key is its
+  secret, so a workflow from any other branch or tag cannot read it): no checkout;
+  through the API it re-checks that the tag points at the built commit, that commit
+  is on `main`, `VERSION` matches, and the versionCode is above every published
+  release; then it downloads the artifacts, verifies the sums, runs a pinned
+  `apksigner` and signs `herdr-push` (detached signature), and publishes.
 - **The control is Ezra's install.** GitHub offers no required reviewer for private
   repositories on his plan. Obtainium (with a read-only token for this repository)
   checks for updates but never installs in the background; before tapping install,

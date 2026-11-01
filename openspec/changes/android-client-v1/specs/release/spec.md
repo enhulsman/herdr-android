@@ -4,8 +4,10 @@
 
 ### Requirement: Ezra's install is the release control
 The repository SHALL stay private. Signing SHALL happen only in a job bound to the
-environment `release`, whose deployment policy admits only tags matching `v*`; the
-signing key SHALL be a secret of that environment, never a repository secret.
+environment `release`, whose deployment policy admits only the branch `main`; the
+signing key SHALL be a secret of that environment, never a repository secret. The
+signing job SHALL run from the workflow definition on `main` (triggered by the
+completed build), never from a definition the tag supplies.
 Obtainium on the phone SHALL check for updates without installing them in the
 background. The release process SHALL state that before installing an update,
 Ezra checks in the GitHub web UI that the release's tag is one he pushed and that
@@ -17,19 +19,31 @@ its commit is on `main`.
   Obtainium shows the update without installing it
 
 #### Scenario: Workflow on another branch
-- **WHEN** a workflow runs from a branch or from a tag not matching `v*`
+- **WHEN** a workflow runs from a branch other than `main` or from a tag
 - **THEN** it cannot read the signing key
+
+#### Scenario: Tag on a commit with a modified workflow
+- **WHEN** a `v*` tag points at a commit off `main` whose workflows skip the checks
+- **THEN** the signing job, running as it is on `main`, finds the commit off `main`
+  and fails before any key is used
 
 ### Requirement: The signing job runs no repository code
 The build job SHALL build from the tagged commit with full history, SHALL fail when
 that commit is not on `main`, and SHALL upload unsigned artifacts with SHA-256 sums.
-The signing job SHALL NOT check out the repository: it SHALL download the artifacts,
-verify their sums, sign the APK with a pinned `apksigner` and `herdr-push` with a
-detached signature, and publish.
+The signing job SHALL NOT check out the repository. Before using any key it SHALL
+check through the GitHub API that the tag points at the built commit, that commit is
+on `main`, `VERSION` there matches the tag, and the `versionCode` is above every
+published release; signing jobs SHALL run one at a time. It SHALL then download the
+artifacts, verify their sums, sign the APK with a pinned `apksigner` and
+`herdr-push` with a detached signature, and publish.
 
 #### Scenario: Tag off main
 - **WHEN** a tag points at a commit not on `main`
 - **THEN** the build job fails and no artifact reaches the signing job
+
+#### Scenario: Overlapping releases
+- **WHEN** v0.0.3 is published while the run for v0.0.2 is still waiting to sign
+- **THEN** the v0.0.2 signing job fails without signing
 
 #### Scenario: Swapped artifact
 - **WHEN** an artifact's sum does not match the one recorded by the build job

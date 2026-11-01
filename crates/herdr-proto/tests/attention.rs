@@ -515,3 +515,57 @@ fn folders_name_as_in_herdr() {
     assert_eq!(folder_name(r"C:\Users\can\src\api", None), "api");
     assert_eq!(folder_name("C:/Users/can/src/web", None), "web");
 }
+
+// ---- review finding: unseen finishes that never moved the turn counter ----
+
+#[test]
+fn a_blocked_finish_stays_unseen_across_a_restart() {
+    for (busy_word, turn) in [("blocked", 3), ("error", 3), ("blocked", 0)] {
+        let mut t = Tracker::default();
+        t.observe(WSL, &[agent("t1", Some(busy_word), turn)], 1);
+        // Leaving blocked or error does not raise `turn` (only leaving working does).
+        t.observe(WSL, &[agent("t1", Some("idle"), turn)], 2);
+        assert_eq!(
+            state_of(&t, "t1"),
+            Some(Attention::Done),
+            "{busy_word} at turn {turn}"
+        );
+        let mut t = Tracker::restore(&t.memory());
+        t.observe(WSL, &[agent("t1", Some("idle"), turn)], 3);
+        assert_eq!(
+            state_of(&t, "t1"),
+            Some(Attention::Done),
+            "{busy_word} at turn {turn}, restored"
+        );
+    }
+}
+
+#[test]
+fn a_blocked_agent_that_finished_while_the_app_was_closed_is_unseen() {
+    for (busy_word, end) in [("blocked", "idle"), ("error", "done"), ("working", "idle")] {
+        let mut t = Tracker::default();
+        t.observe(WSL, &[agent("t1", Some(busy_word), 0)], 1);
+        let mut t = Tracker::restore(&t.memory());
+        // `working` raises the turn on its way out; blocked and error do not.
+        let turn = u64::from(busy_word == "working");
+        t.observe(WSL, &[agent("t1", Some(end), turn)], 2);
+        assert_eq!(
+            state_of(&t, "t1"),
+            Some(Attention::Done),
+            "{busy_word} -> {end}"
+        );
+    }
+}
+
+#[test]
+fn a_seen_blocked_agent_that_was_answered_is_idle_after_a_restart() {
+    // Opened while blocked, then it went back to work and finished: unseen.
+    // Opened after it finished: seen, and stays seen after a restart.
+    let mut t = Tracker::default();
+    t.observe(WSL, &[agent("t1", Some("blocked"), 2)], 1);
+    t.observe(WSL, &[agent("t1", Some("idle"), 2)], 2);
+    t.mark_seen(WSL, "t1");
+    let mut t = Tracker::restore(&t.memory());
+    t.observe(WSL, &[agent("t1", Some("idle"), 2)], 3);
+    assert_eq!(state_of(&t, "t1"), Some(Attention::Idle));
+}

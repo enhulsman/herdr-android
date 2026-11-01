@@ -6,8 +6,10 @@
 //! Changed: the phone tracks terminals across several machines and across app
 //! restarts. A finish it did not see live is caught by each terminal's turn
 //! counter (`turn` rises each time the status leaves `working`): the last turn
-//! the person saw is remembered per terminal (M1 plan, pick 2b). Rows are
-//! derived from the core's terminal records, which the tracker diffs.
+//! the person saw is remembered per terminal (M1 plan, pick 2b), with whether
+//! a finish was still unseen and whether the agent was busy, since leaving
+//! `blocked` or `error` does not move the counter. Rows are derived from the
+//! core's terminal records, which the tracker diffs.
 
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, HashMap};
@@ -78,6 +80,14 @@ struct Agent {
     status_ms: Option<u64>,
 }
 
+/// What survives an app restart for one terminal.
+#[derive(Clone, Copy, Debug, Default)]
+struct Remembered {
+    seen_turn: u64,
+    unseen: bool,
+    busy: bool,
+}
+
 #[derive(Default)]
 struct Machine {
     terminals: Vec<Value>,
@@ -87,8 +97,8 @@ struct Machine {
 #[derive(Default)]
 pub struct Tracker {
     machines: BTreeMap<String, Machine>,
-    /// Seen turns restored from storage for machines not observed yet.
-    remembered: BTreeMap<String, BTreeMap<String, u64>>,
+    /// Restored from storage, for machines not observed yet.
+    remembered: BTreeMap<String, BTreeMap<String, Remembered>>,
     looking: Option<(String, String)>,
 }
 
@@ -119,7 +129,14 @@ impl Tracker {
                 (
                     machine.clone(),
                     turns
-                        .filter_map(|(a, t)| Some((a.clone(), t.as_u64()?)))
+                        .filter_map(|(a, t)| {
+                            let r = Remembered {
+                                seen_turn: t["seen_turn"].as_u64()?,
+                                unseen: t["unseen"] == true,
+                                busy: t["busy"] == true,
+                            };
+                            Some((a.clone(), r))
+                        })
                         .collect(),
                 )
             })
@@ -131,17 +148,27 @@ impl Tracker {
     }
 
     /// What to save so finishes while the app is closed show as unseen later:
-    /// `{"machines": {name: {address: seen_turn}}}`.
+    /// `{"machines": {name: {address: {seen_turn, unseen, busy}}}}`.
     pub fn memory(&self) -> Value {
+        let entry =
+            |r: Remembered| json!({"seen_turn": r.seen_turn, "unseen": r.unseen, "busy": r.busy});
         let mut machines = Map::new();
         for (name, turns) in &self.remembered {
-            machines.insert(name.clone(), json!(turns));
+            let turns = turns.iter().map(|(a, r)| (a.clone(), entry(*r))).collect();
+            machines.insert(name.clone(), Value::Object(turns));
         }
         for (name, m) in &self.machines {
-            let turns: Map<String, Value> = m
+            let turns = m
                 .agents
                 .iter()
-                .map(|(a, s)| (a.clone(), json!(s.seen_turn)))
+                .map(|(a, s)| {
+                    let r = Remembered {
+                        seen_turn: s.seen_turn,
+                        unseen: s.unseen,
+                        busy: busy(s.word.as_deref()),
+                    };
+                    (a.clone(), entry(r))
+                })
                 .collect();
             machines.insert(name.clone(), Value::Object(turns));
         }
@@ -168,15 +195,22 @@ impl Tracker {
             let status_ms = t["status_ms"].as_u64();
             let mut a = match m.agents.remove(address) {
                 None => {
-                    // A first contact with the machine counts what is there as seen;
-                    // a terminal new to a known machine has seen nothing yet.
-                    let seen_turn =
-                        remembered
-                            .get(address)
-                            .copied()
-                            .unwrap_or(if known { 0 } else { turn });
+                    let finished = !busy(word.as_deref()) && word.is_some();
+                    let (seen_turn, unseen) = match remembered.get(address) {
+                        // Unseen before, busy then and finished now, or a turn since.
+                        Some(r) => (
+                            r.seen_turn,
+                            finished && (r.unseen || r.busy || turn > r.seen_turn),
+                        ),
+                        // A first contact with the machine counts what is there as
+                        // seen; a terminal new to a known machine has seen nothing yet.
+                        None => {
+                            let seen_turn = if known { 0 } else { turn };
+                            (seen_turn, finished && turn > seen_turn)
+                        }
+                    };
                     Agent {
-                        unseen: !busy(word.as_deref()) && word.is_some() && turn > seen_turn,
+                        unseen,
                         word,
                         turn,
                         seen_turn,

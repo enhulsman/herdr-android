@@ -363,3 +363,138 @@ async fn closing_the_client_ends_the_connection() {
         Err(CallError::Lost)
     ));
 }
+
+// ---- review findings: shutdown, detach, early-frame budget ----
+
+/// A transport that never accepts a byte, and says when it is dropped.
+struct Stuck(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl tokio::io::AsyncWrite for Stuck {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+        _: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        std::task::Poll::Pending
+    }
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Pending
+    }
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Pending
+    }
+}
+
+impl Drop for Stuck {
+    fn drop(&mut self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+fn connect_stuck() -> (
+    Client,
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+    FakeCore,
+) {
+    let dropped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (app, core) = tokio::io::duplex(1 << 20);
+    let (app_r, _app_w) = tokio::io::split(app);
+    let (r, w) = tokio::io::split(core);
+    let client = Client::start(app_r, Stuck(dropped.clone()));
+    // Something for the writer to get stuck on.
+    client.send(1, wire::DATA, b"keys");
+    (client, dropped, FakeCore { r, w })
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_writer_stuck_on_a_full_transport_is_dropped_when_the_connection_ends() {
+    // Closed by the app.
+    let (client, dropped, _core) = connect_stuck();
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    client.close();
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    assert!(dropped.load(std::sync::atomic::Ordering::SeqCst), "close");
+
+    // The last handle dropped.
+    let (client, dropped, _core) = connect_stuck();
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    drop(client);
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    assert!(dropped.load(std::sync::atomic::Ordering::SeqCst), "drop");
+
+    // A dead link.
+    let (client, dropped, _core) = connect_stuck();
+    assert!(matches!(client.ended().await, Ended::DeadLink));
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    assert!(
+        dropped.load(std::sync::atomic::Ordering::SeqCst),
+        "dead link"
+    );
+    drop(client);
+}
+
+#[tokio::test(start_paused = true)]
+async fn dropping_a_stream_detaches_it_on_the_core() {
+    let (client, mut core) = connect();
+    let gone = client.open_stream(7);
+    let mut kept = client.open_stream(8);
+    drop(gone);
+    let f = core.frame().await;
+    assert_eq!((f.channel, f.kind, f.payload.len()), (7, wire::CLOSE, 0));
+    // Frames still in flight for it are dropped, then the core acknowledges.
+    core.send(7, wire::DATA, b"late").await;
+    core.send(7, wire::CLOSE, b"").await;
+    core.send(8, wire::DATA, b"still here").await;
+    assert!(matches!(kept.recv().await, StreamItem::Data(d) if d == b"still here"));
+    // A stream the core already closed is not closed again.
+    core.send(8, wire::CLOSE, br#"{"reason":"exited"}"#).await;
+    assert!(matches!(kept.recv().await, StreamItem::Closed(_)));
+    drop(kept);
+    client.send(0, wire::DATA, b"{}");
+    // Skip the CREDIT returned for what `kept` consumed.
+    let mut f = core.frame().await;
+    while f.kind == wire::CREDIT {
+        f = core.frame().await;
+    }
+    assert_eq!(
+        (f.channel, f.kind),
+        (0, wire::DATA),
+        "no CLOSE for channel 8"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_flood_of_frames_for_unopened_channels_ends_the_connection() {
+    for payload in [&b""[..], br#"{"reason":"exited"}"#] {
+        let (client, mut core) = connect();
+        let flood = tokio::spawn(async move {
+            for channel in 100..200_000u32 {
+                let kind = if payload.is_empty() {
+                    wire::DATA
+                } else {
+                    wire::CLOSE
+                };
+                if core
+                    .w
+                    .write_all(&wire::encode(channel, kind, payload))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            core
+        });
+        assert!(
+            matches!(client.ended().await, Ended::Protocol(_)),
+            "payload {payload:?}"
+        );
+        drop(flood.await.unwrap());
+    }
+}

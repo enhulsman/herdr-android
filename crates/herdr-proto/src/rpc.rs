@@ -25,8 +25,14 @@ pub const INTERRUPT_TIMEOUT: Duration = Duration::from_secs(15);
 /// No frame at all for this long: the link is dead. The core sends a
 /// heartbeat on each event channel every 15 s.
 pub const DEAD_LINK: Duration = Duration::from_secs(45);
-/// Bytes kept for channels whose opening reply the app has not handled yet.
+/// What the app keeps for channels whose opening reply it has not handled
+/// yet; a core that sends more is broken and the connection ends.
 const EARLY_LIMIT: usize = 4 << 20;
+/// Each kept frame counts this much on top of its payload, so floods of
+/// empty frames hit the limit too.
+const EARLY_ITEM_COST: usize = 64;
+/// How long a closing connection waits for the transport to shut down.
+const SHUTDOWN_WAIT: Duration = Duration::from_secs(1);
 
 pub fn timeout_for(method: &str) -> Duration {
     if method == "terminal.interrupt" {
@@ -98,25 +104,21 @@ pub enum StreamItem {
     Lost,
 }
 
-enum Out {
-    Frame(Vec<u8>),
-    Close,
-}
-
 #[derive(Default)]
 struct Routes {
     closed: bool,
     replies: HashMap<u64, oneshot::Sender<Result<Value, Value>>>,
     streams: HashMap<u32, mpsc::UnboundedSender<StreamItem>>,
     /// Frames for a channel whose opening reply hasn't been handled yet.
-    early: HashMap<u32, Vec<StreamItem>>,
+    early: HashMap<u32, Vec<(usize, StreamItem)>>,
     early_bytes: usize,
-    /// Channels the app stopped reading: their frames are dropped.
+    /// Channels the app stopped reading: their frames are dropped until the
+    /// core acknowledges the CLOSE.
     discard: HashSet<u32>,
 }
 
 struct Shared {
-    out: mpsc::UnboundedSender<Out>,
+    out: mpsc::UnboundedSender<Vec<u8>>,
     routes: Mutex<Routes>,
     next_id: AtomicU64,
     ended: watch::Sender<Option<Ended>>,
@@ -125,12 +127,11 @@ struct Shared {
 
 impl Shared {
     fn send(&self, channel: u32, kind: u8, payload: &[u8]) {
-        let _ = self
-            .out
-            .send(Out::Frame(wire::encode(channel, kind, payload)));
+        let _ = self.out.send(wire::encode(channel, kind, payload));
     }
 
-    /// Ends the connection once: fails waiting calls, tells every stream.
+    /// Ends the connection once: fails waiting calls, tells every stream, and
+    /// stops the writer even when the transport no longer takes writes.
     fn end(&self, why: Ended) {
         {
             let mut r = self.routes.lock().unwrap();
@@ -144,24 +145,24 @@ impl Shared {
             r.replies.clear();
             r.early.clear();
         }
-        let _ = self.out.send(Out::Close);
         self.ended.send_replace(Some(why));
         if let Some(reader) = self.reader.lock().unwrap().take() {
             reader.abort();
         }
     }
 
-    fn route(&self, frame: wire::Frame) {
+    /// Hands a frame to its call or stream; an error ends the connection.
+    fn route(&self, frame: wire::Frame) -> Result<(), String> {
         let mut r = self.routes.lock().unwrap();
         if frame.channel == 0 {
             if frame.kind != wire::DATA {
-                return;
+                return Ok(());
             }
             let Ok(msg) = serde_json::from_slice::<Value>(&frame.payload) else {
-                return;
+                return Ok(());
             };
             let Some(id) = msg.get("id").and_then(Value::as_u64) else {
-                return;
+                return Ok(());
             };
             if let Some(tx) = r.replies.remove(&id) {
                 let _ = tx.send(match msg.get("error") {
@@ -169,25 +170,22 @@ impl Shared {
                     None => Ok(msg.get("result").cloned().unwrap_or(Value::Null)),
                 });
             }
-            return;
+            return Ok(());
         }
-        let (item, size) = match frame.kind {
-            wire::DATA => {
-                let n = frame.payload.len();
-                (StreamItem::Data(frame.payload), n)
+        let size = EARLY_ITEM_COST + frame.payload.len();
+        let item = match frame.kind {
+            wire::DATA => StreamItem::Data(frame.payload),
+            wire::CLOSE => {
+                StreamItem::Closed(serde_json::from_slice(&frame.payload).unwrap_or(Value::Null))
             }
-            wire::CLOSE => (
-                StreamItem::Closed(serde_json::from_slice(&frame.payload).unwrap_or(Value::Null)),
-                0,
-            ),
-            _ => return,
+            _ => return Ok(()),
         };
         let closing = matches!(item, StreamItem::Closed(_));
         if r.discard.contains(&frame.channel) {
             if closing {
                 r.discard.remove(&frame.channel);
             }
-            return;
+            return Ok(());
         }
         match r.streams.get(&frame.channel) {
             Some(tx) => {
@@ -198,10 +196,11 @@ impl Shared {
             }
             None if r.early_bytes + size <= EARLY_LIMIT => {
                 r.early_bytes += size;
-                r.early.entry(frame.channel).or_default().push(item);
+                r.early.entry(frame.channel).or_default().push((size, item));
             }
-            None => {}
+            None => return Err("too many frames for channels nobody opened".into()),
         }
+        Ok(())
     }
 }
 
@@ -238,7 +237,12 @@ impl Client {
             ended: watch::channel(None).0,
             reader: Mutex::new(None),
         });
-        tokio::spawn(write_frames(writer, frames, Arc::downgrade(&shared)));
+        tokio::spawn(write_frames(
+            writer,
+            frames,
+            Arc::downgrade(&shared),
+            shared.ended.subscribe(),
+        ));
         let reading = tokio::spawn(read_frames(reader, shared.clone()));
         *shared.reader.lock().unwrap() = Some(reading.abort_handle());
         if shared.routes.lock().unwrap().closed {
@@ -323,10 +327,8 @@ impl Client {
             let mut r = shared.routes.lock().unwrap();
             r.discard.remove(&channel);
             let mut open = true;
-            for item in r.early.remove(&channel).unwrap_or_default() {
-                if let StreamItem::Data(d) = &item {
-                    r.early_bytes -= d.len();
-                }
+            for (size, item) in r.early.remove(&channel).unwrap_or_default() {
+                r.early_bytes -= size;
                 open &= !matches!(item, StreamItem::Closed(_));
                 let _ = tx.send(item);
             }
@@ -394,10 +396,14 @@ impl Stream {
 }
 
 impl Drop for Stream {
+    /// An open stream detaches on the core (a viewer, a subscription); its
+    /// frames still in flight are dropped until the core's CLOSE.
     fn drop(&mut self) {
         let mut r = self.shared.routes.lock().unwrap();
         if r.streams.remove(&self.channel).is_some() {
             r.discard.insert(self.channel);
+            drop(r);
+            self.shared.send(self.channel, wire::CLOSE, &[]);
         }
     }
 }
@@ -405,7 +411,11 @@ impl Drop for Stream {
 async fn read_frames<R: AsyncRead + Unpin>(mut reader: R, shared: Arc<Shared>) {
     let why = loop {
         match tokio::time::timeout(DEAD_LINK, wire::read_frame(&mut reader)).await {
-            Ok(Ok(Some(frame))) => shared.route(frame),
+            Ok(Ok(Some(frame))) => {
+                if let Err(e) = shared.route(frame) {
+                    break Ended::Protocol(e);
+                }
+            }
             Ok(Ok(None)) => break Ended::Closed,
             Ok(Err(e)) if e.kind() == std::io::ErrorKind::InvalidData => {
                 break Ended::Protocol(e.to_string());
@@ -417,24 +427,36 @@ async fn read_frames<R: AsyncRead + Unpin>(mut reader: R, shared: Arc<Shared>) {
     shared.end(why);
 }
 
+/// Writes queued frames until the connection ends. Ending interrupts a write
+/// the transport is not taking, so a dead path never keeps the task (and the
+/// transport) alive; frames still queued then are dropped.
 async fn write_frames<W: AsyncWrite + Unpin>(
     mut writer: W,
-    mut frames: mpsc::UnboundedReceiver<Out>,
+    mut frames: mpsc::UnboundedReceiver<Vec<u8>>,
     shared: std::sync::Weak<Shared>,
+    mut ended: watch::Receiver<Option<Ended>>,
 ) {
-    while let Some(out) = frames.recv().await {
-        let Out::Frame(frame) = out else { break };
-        let written = async {
-            writer.write_all(&frame).await?;
-            writer.flush().await
-        }
-        .await;
-        if let Err(e) = written {
-            if let Some(shared) = shared.upgrade() {
-                shared.end(Ended::Io(e.to_string()));
+    let writing = async {
+        while let Some(frame) = frames.recv().await {
+            let written = async {
+                writer.write_all(&frame).await?;
+                writer.flush().await
             }
-            return;
+            .await;
+            if let Err(e) = written {
+                return Some(e);
+            }
         }
+        None
+    };
+    let failed = tokio::select! {
+        failed = writing => failed,
+        _ = ended.wait_for(Option::is_some) => None,
+    };
+    if let Some(e) = failed
+        && let Some(shared) = shared.upgrade()
+    {
+        shared.end(Ended::Io(e.to_string()));
     }
-    let _ = writer.shutdown().await;
+    let _ = tokio::time::timeout(SHUTDOWN_WAIT, writer.shutdown()).await;
 }

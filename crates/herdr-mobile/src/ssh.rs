@@ -80,6 +80,8 @@ pub enum SshError {
     Sign {
         detail: String,
     },
+    /// The OS refused the socket: on GrapheneOS, the app's Network permission is off.
+    NetworkPermissionOff,
     Connect {
         detail: String,
     },
@@ -96,6 +98,7 @@ impl std::fmt::Display for SshError {
             SshError::Rejected => f.write_str("the machine rejected the key"),
             SshError::Key { detail } => write!(f, "key: {detail}"),
             SshError::Sign { detail } => write!(f, "signing failed: {detail}"),
+            SshError::NetworkPermissionOff => f.write_str("Network permission is off"),
             SshError::Connect { detail } => write!(f, "connection failed: {detail}"),
             SshError::Timeout => f.write_str("timed out"),
         }
@@ -182,6 +185,21 @@ pub(crate) fn ssh_signature_from_der(der: &[u8]) -> Result<Vec<u8>, SshError> {
     signature.encode_vec().map_err(key_error)
 }
 
+/// Maps a failed connect. EPERM and EACCES mean the OS refused the socket,
+/// which on GrapheneOS is the per-app Network permission being off.
+pub(crate) fn connect_error(e: russh::Error) -> SshError {
+    const EPERM: i32 = 1;
+    const EACCES: i32 = 13;
+    match &e {
+        russh::Error::IO(io) if matches!(io.raw_os_error(), Some(EPERM | EACCES)) => {
+            SshError::NetworkPermissionOff
+        }
+        _ => SshError::Connect {
+            detail: e.to_string(),
+        },
+    }
+}
+
 fn key_error(e: impl std::fmt::Display) -> SshError {
     SshError::Key {
         detail: e.to_string(),
@@ -215,9 +233,7 @@ async fn run(
                 (Some(pinned), Some(presented)) if pinned != presented => {
                     SshError::HostKeyMismatch { presented }
                 }
-                _ => SshError::Connect {
-                    detail: e.to_string(),
-                },
+                _ => connect_error(e),
             });
         }
     };
@@ -372,6 +388,35 @@ mod tests {
 
     fn spki(key: &SigningKey) -> Vec<u8> {
         key.verifying_key().to_public_key_der().unwrap().into_vec()
+    }
+
+    // GrapheneOS refuses the socket with EPERM (or EACCES) when the app's
+    // Network permission is off; Linux and Android share these numbers.
+    #[test]
+    fn refused_socket_means_network_permission_off() {
+        for errno in [1, 13] {
+            let e = russh::Error::IO(std::io::Error::from_raw_os_error(errno));
+            assert!(
+                matches!(connect_error(e), SshError::NetworkPermissionOff),
+                "errno {errno}"
+            );
+        }
+        assert_eq!(
+            SshError::NetworkPermissionOff.to_string(),
+            "Network permission is off"
+        );
+    }
+
+    #[test]
+    fn other_connect_failures_stay_connection_failures() {
+        // ECONNREFUSED, ENETUNREACH, and a non-IO russh error.
+        for e in [
+            russh::Error::IO(std::io::Error::from_raw_os_error(111)),
+            russh::Error::IO(std::io::Error::from_raw_os_error(101)),
+            russh::Error::Disconnect,
+        ] {
+            assert!(matches!(connect_error(e), SshError::Connect { .. }));
+        }
     }
 
     #[test]

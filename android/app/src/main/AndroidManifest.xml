@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- On GrapheneOS, Network is a per-app runtime permission that can come up
+         off after an update; the app reports "Network permission is off". -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- BiometricPrompt throws SecurityException without it. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
     <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="${appLabel}"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity

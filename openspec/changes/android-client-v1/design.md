@@ -133,11 +133,13 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
   name rule (`addr.rs:6-14`: 1-32 of `a-z 0-9 - _ .`, no `/`).
 - **Delivery:** the watcher POSTs only to endpoints whose scheme and host match
   its allowlist (`https://ntfy.example.org`), https only, no redirects, 10 s timeout,
-  4 KiB body cap; the ntfy access token (write-only, `up*`) is sent only there.
+  4 KiB body cap; the ntfy access token (write-only, `up*`) is sent only there, as
+  `Authorization: Bearer`. No VAPID: ntfy accepts the token alone (M0 spike).
 - **Payload,** encrypted with RFC 8291 aes128gcm (`ece` crate; on the phone, the
   UnifiedPush connector's built-in web-push keys and decryption):
   `{v, type: alert|cleared|canary|test, machine, terminal?, name?, state?, kind?, at}`.
-  Never screen text or `msg`.
+  Never screen text or `msg`. `ece` pads the plaintext to a multiple of 128 bytes, so
+  a payload of up to 3967 bytes fits one record and the 4 KiB cap (body 4070 bytes).
 - **Health:** a canary push every 6 hours; the phone records the last push of
   any kind per machine and a local periodic check posts a quiet "Alert health"
   notice after 13 hours of silence. The watcher writes `hdroid-push-status`
@@ -180,6 +182,6 @@ Upstream: no questions asked (maintainers rarely answer Discussions; see
 the client-owned flat doc name `hdroid-push` and on a grace delay instead of
 viewer presence.
 
-For spikes: M0 device smoke test (libghostty on the Pixel); M0 russh with a
-Keystore signing callback; M0 push end to end (VAPID need, binary body through
-ntfy to the connector).
+Spikes, all answered in M0 (`decisions.md`, 2026-11-01): libghostty on the Pixel
+(stays); russh with a Keystore signing callback (ECDSA P-256 in StrongBox); push end
+to end (no VAPID needed, a binary body arrives intact).

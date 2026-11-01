@@ -18,7 +18,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [x] M0.4 `release` environment (deployment policy: branch `main` only, see the release spec), signing key as its secret and in Bitwarden; certificate fingerprint committed
 - [x] M0.5 Spike A, device smoke test: load the `.so` on the Pixel, feed a recorded synthetic Claude Code stream, read the grid, draw one 200x60 frame. Fail -> switch to the Termux fallback and amend design.md before M1
 - [x] M0.6 Spike B, russh signing through a Keystore key with 30-minute user authentication. Fail -> wrapped Ed25519 key; write the key type into design.md
-- [ ] M0.7 Spike C, push end to end: watcher-side `ece` encryption, POST with the `up*` token to ntfy, decrypt in the UnifiedPush connector on the phone; record whether VAPID is needed and that the binary body arrives intact
+- [x] M0.7 Spike C, push end to end: watcher-side `ece` encryption, POST with the `up*` token to ntfy, decrypt in the UnifiedPush connector on the phone; record whether VAPID is needed and that the binary body arrives intact
 - [ ] M0.8 Phone check: Obtainium (read-only token, background install off) installs v0.0.1, updates to v0.0.2 keeping data and the Keystore key
 
 ## M1. Connect and list agents

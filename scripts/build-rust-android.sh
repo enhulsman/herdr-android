@@ -4,7 +4,8 @@
 # bindings with the workspace uniffi-bindgen (library mode) into
 # android/app/build/generated/uniffi/kotlin.
 #
-# Usage: scripts/build-rust-android.sh [--release]
+# Usage: scripts/build-rust-android.sh [--release] [--features <list>]
+#   --features vt links libghostty-vt (scripts/build-ghostty.sh for both targets first).
 # Needs: cargo-ndk, the Rust targets aarch64-linux-android and
 # x86_64-linux-android, and ANDROID_HOME with the NDK below installed.
 set -euo pipefail
@@ -13,12 +14,16 @@ NDK_VERSION=27.1.12297006
 API_LEVEL=31
 
 profile=debug
-cargo_profile=()
-case "${1:-}" in
-  "") ;;
-  --release) profile=release; cargo_profile=(--release) ;;
-  *) echo "usage: $0 [--release]" >&2; exit 2 ;;
-esac
+cargo_args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --release) profile=release; cargo_args+=(--release) ;;
+    --features) [[ $# -ge 2 ]] || { echo "usage: $0 [--release] [--features <list>]" >&2; exit 2; }
+      cargo_args+=(--features "$2"); shift ;;
+    *) echo "usage: $0 [--release] [--features <list>]" >&2; exit 2 ;;
+  esac
+  shift
+done
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
@@ -34,7 +39,7 @@ export CARGO_TARGET_DIR="$repo/target"
 rm -rf android/app/src/main/jniLibs
 cargo ndk -t arm64-v8a -t x86_64 -P "$API_LEVEL" \
   -o android/app/src/main/jniLibs \
-  build -p herdr-mobile --locked "${cargo_profile[@]}"
+  build -p herdr-mobile --locked "${cargo_args[@]}"
 
 out=android/app/build/generated/uniffi/kotlin
 rm -rf "$out"

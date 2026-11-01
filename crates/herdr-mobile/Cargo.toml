@@ -8,5 +8,12 @@ publish.workspace = true
 name = "herdr_mobile"
 crate-type = ["cdylib", "lib"]
 
+[features]
+# Links libghostty-vt from build/ghostty/ (scripts/build-ghostty.sh); see build.rs.
+vt = []
+
 [dependencies]
 uniffi.workspace = true
+
+[dev-dependencies]
+serde_json = "1"

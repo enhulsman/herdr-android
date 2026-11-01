@@ -3,9 +3,10 @@
 ## Plain summary
 
 **Decisions still yours:**
-1. GitHub repo visibility (needed at M0). Public: Obtainium works with no token,
-   anyone can read the code. Private: Obtainium needs a read-only GitHub token on
-   the phone. Pick: private for now; decide again once the app works.
+1. Repositories (decided 2026-11-01): code private in `herdr-android`; signed
+   releases in a small public `herdr-android-releases`, where GitHub allows the
+   "wait for Ezra's approval" step. Obtainium follows the public one, no token.
+   Releases move to the code repository once it goes public.
 
 **What you get, each milestone ending with a check on your phone:**
 - **M0** An empty app that installs and updates itself through Obtainium from a

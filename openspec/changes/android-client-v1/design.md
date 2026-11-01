@@ -144,16 +144,29 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
 
 ## 6. Release and tests
 
-- Tag `v*` → build job (full-history checkout; fails if the tag's commit is not
-  on `main`) builds the Rust core, the unsigned APK (arm64-v8a), `herdr-push`,
-  runs all tests and `cargo-deny`, and uploads artifacts with SHA-256 sums.
-  The `sign-and-release` job runs in the protected environment `release`: no
-  checkout, downloads the artifacts, verifies the sums, runs a pinned `apksigner`
-  and signs `herdr-push` (detached signature), then publishes the release.
+- **Two repositories.** The code stays private in `herdr-android`; GitHub allows a
+  required reviewer on an environment only in public repositories on Ezra's plan,
+  so signing lives in a small public repository, `herdr-android-releases` (signing
+  workflow, README, signed releases; no app code).
+- Tag `v*` in `herdr-android` → build job (full-history checkout; fails if the
+  tag's commit is not on `main`) builds the Rust core, the unsigned APK
+  (arm64-v8a) and `herdr-push`, runs all tests and `cargo-deny`, and attaches the
+  artifacts with SHA-256 sums to an unsigned release there.
+- Ezra then starts `sign` in `herdr-android-releases` for that tag. Its job runs in
+  the environment `release` (required reviewer Ezra, self-review allowed): no
+  checkout, downloads the artifacts with a read-only token for the code
+  repository's contents, verifies the sums, runs a pinned `apksigner`, signs
+  `herdr-push` (detached signature) and publishes the release in the public
+  repository. Obtainium follows the public repository, so the phone needs no token.
 - **The control is Ezra's approval,** done from the phone after checking in the
-  GitHub web UI that the tag's commit is on protected `main` and `.github/` is
-  unchanged since the previous tag. Tag rulesets and workflow protection are
-  defence in depth only (bypassable with the owner's credentials).
+  GitHub web UI that the tag's commit is on `main` and `.github/` in both
+  repositories is unchanged since the previous release. It only holds if no token
+  on WSL can reach the releases repository: the `gh` login for Ezra's account on
+  WSL is replaced by a token limited to `herdr-android`, and pushes go over SSH
+  (confirmed on the phone).
+- When the code repository goes public, signing moves into its own `release`
+  environment with the same key; Obtainium is pointed there and the releases
+  repository is archived.
 - `Cargo.lock` committed, Gradle dependency verification metadata, actions pinned
   by SHA. `versionCode = major*10000 + minor*100 + patch`, tested to increase.
   The signing certificate fingerprint is recorded in the repo.

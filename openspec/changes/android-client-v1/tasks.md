@@ -8,18 +8,18 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 
 - [x] 0.1 ~~Maintainer post~~ dropped 2026-10-31: maintainers rarely answer Discussions (see `decisions.md`)
 - [x] 0.2 Visual design: renders in `design/`, `design-tokens.json` and `design-brief.md`, signed off 2026-11-01
-- [ ] 0.3 Create private `herdr-android` and public `herdr-android-releases` (decided 2026-11-01); `main` protection where the plan allows; `release` environment in the releases repo with Ezra as required reviewer; Ezra replaces the WSL `gh` login with a token limited to `herdr-android`
+- [x] 0.3 Private `herdr-android` created 2026-11-01: `main` protected (no force push, signed commits), tag ruleset for `v*`; `release` environment (tags `v*` only) is set up in M0.4
 
 ## M0. Release loop and early spikes
 
 - [ ] M0.1 Gradle project (Kotlin, Compose, minSdk 31), Cargo workspace (`herdr-proto`, `herdr-mobile`, `herdr-push`), uniffi bridge returning a version string
 - [ ] M0.2 libghostty-vt build: Zig 0.16.0 pinned by checksum, Ghostty `1e5cdb8`, Android targets; bindings regenerated from its headers
-- [ ] M0.3 Workflows per the release spec: build job in `herdr-android` (main-ancestry check, tests, cargo-deny, sums, unsigned release); `sign` in `herdr-android-releases` (no checkout, read-only download token); lockfiles and Gradle verification
-- [ ] M0.4 Signing key in the releases repo's `release` environment and Bitwarden; certificate fingerprint committed
+- [ ] M0.3 Workflow per the release spec: build job (main-ancestry check, tests, cargo-deny, sums), sign job without checkout in environment `release`; lockfiles and Gradle verification
+- [ ] M0.4 `release` environment (deployment policy: tags `v*`), signing key as its secret and in Bitwarden; certificate fingerprint committed
 - [ ] M0.5 Spike A, device smoke test: load the `.so` on the Pixel, feed a recorded synthetic Claude Code stream, read the grid, draw one 200x60 frame. Fail -> switch to the Termux fallback and amend design.md before M1
 - [ ] M0.6 Spike B, russh signing through a Keystore key with 30-minute user authentication. Fail -> wrapped Ed25519 key; write the key type into design.md
 - [ ] M0.7 Spike C, push end to end: watcher-side `ece` encryption, POST with the `up*` token to ntfy, decrypt in the UnifiedPush connector on the phone; record whether VAPID is needed and that the binary body arrives intact
-- [ ] M0.8 Phone check: Obtainium installs v0.0.1, updates to v0.0.2 keeping data and the Keystore key
+- [ ] M0.8 Phone check: Obtainium (read-only token, background install off) installs v0.0.1, updates to v0.0.2 keeping data and the Keystore key
 
 ## M1. Connect and list agents
 

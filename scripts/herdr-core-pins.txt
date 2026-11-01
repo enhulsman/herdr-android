@@ -1,0 +1,5 @@
+# herdr-core release archives the tests may run, by SHA-256, read by
+# scripts/fetch-herdr-core.sh. The first is MIN_CORE (crates/herdr-proto/src/compat.rs).
+# Taken from https://releases.herdr.dev/core/<version>/manifest.json on 2026-11-01.
+# version target sha256
+0.1.15 linux-x86_64 efbb1382da3d5053cb20c60c166a62ec34e73d8299977fb1f5abed28ddec8d66

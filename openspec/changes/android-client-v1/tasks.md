@@ -7,7 +7,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 ## 0. Before code
 
 - [x] 0.1 ~~Maintainer post~~ dropped 2026-10-31: maintainers rarely answer Discussions (see `decisions.md`)
-- [ ] 0.2 Visual design: `/design-brief` from the canvas and reference shots, renders, `design-tokens.json` signed off
+- [x] 0.2 Visual design: renders in `design/`, `design-tokens.json` and `design-brief.md`, signed off 2026-11-01
 - [ ] 0.3 Ezra decides repo visibility; create the GitHub repo; tag ruleset, `main` protection, `release` environment with required reviewer
 
 ## M0. Release loop and early spikes
@@ -27,7 +27,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [ ] M1.2 Tests: protocol suite against scratch cores, pinned and latest; throwaway-sshd test of the `authorized_keys` line
 - [ ] M1.3 Machines screen: key, restricted line, host key confirm, reconnect, lifecycle, export/import
 - [ ] M1.4 Agents home: attention order, kinds, progress, names, "Other terminals", "as of", duplicate skipping
-- [ ] M1.5 Phone check: WSL agents listed; refused-command check on WSL; fingerprint UX judged (keep C or fall back to B)
+- [ ] M1.5 Phone check: WSL agents listed; refused-command check on WSL; fingerprint UX judged (keep C or fall back to B); dim text and paper status colours judged outdoors (keep the Mac values or switch to the AA values in `design-tokens.json`)
 
 ## M2. Live terminal and keyboard
 

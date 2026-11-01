@@ -1,0 +1,592 @@
+{
+  "meta": {
+    "schemaVersion": "2",
+    "projectType": "product",
+    "created": "2026-11-01",
+    "platform": "Android, Jetpack Compose; sizes in dp/sp (1 CSS px in the renders = 1 dp)",
+    "source": "herdr-app settings.rs presets (graphite, paper) run through resolve(); defaults/mods/agents/main.js for the agent list. Values are copied, not invented.",
+    "groundTruth": "design/renders/screens.html and design/checkpoints/*.png, signed off by Ezra 2026-11-01",
+    "project": "herdr-android",
+    "updated": "2026-11-01",
+    "aesthetic": "herdr-app design system (graphite/paper), phone layout",
+    "extends": "herdr-app settings.rs presets"
+  },
+  "concept": {
+    "name": "The same herdr, held in one hand",
+    "statement": "The Mac app's design system, unchanged in colour, type and status language, rearranged for one thumb: the list is ordered by who needs you, and the terminal is the real terminal.",
+    "mood": "Graphite chrome a shade darker than the terminal, quiet grey text, colour only where an agent has a state. Nothing decorative: the agents and their terminals are the content.",
+    "avoid": [
+      "Material You dynamic colour: the app must look like herdr, not like the wallpaper",
+      "A chat-style composer or message bubbles: the terminal is shown as it is",
+      "Marketing-site colours (blue working, amber needs-you, green done) from the early sketch",
+      "Approve/Deny buttons and any destructive action in v1"
+    ],
+    "subjectWorld": [
+      "herdr-app agents sidebar: priority sections, spinner, needs-you pill",
+      "terminal grids, ANSI palettes, Claude Code permission boxes",
+      "SSH machines, host keys, push alerts"
+    ],
+    "audienceFeeling": "Ezra away from the desk: in three seconds, which agent needs me and what it asks"
+  },
+  "signature": {
+    "element": "The needs-you queue",
+    "description": "Agents that need you are not rows but cards at the top of the list: a 3 dp red left edge, the kind in red, and the agent's request in terminal type on the canvas colour, readable without opening the terminal. Inside a terminal the same red edge continues as the queue strip under the title: 'N more needs you · next: <agent>, <kind>', tap to jump.",
+    "rules": [
+      "Only blocked agents (blocked or error) get the card and the strip; nothing else uses the red edge",
+      "The strip shows only when at least one other agent needs you",
+      "msg is shown in the app only; it never goes into a notification"
+    ],
+    "location": "Home list, top section; terminal screen, directly under the title bar",
+    "implementation": "Compose: card = popover surface, 1 dp border, 3 dp blocked left edge drawn as a separate Box; queue strip = Row under the title bar, background blocked mixed 9% into chrome",
+    "boldnessBudget": "Red is spent only here; everything else stays grey or uses its state colour in a 9 dp mark"
+  },
+  "imagery": {
+    "strategy": "none",
+    "direction": "herdr-app icon set (Apache-2.0), 1.5-2 stroke, 22 dp in buttons, 16-18 dp inline; agent marks claude.svg and codex.svg at 20 dp",
+    "sources": [
+      "design/renders/icons/"
+    ]
+  },
+  "layout": {
+    "composition": "Single column. Home: title bar, machine notices, sectioned agent list. Terminal: title bar, queue strip, terminal, keys row above the keyboard while typing.",
+    "wireframe": "[Agents        (srv)]\n[o server unreachable >]\nNeeds you 2\n|card: docs nav / Permission / git push|\nDone 1 / Working 3 / Idle 2\nOther terminals 3 >",
+    "rhythm": "64 dp rows, 40 dp section headers, 4 dp grid",
+    "maxWidth": "412px reference width; full width up to 600 dp, rail beyond (v1.1)",
+    "contentWidth": "full width",
+    "gutter": "16px",
+    "referenceViewport": {
+      "width": 412,
+      "height": 915,
+      "density": 2
+    },
+    "screenPaddingX": 16,
+    "listPaddingX": 8,
+    "rowPaddingX": 12,
+    "topBarHeight": 60,
+    "terminalTitleHeight": 64,
+    "queueStripHeight": 34,
+    "keysRowHeight": 48,
+    "sectionHeaderHeight": 40,
+    "rowMinHeight": 64,
+    "systemBars": "edge to edge; status bar 36, gesture bar 28 in the renders",
+    "terminalFit": "watching: desk grid scaled to fit the width, area below the grid in canvas colour behind a dashed top border; typing: phone grid at 12.2 sp, about 56 columns on 412 dp",
+    "wide": "v1.1 (M4): rail at 600 dp and wider; not specified here"
+  },
+  "colors": {
+    "note": "Two themes in v1. Each value is the resolved herdr-app colour; '#rrggbbaa' are alpha overlays.",
+    "themes": {
+      "graphite": {
+        "mode": "dark",
+        "bg": "#17191d",
+        "chrome": "#101114",
+        "canvas": "#131518",
+        "popover": "#25272b",
+        "raised": "#2c2e31",
+        "hover": "#ffffff0e",
+        "selected": "#ffffff17",
+        "border": "#ffffff18",
+        "input": "#ffffff24",
+        "fg": "#eeeeef",
+        "termFg": "#d2d4d9",
+        "muted": "#98999b",
+        "dim": "#696a6d",
+        "idle": "#696a6d",
+        "ring": "#aeaeb0",
+        "accent": "#96b2d7",
+        "solid": "#eeeeef",
+        "solidFg": "#111215",
+        "selection": "#394454",
+        "ansi": [
+          "#45484f",
+          "#dc8c95",
+          "#a6bd91",
+          "#d8be87",
+          "#96b2d7",
+          "#b5a2ce",
+          "#8cbdc3",
+          "#d2d4d9",
+          "#818793",
+          "#f0a5ad",
+          "#bad5a2",
+          "#ead2a1",
+          "#b0cbef",
+          "#cbb7e6",
+          "#a4d5db",
+          "#f0f0f2"
+        ]
+      },
+      "paper": {
+        "mode": "light",
+        "bg": "#ffffff",
+        "chrome": "#f1f1ee",
+        "canvas": "#fafaf9",
+        "popover": "#ffffff",
+        "raised": "#f6f6f6",
+        "hover": "#0000000c",
+        "selected": "#00000012",
+        "border": "#00000017",
+        "input": "#00000026",
+        "fg": "#1b1b1e",
+        "termFg": "#25272c",
+        "muted": "#69696a",
+        "dim": "#969698",
+        "idle": "#a8a8aa",
+        "ring": "#5f5f62",
+        "accent": "#1f62d0",
+        "solid": "#1b1b1e",
+        "solidFg": "#ffffff",
+        "selection": "#cfdcf5",
+        "ansi": [
+          "#25272c",
+          "#c62a2a",
+          "#1a7f37",
+          "#8f5d00",
+          "#1f62d0",
+          "#7a45c8",
+          "#0f6f74",
+          "#5f6068",
+          "#7b7e87",
+          "#d1242f",
+          "#1f883d",
+          "#9a6700",
+          "#0969da",
+          "#8250df",
+          "#1b7c83",
+          "#111214"
+        ]
+      }
+    },
+    "semantic": {
+      "note": "Agent states, per theme. Same meaning as the Mac sidebar.",
+      "working": {
+        "graphite": "#e5c07b",
+        "paper": "#9a6700",
+        "mark": "spinner"
+      },
+      "blocked": {
+        "graphite": "#f0705f",
+        "paper": "#c93c2c",
+        "mark": "Needs you pill (blocked at 15% behind blocked text) or the needs-you card",
+        "includes": [
+          "blocked",
+          "error"
+        ]
+      },
+      "done": {
+        "graphite": "#76a8ff",
+        "paper": "#2f6fe4",
+        "mark": "filled 9 dp dot"
+      },
+      "idle": {
+        "graphite": "#696a6d",
+        "paper": "#a8a8aa",
+        "mark": "9 dp ring, 1.5 dp stroke"
+      },
+      "connected": {
+        "graphite": "#a6bd91",
+        "paper": "#1a7f37",
+        "note": "ansi 2; machine status dot only"
+      },
+      "unreachable": {
+        "mark": "idle ring",
+        "note": "machine status; never red"
+      },
+      "warning": "#e5c07b",
+      "queueStripBackground": "blocked mixed 9% into chrome",
+      "diffAdd": "ansi 2 at 16%",
+      "diffDel": "ansi 1 at 16%",
+      "success": "#76a8ff",
+      "error": "#f0705f",
+      "info": "#96b2d7",
+      "_mapping": "success=done, warning=working, error=blocked (needs you), info=accent; per-theme values in the state entries"
+    },
+    "lockScreen": {
+      "note": "Drawn by Android; values only for the render",
+      "notificationTitle": "#eef0f3",
+      "notificationBody": "#c4c7cd"
+    },
+    "_defaultTheme": "graphite; top-level values are graphite, both themes in colors.themes",
+    "background": "#101114",
+    "surface": "#25272b",
+    "surfaceRaised": "#2c2e31",
+    "text": "#eeeeef",
+    "textMuted": "#98999b",
+    "primary": "#eeeeef",
+    "secondary": "#98999b",
+    "accent": "#96b2d7",
+    "border": "#ffffff18"
+  },
+  "typography": {
+    "families": {
+      "ui": {
+        "name": "Geist",
+        "weights": [
+          400,
+          500,
+          600
+        ],
+        "license": "OFL",
+        "bundle": true
+      },
+      "mono": {
+        "name": "JetBrains Mono",
+        "weights": [
+          400,
+          500,
+          700
+        ],
+        "license": "OFL",
+        "bundle": true,
+        "features": "ligatures off (calt/liga disabled): === and -> must stay three and two cells"
+      }
+    },
+    "scale": {
+      "screenTitle": {
+        "family": "ui",
+        "size": 22,
+        "weight": 600,
+        "letterSpacing": "-0.01em"
+      },
+      "subScreenTitle": {
+        "family": "ui",
+        "size": 20,
+        "weight": 600
+      },
+      "dialogTitle": {
+        "family": "ui",
+        "size": 21,
+        "weight": 600
+      },
+      "sheetTitle": {
+        "family": "ui",
+        "size": 18,
+        "weight": 600
+      },
+      "terminalTitle": {
+        "family": "ui",
+        "size": 17,
+        "weight": 500
+      },
+      "machineName": {
+        "family": "ui",
+        "size": 17,
+        "weight": 500
+      },
+      "rowName": {
+        "family": "ui",
+        "size": 16,
+        "weight": 400
+      },
+      "body": {
+        "family": "ui",
+        "size": 15,
+        "weight": 400,
+        "lineHeight": 1.5
+      },
+      "settingRow": {
+        "family": "ui",
+        "size": 14.5,
+        "weight": 400
+      },
+      "sectionHeader": {
+        "family": "ui",
+        "size": 13,
+        "weight": 500,
+        "color": "state colour of the section; count in dim"
+      },
+      "secondary": {
+        "family": "ui",
+        "size": 13,
+        "weight": 400,
+        "color": "dim (row subtitles, times)"
+      },
+      "pill": {
+        "family": "ui",
+        "size": 12.5,
+        "weight": 600
+      },
+      "cardKind": {
+        "family": "ui",
+        "size": 12,
+        "weight": 600,
+        "color": "blocked",
+        "letterSpacing": "0.01em"
+      },
+      "cardMsg": {
+        "family": "mono",
+        "size": 13,
+        "weight": 400,
+        "lineHeight": 1.45,
+        "color": "termFg"
+      },
+      "keysRow": {
+        "family": "mono",
+        "size": 13.5,
+        "weight": 400
+      },
+      "fingerprint": {
+        "family": "mono",
+        "size": 13.5,
+        "weight": 400,
+        "lineHeight": 1.6
+      },
+      "terminalPhone": {
+        "family": "mono",
+        "size": 12.2,
+        "lineHeight": 1.25,
+        "note": "about 56 columns at 412 dp"
+      },
+      "terminalWatch": {
+        "family": "mono",
+        "size": "fit: width / (cols * 0.6)",
+        "lineHeight": 1.25,
+        "note": "96 columns at 412 dp = 7.15 sp"
+      }
+    },
+    "fontFamily": {
+      "display": "Geist",
+      "heading": "Geist",
+      "body": "Geist",
+      "mono": "JetBrains Mono"
+    },
+    "weightPairing": {
+      "display": "600 titles",
+      "emphasis": "500/600 on 400 body; deliberately the Mac's restrained pairing, not weight extremes"
+    },
+    "lineHeight": {
+      "terminal": "1.25",
+      "cardMsg": "1.45",
+      "body": "1.5",
+      "fingerprint": "1.6"
+    }
+  },
+  "spacing": {
+    "unit": 4,
+    "scale": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14,
+      16,
+      20,
+      24
+    ]
+  },
+  "borders": {
+    "radius": {
+      "pill": "6px",
+      "key": "8px",
+      "askBox": "9px",
+      "notice": "10px",
+      "row": "12px",
+      "button": "12px",
+      "field": "12px",
+      "card": "14px",
+      "machineCard": "16px",
+      "chip": "20px",
+      "sheetTop": "22px",
+      "dialog": "24px"
+    },
+    "width": {
+      "thin": "1px",
+      "default": "1px",
+      "signature": "3px"
+    },
+    "hairline": "1 dp border colour",
+    "signatureEdge": "3 dp blocked, left side only",
+    "deskGridEnd": "1 dp dashed border colour"
+  },
+  "shadows": {
+    "note": "Flat app; one shadow only, for the floating chip over the terminal",
+    "chip": "0 6 20 #00000066"
+  },
+  "animations": {
+    "choreography": "None orchestrated. The one moving thing is the working spinner, as on the Mac.",
+    "spinner": {
+      "period": "900ms",
+      "easing": "linear",
+      "shape": "ring at 24% opacity with a quarter arc, 15 dp, 3.2 stroke"
+    },
+    "listReorder": {
+      "duration": "200ms",
+      "easing": "standard",
+      "note": "an agent moving between sections slides; no other list motion"
+    },
+    "sheet": "platform bottom-sheet motion",
+    "hero": {
+      "archetype": "none (product app)",
+      "reducedMotionStrategy": "spinner static quarter arc; reorder instant"
+    },
+    "duration": {
+      "listReorder": "200ms",
+      "spinnerPeriod": "900ms"
+    },
+    "easing": {
+      "default": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "spinner": "linear"
+    },
+    "patterns": [
+      "working spinner",
+      "list reorder slide",
+      "platform bottom sheet"
+    ]
+  },
+  "components": {
+    "agentRow": {
+      "height": 64,
+      "parts": "agent mark 20, name 16 / subtitle 'space · machine' 13 dim, optional progress bar 150x3, optional 'offline' tag, time 13 dim, state mark in an 18 dp slot",
+      "states": [
+        "working",
+        "done",
+        "idle"
+      ],
+      "idleName": "muted"
+    },
+    "needsYouCard": {
+      "signature": true,
+      "background": "popover",
+      "border": "1 border + 3 blocked left edge",
+      "radius": 14,
+      "padding": "12 14 13 13",
+      "ask": "canvas box, radius 9, padding 9 11: kind (cardKind) above msg (cardMsg)"
+    },
+    "sectionHeader": {
+      "height": 40,
+      "order": [
+        "Needs you",
+        "Done",
+        "Working",
+        "Idle",
+        "Other terminals (collapsed)"
+      ],
+      "colors": {
+        "Needs you": "blocked",
+        "Done": "done",
+        "Working": "working",
+        "Idle": "dim",
+        "Other terminals": "dim"
+      }
+    },
+    "machineNotice": {
+      "height": 36,
+      "radius": 10,
+      "background": "hover",
+      "text": "13 muted, machine name in fg",
+      "use": "one line per unreachable machine above the list"
+    },
+    "terminalTitleBar": {
+      "height": 64,
+      "parts": "back 48 target, agent mark, name 17/500 over 'space · machine' 13 dim, state pill"
+    },
+    "queueStrip": {
+      "signature": true,
+      "height": 34,
+      "border": "3 blocked left edge, 1 border top",
+      "text": "'N more needs you' 13/600 blocked, '· next: <agent>, <kind>' muted",
+      "action": "tap opens the next agent"
+    },
+    "watchingChip": {
+      "height": 40,
+      "radius": 20,
+      "position": "bottom centre over the terminal, 16 from the bottom",
+      "text": "'Watching at desk size CxR · tap to type'",
+      "shadow": "chip"
+    },
+    "sizeTag": {
+      "position": "top right of the terminal",
+      "text": "'phone size CxR', 11.5 dim on canvas, radius 6"
+    },
+    "keysRow": {
+      "height": 48,
+      "keys": [
+        "esc",
+        "tab",
+        "ctrl",
+        "alt",
+        "←",
+        "↓",
+        "↑",
+        "→",
+        "compose"
+      ],
+      "key": "raised, radius 8",
+      "latched": "solid background, solidFg text",
+      "compose": "1.25 width, outlined with input colour, pen icon"
+    },
+    "composeSheet": {
+      "radius": "22 top",
+      "parts": "handle, 'Compose' 18/600 with 'to <agent>' dim, multiline field (canvas, input border, 16 text), hint 'Pasted into the terminal. Enter is yours.', Cancel and Paste (solid)",
+      "behaviour": "Paste sends bracketed paste, no Enter"
+    },
+    "machineCard": {
+      "radius": 16,
+      "background": "popover",
+      "head": "status dot or ring, name 17/500, status line 13 muted",
+      "rows": "Alerts status, Mute alerts toggle, Send test alert"
+    },
+    "hostKeyDialog": {
+      "radius": 24,
+      "parts": "'Trust this machine?' 21/600, host in fg, fingerprint box (mono, canvas), 'After this, a different key stops the connection.', Cancel and 'Trust and connect' (solid)"
+    },
+    "notification": {
+      "channels": [
+        "Needs you (loud)",
+        "Finished (quiet)",
+        "Alert health (quiet)"
+      ],
+      "title": "'<agent> needs you' / '<agent> finished · <machine>'",
+      "body": "'<kind> · <machine>'",
+      "never": "screen text or msg"
+    },
+    "button": {
+      "height": 44,
+      "radius": 12,
+      "outline": "1 input",
+      "solid": "solid background, solidFg, 500"
+    },
+    "toggle": {
+      "size": "44x26",
+      "note": "Compose Switch styled with these colours"
+    }
+  },
+  "accessibility": {
+    "wcag": "AA",
+    "minContrastRatioText": 4.5,
+    "minContrastRatioLarge": 3.0,
+    "minContrastRatioUI": 3.0,
+    "minTouchTarget": "44px",
+    "respectReducedMotion": true,
+    "minTextSize": 11.5,
+    "checked": {
+      "graphite": {
+        "fgOnChrome": 16.28,
+        "mutedOnChrome": 6.62,
+        "mutedOnPopover": 5.25,
+        "blockedOnPopover": 5.12,
+        "workingOnChrome": 10.93,
+        "doneOnChrome": 7.93,
+        "termFgOnBg": 11.87
+      },
+      "paper": {
+        "fgOnChrome": 15.18,
+        "mutedOnChrome": 4.85,
+        "mutedOnPopover": 5.48,
+        "blockedOnPopover": 5.04
+      }
+    },
+    "stateNotByColourAlone": "every state also has a mark (spinner, pill, dot, ring) and a section header in words",
+    "fontScaling": "all text in sp; layouts must hold at 130% font scale",
+    "knownExceptions": [
+      "Kept on purpose (Ezra, 2026-11-01): Mac values first, judge on the phone. dim text is under 4.5:1 (graphite 3.49 on chrome, 2.77 on popover; paper 2.61 on chrome) for subtitles, times and counts.",
+      "paper status colours as 13 sp section headers on chrome: working 4.30, blocked 4.45, done 4.11."
+    ],
+    "followUp": "Judge at the M1 phone check (task M1.5), outdoors. If too faint: dim for text graphite #8d8e90, paper #6d6d70 (dim stays for rings/counts); paper status #956401, #c73c2c, #2e69d6. All pass 4.5:1."
+  },
+  "breakpoints": {
+    "compact": "0-599dp (v1)",
+    "medium": "600dp+ rail (v1.1)"
+  }
+}

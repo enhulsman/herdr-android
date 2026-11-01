@@ -1,6 +1,8 @@
 # Release build on a v* tag (see docs/release.md and the release spec): checks
-# the tag, runs every test and cargo-deny, builds the unsigned arm64-v8a APK and
-# herdr-push, and uploads them with their SHA-256 sums. No secrets, no caches.
+# the tag, runs every test (with core-tests.yml: the scratch-core suite against
+# the oldest supported and the latest herdr-core) and cargo-deny, builds the
+# unsigned arm64-v8a APK and herdr-push, and uploads them with their SHA-256
+# sums. No secrets, no caches.
 # release-sign.yml signs and publishes once this succeeds; it runs as it is on
 # main and repeats the tag checks itself, since a tag can carry any version of
 # this file.
@@ -25,9 +27,18 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # The protocol suite against the oldest supported and the latest herdr-core:
+  # a failure blocks the release; the latest passed is stamped in below.
+  core:
+    uses: ./.github/workflows/core-tests.yml
+
   build:
+    needs: core
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      # compat::NEWEST_TESTED: above it, the app says the core is untested.
+      HERDR_TESTED_CORE: ${{ needs.core.outputs.latest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

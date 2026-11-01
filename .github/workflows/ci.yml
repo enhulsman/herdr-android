@@ -55,50 +55,11 @@ jobs:
           tool: cargo-deny@0.20.2
       - run: cargo deny --locked check advisories licenses sources
 
-  # The protocol suite and the restricted-line test against released cores:
-  # the oldest supported (MIN_CORE, checksum pinned) and whatever is latest.
+  # Scratch-core and sshd tests against the oldest supported and the latest core.
   core:
-    name: core (${{ matrix.core }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        core: [min, latest]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Rust toolchain
-        run: |
-          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
-          rustup default "$RUST_TOOLCHAIN"
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: false
-
-      - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
-
-      - name: Fetch herdr-core
-        env:
-          CORE: ${{ matrix.core }}
-        run: |
-          if [[ $CORE == min ]]; then
-            CORE=$(sed -n 's/^pub const MIN_CORE: &str = "\(.*\)";/\1/p' crates/herdr-proto/src/compat.rs)
-          fi
-          bin=$(scripts/fetch-herdr-core.sh "$CORE")
-          "$bin" --version
-          echo "HERDR_CORE_BIN=$bin" >> "$GITHUB_ENV"
-
-      - name: Scratch-core and sshd tests
-        env:
-          HERDR_REQUIRE_CORE: "1"
-          HERDR_REQUIRE_SSHD: "1"
-        run: |
-          cargo test --locked -p herdr-proto --test scratch_core
-          cargo test --locked -p herdr-mobile --test sshd
+    uses: ./.github/workflows/core-tests.yml
+    with:
+      cache: true
 
   android:
     runs-on: ubuntu-24.04

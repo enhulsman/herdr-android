@@ -1,0 +1,105 @@
+# The protocol suite (crates/herdr-proto/tests/scratch_core.rs) and the
+# restricted-line test (crates/herdr-mobile/tests/sshd.rs) against released
+# herdr-core: the oldest supported (MIN_CORE, checksum pinned) and the latest.
+# Called by CI and by the release build, which stamps `latest` into the app as
+# the newest tested core (HERDR_TESTED_CORE).
+name: Core tests
+
+on:
+  workflow_call:
+    inputs:
+      cache:
+        description: Restore the Rust build cache (CI); the release build uses none
+        type: boolean
+        default: false
+    outputs:
+      latest:
+        description: The latest herdr-core version the tests passed against
+        value: ${{ jobs.resolve.outputs.latest }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  RUST_TOOLCHAIN: "1.95.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Fixes "latest" once, so every job and the release stamp mean one version.
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      min: ${{ steps.v.outputs.min }}
+      latest: ${{ steps.v.outputs.latest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: v
+        run: |
+          min=$(sed -n 's/^pub const MIN_CORE: &str = "\(.*\)";/\1/p' crates/herdr-proto/src/compat.rs)
+          latest=$(curl -fsSL https://releases.herdr.dev/core/latest.json |
+            python3 -I -c 'import json, sys; print(json.load(sys.stdin)["version"])')
+          for v in "$min" "$latest"; do
+            [[ $v =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad version '$v'" >&2; exit 1; }
+          done
+          echo "min=$min" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "min $min, latest $latest"
+
+  test:
+    needs: resolve
+    name: core (${{ matrix.core }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        core: [min, latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: inputs.cache
+        with:
+          save-if: false
+
+      - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
+
+      # The pinned version by its number; latest through latest.json, which
+      # must still name the version resolved above.
+      - name: Fetch herdr-core
+        env:
+          CORE: ${{ matrix.core }}
+          MIN: ${{ needs.resolve.outputs.min }}
+          LATEST: ${{ needs.resolve.outputs.latest }}
+        run: |
+          if [[ $CORE == min ]]; then
+            bin=$(scripts/fetch-herdr-core.sh "$MIN")
+          else
+            bin=$(scripts/fetch-herdr-core.sh latest)
+            [[ $bin == */herdr-core/$LATEST/herdr-core ]] ||
+              { echo "latest moved past $LATEST during the run; run again" >&2; exit 1; }
+          fi
+          "$bin" --version
+          echo "HERDR_CORE_BIN=$bin" >> "$GITHUB_ENV"
+
+      - name: Scratch-core and sshd tests
+        env:
+          HERDR_REQUIRE_CORE: "1"
+          HERDR_REQUIRE_SSHD: "1"
+        run: |
+          cargo test --locked -p herdr-proto --test scratch_core
+          cargo test --locked -p herdr-mobile --test sshd

@@ -10,8 +10,11 @@ reference-shots/*
 !reference-shots/herdr-4-machines.png
 # Build
 .gradle/
+.kotlin/
 build/
 target/
+# Written by scripts/build-rust-android.sh
+android/app/src/main/jniLibs/
 local.properties
 *.keystore
 *.jks

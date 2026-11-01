@@ -10,8 +10,9 @@
 # against its own manifest (latest.json), and against a pin too when that
 # version is pinned. Download URLs must be on the release server.
 #
-# Cached under target/herdr-core/<version>/ (archive, binary, checksums); a
-# cached binary is reused when its checksums still hold, without the network.
+# Cached under target/herdr-core/<version>/ (archive and binary); a cached
+# binary is reused without the network when the archive still has the expected
+# checksum and the binary is identical to the one in it.
 #
 # Environment (tests): HERDR_RELEASES_URL (default https://releases.herdr.dev),
 # HERDR_CORE_PINS, HERDR_CORE_CACHE.
@@ -76,11 +77,15 @@ fi
 
 dir="$cache/$version"
 bin="$dir/herdr-core"
-# Reuse: the archive it came from has the expected checksum, the binary is intact.
-if [[ -x $bin && -f $dir/archive.sha256 && -f $dir/binary.sha256 ]] &&
-  [[ $(cat "$dir/archive.sha256") == "$expect" && $(cat "$dir/binary.sha256") == "$(sha "$bin")" ]]; then
-  echo "$bin"
-  exit 0
+# Reuse: the cached archive still has the expected checksum and the cached
+# binary is byte for byte the one inside it. Nothing else in the cache is trusted.
+if [[ -x $bin && -f $dir/archive.tar.gz && $(sha "$dir/archive.tar.gz") == "$expect" ]]; then
+  mkdir "$tmp/cached"
+  if tar -xzf "$dir/archive.tar.gz" -C "$tmp/cached" herdr-core 2>/dev/null &&
+    cmp -s "$tmp/cached/herdr-core" "$bin"; then
+    echo "$bin"
+    exit 0
+  fi
 fi
 
 if [[ $want != latest ]]; then
@@ -103,7 +108,5 @@ tar -xzf "$tmp/archive.tar.gz" -C "$tmp/x" herdr-core || fail "no herdr-core in 
 rm -rf "$dir"
 mkdir -p "$dir"
 mv "$tmp/archive.tar.gz" "$dir/archive.tar.gz"
-printf '%s\n' "$expect" > "$dir/archive.sha256"
 mv "$tmp/x/herdr-core" "$bin"
-sha "$bin" > "$dir/binary.sha256"
 echo "$bin"

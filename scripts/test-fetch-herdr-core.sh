@@ -146,6 +146,35 @@ a_damaged_cache_is_fetched_again() {
   [[ $("$out" --version) == "herdr-core 0.1.15" ]] || fail "kept the damaged binary"
 }
 
+a_forged_cache_is_not_trusted() {
+  reset; release 0.1.15
+  local archive="$releases/core/0.1.15/herdr-core-linux-x86_64.tar.gz"
+  pin 0.1.15 "$(sha "$archive")"
+  # A cache someone filled by hand: the real archive, a different binary, and
+  # sidecar files that agree with it.
+  local dir="$HERDR_CORE_CACHE/0.1.15"
+  mkdir -p "$dir"
+  cp "$archive" "$dir/archive.tar.gz"
+  printf '#!/bin/sh\necho forged\n' > "$dir/herdr-core"
+  chmod 755 "$dir/herdr-core"
+  sha "$archive" > "$dir/archive.sha256"
+  sha "$dir/herdr-core" > "$dir/binary.sha256"
+  run 0.1.15
+  [[ $status -eq 0 ]] || { fail "exit $status: $(cat "$scratch/stderr")"; return; }
+  [[ $("$out" --version) == "herdr-core 0.1.15" ]] || fail "ran the forged binary"
+}
+
+a_cached_archive_that_no_longer_matches_is_fetched_again() {
+  reset; release 0.1.15
+  pin 0.1.15 "$(sha "$releases/core/0.1.15/herdr-core-linux-x86_64.tar.gz")"
+  run 0.1.15
+  printf 'x' >> "$HERDR_CORE_CACHE/0.1.15/archive.tar.gz"
+  run 0.1.15
+  [[ $status -eq 0 ]] || { fail "exit $status: $(cat "$scratch/stderr")"; return; }
+  cmp -s "$HERDR_CORE_CACHE/0.1.15/archive.tar.gz" \
+    "$releases/core/0.1.15/herdr-core-linux-x86_64.tar.gz" || fail "kept the damaged archive"
+}
+
 a_binary_that_does_not_run_is_refused() {
   reset; release 0.1.16 'exit 1'; latest 0.1.16
   run latest
@@ -178,6 +207,8 @@ latest_that_is_pinned_is_checked_against_the_pin
 a_url_off_the_release_server_is_refused
 the_cache_is_used_without_the_network
 a_damaged_cache_is_fetched_again
+a_forged_cache_is_not_trusted
+a_cached_archive_that_no_longer_matches_is_fetched_again
 a_binary_that_does_not_run_is_refused
 a_bad_version_argument_is_refused
 the_committed_pins_name_the_supported_minimum

@@ -6,7 +6,7 @@
 //! or latest). Without it every test says so and passes, unless
 //! `HERDR_REQUIRE_CORE` is set (CI's core jobs set both).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -22,6 +22,23 @@ use tokio::process::{Child, Command};
 
 /// Long enough for a debug build on a loaded CI runner.
 const WAIT: Duration = Duration::from_secs(20);
+
+/// Makes a new directory only this user can enter. One that already exists
+/// (left over, or made by someone else) is an error: a config inside it could
+/// point the scratch core at the user's own.
+fn fresh_dir(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new().mode(0o700).create(path)
+}
+
+#[test]
+fn an_existing_scratch_dir_is_refused() {
+    let dir = std::env::temp_dir().join(format!("hcp-{}-pre", std::process::id()));
+    std::fs::create_dir(&dir).unwrap();
+    let again = fresh_dir(&dir);
+    std::fs::remove_dir(&dir).unwrap();
+    assert_eq!(again.unwrap_err().kind(), std::io::ErrorKind::AlreadyExists);
+}
 
 /// One scratch core: its own session name and dirs. Dropping it stops the core
 /// (with the same environment, so only this one) and removes the dirs.
@@ -44,8 +61,8 @@ impl Core {
         };
         // Short: the core's sockets go under it (108-byte socket path limit).
         let dir = std::env::temp_dir().join(format!("hcp-{}-{session}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(dir.join("home")).unwrap();
+        fresh_dir(&dir).unwrap_or_else(|e| panic!("scratch dir {}: {e}", dir.display()));
+        std::fs::create_dir(dir.join("home")).unwrap();
         Some(Core {
             bin: std::fs::canonicalize(bin).unwrap(),
             dir,

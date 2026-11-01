@@ -99,6 +99,14 @@ fn user() -> String {
     std::env::var("USER").expect("USER is set")
 }
 
+/// Makes a new directory only this user can enter. One that already exists
+/// (left over, or made by someone else) is an error: a config inside it could
+/// point the scratch core at the user's own.
+fn fresh_dir(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new().mode(0o700).create(path)
+}
+
 /// The PATH a session gets: system directories only, plus `extra` dirs under
 /// the session HOME first.
 fn session_path(home: &Path, extra: &[&str]) -> String {
@@ -125,8 +133,8 @@ fn sshd(name: &str, authorized: &str, path_dirs: &[&str], env: &[(&str, String)]
     }
     // Short: a real core's sockets go under it (108-byte socket path limit).
     let dir = std::env::temp_dir().join(format!("hsd-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("home")).unwrap();
+    fresh_dir(&dir).unwrap_or_else(|e| panic!("scratch dir {}: {e}", dir.display()));
+    std::fs::create_dir(dir.join("home")).unwrap();
     let host_key = dir.join("host_key");
     let status = Command::new("ssh-keygen")
         .args(["-q", "-t", "ed25519", "-N", "", "-f"])
@@ -529,6 +537,8 @@ fn a_real_core_answers_hello_through_the_line() {
     let Some(sshd) = sshd("real", &app_line(&phone), &[], &env) else {
         return;
     };
+    // Before the core ever runs, so no one else's dir can stand in for it.
+    fresh_dir(&scratch).unwrap_or_else(|e| panic!("scratch dir {}: {e}", scratch.display()));
     let local_bin = sshd.home().join(".local/bin");
     std::fs::create_dir_all(&local_bin).unwrap();
     std::fs::copy(&bin, local_bin.join("herdr-core")).unwrap();

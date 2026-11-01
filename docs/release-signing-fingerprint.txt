@@ -1,0 +1,6 @@
+# SHA-256 of the release signing certificate, as `apksigner verify --print-certs`
+# prints it: 64 lowercase hex characters, no colons. The release workflow reads
+# the one line below that is not a comment and publishes nothing unless the signed
+# APK's certificate matches it.
+# M0.4: replace the next line with the real fingerprint.
+PLACEHOLDER-replace-in-M0.4

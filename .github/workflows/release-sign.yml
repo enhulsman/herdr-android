@@ -1,0 +1,144 @@
+# Signs and publishes what the Release workflow (release.yml) built for a v* tag.
+# A workflow_run workflow always runs as this file is on main, so a tag on a
+# commit off main cannot change what happens here; the release environment
+# admits main only and holds the signing keys. Before any key is used, the gate
+# step checks through the API, not the build's word: the tag points at the built
+# commit, that commit is on main, VERSION there matches the tag, and the
+# versionCode is above every published release. One run at a time, so an older
+# tag that finishes late fails the gate instead of publishing after a newer one.
+# Checks out nothing and runs no repository code.
+name: Sign and publish
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: sign-and-publish
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # apksigner comes from this build-tools version.
+  BUILD_TOOLS: "36.0.0"
+
+jobs:
+  sign-and-release:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.workflow_run.head_branch }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Tag points at the built commit, which is on main, matches VERSION, and raises versionCode
+        id: gate
+        run: |
+          fail() { echo "::error::$TAG: $*"; exit 1; }
+          api() { gh api "repos/$GITHUB_REPOSITORY/$1" "${@:2}"; }
+          # As scripts/check-release-tag.sh and android/app/build.gradle.kts.
+          code() {
+            [[ $1 =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$ ]] || return 1
+            echo $((BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3]))
+          }
+          current=$(code "$TAG") || fail "not a release tag"
+          ref=$(api "git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
+          commit=${ref#* }
+          if [[ $ref == "tag "* ]]; then commit=$(api "git/tags/$commit" --jq .object.sha); fi
+          [[ $commit == "$SHA" ]] || fail "tag points at $commit, the build was of $SHA"
+          # By sha, so a tag named main cannot stand in for the branch.
+          main=$(api branches/main --jq .commit.sha)
+          status=$(api "compare/$SHA...$main" --jq .status)
+          [[ $status == ahead || $status == identical ]] || fail "$SHA is not on main ($status)"
+          version=$(api "contents/VERSION?ref=$SHA" -H "Accept: application/vnd.github.raw")
+          [[ "v$version" == "$TAG" ]] || fail "VERSION at $SHA is '$version'"
+          published=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1000 \
+            --json tagName --jq '.[].tagName')
+          while read -r other; do
+            previous=$(code "$other") || continue
+            ((current > previous)) || fail "versionCode $current is not above $previous of published $other"
+          done <<<"$published"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned
+          path: unsigned
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify the sums recorded by the build
+        working-directory: unsigned
+        run: sha256sum --check --strict SHA256SUMS
+
+      - name: Expected certificate fingerprint, from the tagged commit
+        id: fingerprint
+        run: |
+          expected=$(gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$GITHUB_REPOSITORY/contents/docs/release-signing-fingerprint.txt?ref=$SHA" \
+            | grep -v -e '^#' -e '^$')
+          if [[ ! $expected =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::docs/release-signing-fingerprint.txt holds no fingerprint (still the M0.4 placeholder?)"
+            exit 1
+          fi
+          echo "expected=$expected" >> "$GITHUB_OUTPUT"
+
+      - name: Pinned apksigner (build-tools ${{ env.BUILD_TOOLS }})
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "build-tools;$BUILD_TOOLS" > /dev/null'
+
+      - name: Sign the APK and check its certificate
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          EXPECTED: ${{ steps.fingerprint.outputs.expected }}
+        run: |
+          tools="$ANDROID_HOME/build-tools/$BUILD_TOOLS"
+          apk="release/herdr-android-${TAG#v}.apk"
+          umask 077
+          mkdir release
+          keystore="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$keystore"' EXIT
+          base64 --decode <<<"$RELEASE_KEYSTORE_B64" > "$keystore"
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$RELEASE_KEY_ALIAS" \
+            --ks-pass env:RELEASE_KEYSTORE_PASSWORD --key-pass env:RELEASE_KEY_PASSWORD \
+            --out "$apk" unsigned/herdr-android-unsigned.apk
+          certs=$("$tools/apksigner" verify --print-certs --min-sdk-version 31 "$apk")
+          digests=$(sed -n 's/^Signer #[0-9]* certificate SHA-256 digest: //p' <<<"$certs")
+          echo "Signing certificate SHA-256: $digests"
+          if [[ $digests != "$EXPECTED" ]]; then
+            echo "::error::signing certificate $digests is not the recorded $EXPECTED"
+            exit 1
+          fi
+
+      - name: Sign herdr-push (detached, namespace herdr-push)
+        env:
+          HERDR_PUSH_SIGNING_KEY: ${{ secrets.HERDR_PUSH_SIGNING_KEY }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/herdr-push-signing"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$HERDR_PUSH_SIGNING_KEY" > "$key"
+          cp unsigned/herdr-push release/herdr-push
+          ssh-keygen -Y sign -f "$key" -n herdr-push release/herdr-push
+
+      - name: Publish the release
+        working-directory: release
+        run: |
+          files=("herdr-android-${TAG#v}.apk" herdr-push herdr-push.sig)
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TAG" --notes "Built from commit $SHA." \
+            "${files[@]}" SHA256SUMS

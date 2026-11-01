@@ -1,0 +1,98 @@
+# Release build on a v* tag (see docs/release.md and the release spec): checks
+# the tag, runs every test and cargo-deny, builds the unsigned arm64-v8a APK and
+# herdr-push, and uploads them with their SHA-256 sums. No secrets, no caches.
+# release-sign.yml signs and publishes once this succeeds; it runs as it is on
+# main and repeats the tag checks itself, since a tag can carry any version of
+# this file.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  RUST_TOOLCHAIN: "1.95.0"
+  NDK_VERSION: "27.1.12297006"
+  # aapt2 comes from this build-tools version.
+  BUILD_TOOLS: "36.0.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Tag is on main, matches VERSION, and raises versionCode
+        id: tag
+        run: scripts/check-release-tag.sh "$GITHUB_REF_NAME" | tee -a "$GITHUB_OUTPUT"
+
+      - name: JDK 17, Android NDK and build-tools
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "ndk;$NDK_VERSION" "build-tools;$BUILD_TOOLS" > /dev/null
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal \
+            --target aarch64-linux-android,x86_64-linux-android
+          rustup default "$RUST_TOOLCHAIN"
+          cargo install cargo-ndk --version 4.1.2 --locked
+
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-deny@0.20.2
+
+      - name: Rust tests, release-tag tests, cargo-deny
+        run: |
+          cargo test --locked
+          scripts/test-check-release-tag.sh
+          scripts/test-release-sign-gate.sh
+          cargo deny --locked check advisories licenses sources
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+
+      - name: Unit tests and unsigned release APK
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease
+
+      - name: herdr-push for Linux x86_64
+        run: cargo build -p herdr-push --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: APK carries the tag's versionCode and only arm64-v8a
+        env:
+          VERSION_CODE: ${{ steps.tag.outputs.version_code }}
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          badging=$("$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2" dump badging "$apk")
+          grep -q "^package: name='dev.herdr.android' versionCode='$VERSION_CODE' versionName='${GITHUB_REF_NAME#v}'" <<<"$badging"
+          [[ $(grep '^native-code:' <<<"$badging") == "native-code: 'arm64-v8a'" ]]
+
+      - name: Stage artifacts and record their sums
+        run: |
+          mkdir dist
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk dist/herdr-android-unsigned.apk
+          cp target/x86_64-unknown-linux-gnu/release/herdr-push dist/herdr-push
+          (cd dist && sha256sum herdr-android-unsigned.apk herdr-push > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

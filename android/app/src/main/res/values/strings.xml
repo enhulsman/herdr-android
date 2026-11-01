@@ -3,4 +3,56 @@
     <!-- The system prompt that opens the SSH key's 30-minute window. -->
     <string name="unlock_key_title">Unlock the SSH key</string>
     <string name="unlock_key_subtitle">To connect to your machines</string>
+
+    <!-- Machines screen (render 7). -->
+    <string name="back">Back</string>
+    <string name="machines_title">Machines</string>
+    <string name="machines_empty">Add a machine that runs herdr-core to see its agents here.</string>
+    <string name="machines_add">Add machine</string>
+    <string name="machines_this_phone">This phone</string>
+    <string name="machines_phone_key">Phone key</string>
+    <!-- The key accepts a strong biometric or the device credential, for 30 minutes (AndroidKeystoreBackend). -->
+    <string name="machines_phone_key_detail">Needs your fingerprint or screen lock, then valid 30 min</string>
+    <string name="machines_export">Export machine list</string>
+    <string name="machines_export_detail">Without keys</string>
+
+    <!-- A machine's status line: parts joined by status_separator. -->
+    <string name="status_separator">" · "</string>
+    <string name="status_paused">Paused</string>
+    <string name="status_connecting">Connecting</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_core_version">herdr-core %1$s</string>
+    <string name="status_untested">untested version</string>
+    <string name="status_unreachable">Unreachable</string>
+    <!-- %1$s is one of the status_ago_* strings. -->
+    <string name="status_last_connected">last connected %1$s</string>
+    <string name="status_ago_now">just now</string>
+    <string name="status_ago_minutes">%1$dm ago</string>
+    <string name="status_ago_hours">%1$dh ago</string>
+    <string name="status_ago_days">%1$dd ago</string>
+    <string name="status_retrying">retrying</string>
+    <string name="status_needs_user_auth">Phone key locked</string>
+    <string name="status_host_key_unconfirmed">Host key not confirmed yet</string>
+    <string name="status_host_key_changed">Host key changed</string>
+    <string name="status_not_connecting">not connecting</string>
+    <string name="status_key_rejected">Phone key not accepted</string>
+    <!-- Wording from the machine-connection spec ("herdr-core missing", "Older core"). -->
+    <string name="status_not_installed">herdr-core not found on this machine</string>
+    <string name="status_too_old">herdr-core %1$s is older than this app supports</string>
+    <string name="status_too_old_detail">Update it to %1$s or newer, then try again.</string>
+    <string name="status_app_too_old">This app is too old for this machine\'s herdr-core</string>
+    <string name="status_app_too_old_detail">Update the app to connect.</string>
+    <!-- decisions.md 2026-11-01: GrapheneOS's per-app Network permission. -->
+    <string name="status_network_off">Network permission is off</string>
+    <string name="status_network_off_detail">Allow Network for herdr in Android settings.</string>
+
+    <!-- What a machine card offers when it waits for the person. -->
+    <string name="action_unlock">Unlock</string>
+    <string name="action_try_again">Try again</string>
+    <string name="link_check_host_key">Check the host key</string>
+    <string name="link_check_host_key_detail">Connects once you trust its fingerprint</string>
+    <string name="link_compare_host_keys">Compare the host keys</string>
+    <string name="link_compare_host_keys_detail">The machine shows a different key than the one you trusted</string>
+    <string name="link_add_phone_key">Add the phone key</string>
+    <string name="link_add_phone_key_detail">One line for this machine\'s authorized_keys</string>
 </resources>

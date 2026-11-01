@@ -5,45 +5,36 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import uniffi.herdr_mobile.coreVersion
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import dev.herdr.android.ui.machines.MachinesRoute
+import dev.herdr.android.ui.theme.HerdrTheme
 
-// Graphite bg, fg and muted from design-tokens.json; the full theme comes in M1.
-private val Background = Color(0xFF17191D)
-private val Foreground = Color(0xFFEEEEEF)
-private val Muted = Color(0xFF98999B)
+/** The app's screens; switched by state, without a navigation library. */
+enum class Screen {
+    /** The start screen until the Agents home (step 6) takes over. */
+    Machines,
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val transparent = android.graphics.Color.TRANSPARENT
-        enableEdgeToEdge(SystemBarStyle.dark(transparent), SystemBarStyle.dark(transparent))
-        val version = coreVersion()
-        setContent { Home(version) }
+        // Light or dark bar icons follow the system, as the theme does.
+        enableEdgeToEdge(SystemBarStyle.auto(transparent, transparent), SystemBarStyle.auto(transparent, transparent))
+        val app = application as HerdrApp
+        setContent { HerdrTheme { Root(app) } }
     }
 }
 
 @Composable
-private fun Home(coreVersion: String) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Background)
-            .safeDrawingPadding()
-            .padding(24.dp),
-    ) {
-        BasicText("herdr", style = TextStyle(color = Foreground, fontSize = 28.sp))
-        BasicText("core $coreVersion", style = TextStyle(color = Muted, fontSize = 14.sp))
+private fun Root(app: HerdrApp) {
+    val screen by rememberSaveable { mutableStateOf(Screen.Machines) }
+    when (screen) {
+        // The start screen has no back arrow; once the Agents home is the start,
+        // Machines gets onBack = { screen = Screen.Agents }.
+        Screen.Machines -> MachinesRoute(app, onBack = null)
     }
 }

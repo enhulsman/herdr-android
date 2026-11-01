@@ -23,8 +23,29 @@ android {
         targetSdk = 36
         versionName = appVersion
         versionCode = major * 10000 + minor * 100 + patch
+        manifestPlaceholders["appLabel"] = "herdr"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+    }
+
+    buildTypes {
+        // Installs next to the release from Obtainium, signed with the debug key.
+        debug {
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "herdr debug"
+        }
+        // The terminal spike (task M0.5, src/spike/): optimized Rust with
+        // libghostty-vt linked in, not debuggable so frame times are realistic.
+        // Needs scripts/build-ghostty.sh for both Android targets. CI and
+        // releases never build it.
+        create("spike") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            isJniDebuggable = false
+            applicationIdSuffix = ".spike"
+            manifestPlaceholders["appLabel"] = "herdr spike"
+            matchingFallbacks += "debug"
         }
     }
 
@@ -50,6 +71,7 @@ abstract class BuildRust @Inject constructor(
     private val fs: FileSystemOperations,
 ) : DefaultTask() {
     @get:Input abstract val release: Property<Boolean>
+    @get:Input abstract val features: ListProperty<String>
     @get:Internal abstract val repoRoot: DirectoryProperty
     @get:OutputDirectory abstract val jniLibs: DirectoryProperty
     @get:OutputDirectory abstract val kotlin: DirectoryProperty
@@ -65,6 +87,7 @@ abstract class BuildRust @Inject constructor(
             workingDir(root)
             commandLine(root.file("scripts/build-rust-android.sh").asFile.path)
             if (release.get()) args("--release")
+            if (features.get().isNotEmpty()) args("--features", features.get().joinToString(","))
         }
         fs.sync {
             from(root.dir("android/app/src/main/jniLibs"))
@@ -82,7 +105,8 @@ androidComponents {
         val buildRust = tasks.register<BuildRust>("buildRust${variant.name.replaceFirstChar(Char::uppercase)}") {
             group = "build"
             description = "Builds the Rust core and its Kotlin bindings for ${variant.name}."
-            release.set(variant.buildType == "release")
+            release.set(variant.buildType != "debug")
+            features.set(if (variant.buildType == "spike") listOf("vt") else emptyList())
             repoRoot.set(rootProject.layout.projectDirectory.dir(".."))
         }
         variant.sources.jniLibs?.addGeneratedSourceDirectory(buildRust, BuildRust::jniLibs)

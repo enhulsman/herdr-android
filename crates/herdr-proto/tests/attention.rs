@@ -626,7 +626,12 @@ fn a_needs_you_row_carries_its_kind_and_request_apart() {
 #[test]
 fn the_program_is_named_for_its_icon() {
     let mut t = tracker_knowing_wsl();
-    let app = |a: &str, app: &str| status(agent(a, Some("idle"), 0), json!({"state": "idle", "app": app}));
+    let app = |a: &str, app: &str| {
+        status(
+            agent(a, Some("idle"), 0),
+            json!({"state": "idle", "app": app}),
+        )
+    };
     let claude_code = app("t1", "claude-code");
     let claude = app("t2", "claude");
     let codex = app("t3", "codex");

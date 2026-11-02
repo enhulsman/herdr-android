@@ -619,7 +619,11 @@ async fn a_core_with_an_added_machine_lists_each_terminal_once() {
     let mut core = rig.core().await;
     core.connect(
         "0.1.15",
-        vec![agent("t1", "working", 0), agent("other/t3", "blocked", 0), shell],
+        vec![
+            agent("t1", "working", 0),
+            agent("other/t3", "blocked", 0),
+            shell,
+        ],
     )
     .await;
     let s = rig.until_state(WS, connected).await;
@@ -646,7 +650,10 @@ async fn rows_carry_the_program_and_the_request_apart() {
     let row = &s.agents[0];
     assert_eq!(row.program.as_deref(), Some("codex"));
     assert_eq!(row.request_kind.as_deref(), Some("Question"));
-    assert_eq!(row.request.as_deref(), Some("Which test runner should I use?"));
+    assert_eq!(
+        row.request.as_deref(),
+        Some("Which test runner should I use?")
+    );
     assert_eq!(row.label, "Question: Which test runner should I use?");
     assert_eq!(s.others[0].program.as_deref(), Some("make"));
 }

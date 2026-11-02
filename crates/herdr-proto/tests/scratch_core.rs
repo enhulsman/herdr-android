@@ -256,22 +256,29 @@ fn status_reports_drive_the_rows_through_events() {
         // First contact: nothing yet, so nothing is counted as seen already.
         tracker.observe("box", lines.terminals(), 0);
 
-        let fifo = core.dir.join("home/step");
+        // One FIFO per step: with a single FIFO, the shell's second `read` could
+        // open it while the first writer was still closing, hit end-of-file at
+        // once and run to idle without the second step, so `blocked` was never
+        // reported and the wait for it timed out on a loaded runner.
+        let fifos = [core.dir.join("home/step1"), core.dir.join("home/step2")];
         let script = format!(
-            "{working}; read _ < {fifo}; {blocked}; read _ < {fifo}; {idle}; sleep 60",
+            "{working}; read _ < {first}; {blocked}; read _ < {second}; {idle}; sleep 60",
             working = report("state=working:app=claude"),
             // msg is base64: "Run npm test?"
             blocked = report("state=blocked:kind=permission:app=claude:msg=UnVuIG5wbSB0ZXN0Pw=="),
             idle = report("state=idle:app=claude"),
-            fifo = fifo.display(),
+            first = fifos[0].display(),
+            second = fifos[1].display(),
         );
-        assert!(
-            std::process::Command::new("mkfifo")
-                .arg(&fifo)
-                .status()
-                .unwrap()
-                .success()
-        );
+        for fifo in &fifos {
+            assert!(
+                std::process::Command::new("mkfifo")
+                    .arg(fifo)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
         let run = c
             .client
             .call("terminal.run", json!({"argv": ["sh", "-c", script]}))
@@ -281,8 +288,8 @@ fn status_reports_drive_the_rows_through_events() {
         let state_is = |lines: &EventLines, word: &str| {
             find(lines, &address).is_some_and(|t| t.pointer("/status/state") == Some(&json!(word)))
         };
-        let step = || {
-            let fifo = fifo.clone();
+        let step = |n: usize| {
+            let fifo = fifos[n].clone();
             tokio::task::spawn_blocking(move || std::fs::write(fifo, "\n").unwrap())
         };
 
@@ -296,7 +303,7 @@ fn status_reports_drive_the_rows_through_events() {
         assert_eq!(row.attention, Attention::Working);
         assert_eq!(row.name, "Claude Code");
 
-        step().await.unwrap();
+        step(0).await.unwrap();
         until(&mut events, &mut lines, |l| state_is(l, "blocked")).await;
         tracker.observe("box", lines.terminals(), 2);
         let row = tracker
@@ -308,7 +315,7 @@ fn status_reports_drive_the_rows_through_events() {
         assert_eq!(row.label, "Permission: Run npm test?");
         assert!(row.since_ms.is_some());
 
-        step().await.unwrap();
+        step(1).await.unwrap();
         until(&mut events, &mut lines, |l| {
             state_is(l, "idle") && find(l, &address).is_some_and(|t| t["turn"] == 1)
         })

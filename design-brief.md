@@ -65,8 +65,9 @@ in v1.1.
 
 - **UI: Geist**, at 400, 500 and 600. Screen title 22/600, row name 16, secondary text 13.
 - **Terminal and the card's request text: JetBrains Mono**, with ligatures off, so that `===` stays three cells.
-- **Terminal size while typing:** 12.2 sp, which gives about 56 columns on a 412 dp phone.
-- **Terminal size while watching:** the desk's grid is scaled to the phone's width. The 96-column example comes out at 7.15 sp.
+- **Terminal padding:** the grid sits inside the Mac pane's padding, 10 dp at the sides and 6 dp at the top, painted in the terminal background (herdr-app `terminal_padding`). Claude Code starts at column 0; the margin is the terminal app's.
+- **Terminal size while typing:** 12.2 sp, which gives about 53 columns on a 412 dp phone. With the keyboard hidden the grid grows to the full height; the keys row stays.
+- **Terminal size while watching:** the desk's grid is scaled to the phone's width inside the padding. The 96-column example comes out at 6.8 sp.
 - Both fonts are OFL and bundled in the app.
 
 ## Screens (the approved renders)
@@ -76,6 +77,7 @@ in v1.1.
 | `1-home-dark`, `2-home-light` | Agent list in the order Needs you, Done, Working, Idle, then "Other terminals" (collapsed); an unreachable-machine line |
 | `3-terminal-watch` | Watching at desk size: the grid fitted to the width, a dashed line where it ends, and the "Watching … tap to type" chip |
 | `4-terminal-type` | Typing at phone size: size tag, keys row (`esc tab ctrl alt ← ↓ ↑ →` and compose), ctrl latched |
+| `4b-terminal-type-hidden` | Typing with the keyboard hidden: the phone grid at full height, keys row kept |
 | `5-compose` | Compose sheet; Paste sends no Enter |
 | `6-notification` | Lock screen: "Needs you" (loud) and "Finished" (quiet); agent, kind and machine only |
 | `7-machines` | Machine cards: alert status, mute, test alert, untested-version warning, unreachable machine |

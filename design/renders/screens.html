@@ -97,7 +97,7 @@ button{font-family:inherit;color:inherit}
 .queue b{font-weight:600;color:var(--blocked)}
 .queue .rest{color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .queue svg{width:16px;height:16px;color:var(--muted)}
-.term{font-variant-ligatures:none;flex:1;background:var(--bg);color:var(--term-fg);font-family:"JetBrains Mono",monospace;white-space:pre;overflow:hidden;position:relative}
+.term{font-variant-ligatures:none;flex:1;padding:6px 10px 0;box-sizing:border-box;background:var(--bg);color:var(--term-fg);font-family:"JetBrains Mono",monospace;white-space:pre;overflow:hidden;position:relative}
 .term .l{display:block;height:1.25em;line-height:1.25em}
 .c1{color:var(--a1)}.c2{color:var(--a2)}.c3{color:var(--a3)}.c4{color:var(--a4)}.c5{color:var(--a5)}.c6{color:var(--a6)}.c8{color:var(--a8)}.c9{color:var(--a9)}.c15{color:var(--a15)}
 .bgadd{background:color-mix(in srgb,var(--a2) 16%,transparent)}.bgdel{background:color-mix(in srgb,var(--a1) 16%,transparent)}
@@ -240,7 +240,8 @@ function termLines(cols){
   const box=(lines)=>{const w=cols-2;return [`<span class="c4">╭${'─'.repeat(w)}╮</span>`,...lines.map(([t,cls])=>`<span class="c4">│</span>${cls?`<span class="${cls}">`:''}${pad(t,w)}${cls?'</span>':''}<span class="c4">│</span>`),`<span class="c4">╰${'─'.repeat(w)}╯</span>`];};
   const wide = cols>70;
   const H=[
-    `<span class="c8">&gt;</span> fix the docs nav so the current page is marked, then push`,
+    ...(wide?[`<span class="c8">&gt;</span> fix the docs nav so the current page is marked, then push`]
+        :[`<span class="c8">&gt;</span> fix the docs nav so the current page is marked,`,`  then push`]),
     ``,
     `<span class="c15 bold">●</span> Search<span class="c8">(pattern: "docs-nav", path: "src")</span>`,
     `  <span class="c8">⎿  Found 3 files</span>`,
@@ -248,7 +249,8 @@ function termLines(cols){
     `<span class="c15 bold">●</span> Read<span class="c8">(src/layouts/Docs.astro)</span>`,
     `  <span class="c8">⎿  Read 57 lines</span>`,
     ``,
-    `<span class="c15 bold">●</span> The nav gets <span class="c6">active</span> from the layout but never uses it.`,
+    ...(wide?[`<span class="c15 bold">●</span> The nav gets <span class="c6">active</span> from the layout but never uses it.`]
+        :[`<span class="c15 bold">●</span> The nav gets <span class="c6">active</span> from the layout but never uses`,`  it.`]),
     ``,
   ];
   const L=[
@@ -259,10 +261,10 @@ function termLines(cols){
     `<span class="c15 bold">●</span> Update<span class="c8">(src/components/DocsNav.astro)</span>`,
     `  <span class="c8">⎿  Updated with 2 additions and 1 removal</span>`,
     `<span class="c8">      41</span>    &lt;nav class="docs-nav"&gt;`,
-    `<span class="bgdel"><span class="c8">      42</span> <span class="c1">-</span>    &lt;a href="/guide"&gt;Guide&lt;/a&gt;${' '.repeat(Math.max(0,cols-36))}</span>`,
-    wide?`<span class="bgadd"><span class="c8">      42</span> <span class="c2">+</span>    &lt;a href="/guide" aria-current={active === "guide"}&gt;Guide&lt;/a&gt;${' '.repeat(Math.max(0,cols-73))}</span>`
-        :`<span class="bgadd"><span class="c8">      42</span> <span class="c2">+</span>    &lt;a href="/guide"${' '.repeat(Math.max(0,cols-29))}</span>`,
-    ...(wide?[]:[`<span class="bgadd"><span class="c8">      43</span> <span class="c2">+</span>      aria-current={active === "guide"}&gt;${' '.repeat(Math.max(0,cols-45))}</span>`]),
+    `<span class="bgdel"><span class="c8">      42</span> <span class="c1">-</span>    &lt;a href="/guide"&gt;Guide&lt;/a&gt;${' '.repeat(Math.max(0,cols-40))}</span>`,
+    wide?`<span class="bgadd"><span class="c8">      42</span> <span class="c2">+</span>    &lt;a href="/guide" aria-current={active === "guide"}&gt;Guide&lt;/a&gt;${' '.repeat(Math.max(0,cols-74))}</span>`
+        :`<span class="bgadd"><span class="c8">      42</span> <span class="c2">+</span>    &lt;a href="/guide"${' '.repeat(Math.max(0,cols-30))}</span>`,
+    ...(wide?[]:[`<span class="bgadd"><span class="c8">      43</span> <span class="c2">+</span>      aria-current={active === "guide"}&gt;${' '.repeat(Math.max(0,cols-50))}</span>`]),
     `<span class="c8">      43</span>    &lt;a href="/api"&gt;API&lt;/a&gt;`,
     ``,
     `<span class="c15 bold">●</span> Active link now has aria-current. Build passes.`,
@@ -288,7 +290,7 @@ function terminal(cols, font, rows=0){
   const body = lines.map(l=>`<span class="l">${l||' '}</span>`).join('');
   // rows: draw exactly the desk's grid; the space below it is not terminal.
   return rows
-    ? `<div class="term" style="font-size:${font}px;flex:none;height:${rows*1.25}em">${body}</div><div style="flex:1;background:var(--canvas);border-top:1px dashed var(--border)"></div>`
+    ? `<div class="term" style="font-size:${font}px;flex:none;height:calc(${rows*1.25}em + 6px)">${body}</div><div style="flex:1;background:var(--canvas);border-top:1px dashed var(--border)"></div>`
     : `<div class="term" style="font-size:${font}px;padding-top:6px">${body}</div>`;
 }
 const ttop = (status='blocked') => `
@@ -301,12 +303,12 @@ const ttop = (status='blocked') => `
   <div class="queue"><b>1 more needs you</b><span class="rest">· next: api tests, question</span>${ico.up}</div>`;
 
 function watch(){
-  // Desk terminal 96x44, fitted to 412 px: 412 / (96 * 0.6) ≈ 7.15 px.
+  // Desk terminal 96x44 inside the Mac's terminal padding (10 px sides, 6 px top), fitted: 392 / (96 * 0.6) ≈ 6.8 px.
   return `<div class="phone graphite">
     ${sysbar()}
     ${ttop()}
     <div style="flex:1;display:flex;flex-direction:column;position:relative;background:var(--bg)">
-      ${terminal(96, 7.15, 44)}
+      ${terminal(96, 6.8, 44)}
       <div class="chip">${ico.eye}<span><b>Watching</b> at desk size 96×44 · tap to type</span></div>
     </div>
     ${navbar()}
@@ -326,23 +328,36 @@ const keysrow = () => `<div class="keys">
   <span class="key compose" aria-label="Compose">${ico.pen}</span>
 </div>`;
 function typing(){
-  // Phone size: 12 px JetBrains Mono, 0.6 em advance → 56 columns in 412 px less padding.
+  // Phone size: 12.2 px JetBrains Mono, 0.6 em advance (7.32 px) → 53 columns in 412 px less the Mac's 10 px side padding.
   return `<div class="phone graphite">
     ${sysbar()}
     ${ttop()}
     <div style="flex:1;display:flex;flex-direction:column;position:relative;background:var(--bg);overflow:hidden">
-      <div style="position:absolute;inset:auto 0 0 0">${terminal(56, 12.2)}</div>
-      <span class="sizetag">phone size 56×31</span>
+      <div style="position:absolute;inset:auto 0 0 0">${terminal(53, 12.2)}</div>
+      <span class="sizetag">phone size 53×31</span>
     </div>
     ${keysrow()}
     ${keyboard(false)}
+  </div>`;
+}
+function typingHidden(){
+  // Keyboard hidden while typing: the phone grid grows to the full height (53x45), keys row stays.
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${ttop()}
+    <div style="flex:1;display:flex;flex-direction:column;position:relative;background:var(--bg);overflow:hidden">
+      <div style="position:absolute;inset:auto 0 0 0">${terminal(53, 12.2)}</div>
+      <span class="sizetag">phone size 53×45</span>
+    </div>
+    ${keysrow()}
+    ${navbar()}
   </div>`;
 }
 function compose(){
   return `<div class="phone graphite">
     ${sysbar()}
     ${ttop()}
-    <div style="flex:1;position:relative;background:var(--bg);overflow:hidden">${terminal(56,12.2)}</div>
+    <div style="flex:1;position:relative;background:var(--bg);overflow:hidden">${terminal(53,12.2)}</div>
     <div class="scrim"></div>
     <div class="sheet">
       <div class="handle"></div>
@@ -430,6 +445,7 @@ const SCREENS = [
   ['2-home-light','2 Agent list (paper)',()=>home('paper')],
   ['3-terminal-watch','3 Terminal, watching at desk size',watch],
   ['4-terminal-type','4 Terminal, typing at phone size',typing],
+  ['4b-terminal-type-hidden','4b Terminal, typing, keyboard hidden',typingHidden],
   ['5-compose','5 Compose',compose],
   ['6-notification','6 Needs-you notification',lockscreen],
   ['7-machines','7 Machines',machines],

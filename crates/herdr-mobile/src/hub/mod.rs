@@ -98,6 +98,17 @@ impl MachineState {
             MachineState::Connecting | MachineState::Connected { .. }
         )
     }
+
+    /// Waiting out a backoff: the hub tries again by itself.
+    fn retrying(&self) -> bool {
+        matches!(
+            self,
+            MachineState::Unreachable { .. }
+                | MachineState::KeyRejected
+                | MachineState::NotInstalled
+                | MachineState::NetworkOff
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, uniffi::Record)]
@@ -111,6 +122,12 @@ pub struct MachineView {
     /// The last moment the app was connected, ms since the epoch: "unreachable
     /// · last connected ...", and "as of hh:mm" on its rows while not connected.
     pub last_connected_ms: Option<u64>,
+    /// When the next attempt starts, ms since the epoch, while the state
+    /// retries by itself (unreachable, key not accepted, herdr-core missing,
+    /// Network off): "retrying in 30 s". None while connecting, connected,
+    /// paused, or waiting for the person.
+    #[uniffi(default = None)]
+    pub next_retry_ms: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
@@ -263,6 +280,8 @@ struct Live {
     /// at the task's next await.
     epoch: u64,
     task: Option<AbortHandle>,
+    /// When the task's backoff ends, ms since the epoch; only while waiting.
+    next_retry_ms: Option<u64>,
 }
 
 impl Live {
@@ -271,11 +290,13 @@ impl Live {
             state: MachineState::Paused,
             epoch: 0,
             task: None,
+            next_retry_ms: None,
         }
     }
 
     fn stop(&mut self) {
         self.epoch = 0;
+        self.next_retry_ms = None;
         if let Some(task) = self.task.take() {
             task.abort();
         }
@@ -749,9 +770,21 @@ impl HubCore {
     /// Sets a machine's state if `epoch` still owns it; false means the task
     /// was replaced and should stop.
     fn set(self: &Arc<Self>, name: &str, epoch: u64, state: MachineState) -> bool {
+        self.settle(name, epoch, state, None)
+    }
+
+    /// [`HubCore::set`], plus when the next attempt starts if it retries.
+    fn settle(
+        self: &Arc<Self>,
+        name: &str,
+        epoch: u64,
+        state: MachineState,
+        next_retry_ms: Option<u64>,
+    ) -> bool {
         self.with(|_, st| match st.live.get_mut(name) {
             Some(live) if live.epoch == epoch => {
                 live.state = state;
+                live.next_retry_ms = next_retry_ms;
                 true
             }
             _ => false,
@@ -772,6 +805,7 @@ impl HubCore {
             };
             if let Some(state) = connected {
                 live.state = state;
+                live.next_retry_ms = None;
                 if let Some(m) = st.list.get_mut(name) {
                     m.last_connected_ms = Some(now_ms());
                 }
@@ -802,17 +836,21 @@ fn build_snapshot(st: &State) -> HubSnapshot {
             .list
             .machines()
             .iter()
-            .map(|m| MachineView {
-                name: m.name.clone(),
-                host: m.host.clone(),
-                port: m.port,
-                user: m.user.clone(),
-                host_key: m.host_key.clone(),
-                state: st
-                    .live
-                    .get(&m.name)
-                    .map_or(MachineState::Paused, |l| l.state.clone()),
-                last_connected_ms: m.last_connected_ms,
+            .map(|m| {
+                let live = st.live.get(&m.name);
+                let state = live.map_or(MachineState::Paused, |l| l.state.clone());
+                MachineView {
+                    name: m.name.clone(),
+                    host: m.host.clone(),
+                    port: m.port,
+                    user: m.user.clone(),
+                    host_key: m.host_key.clone(),
+                    next_retry_ms: live
+                        .and_then(|l| l.next_retry_ms)
+                        .filter(|_| state.retrying()),
+                    state,
+                    last_connected_ms: m.last_connected_ms,
+                }
             })
             .collect(),
         agents: st.tracker.rows().into_iter().map(AgentRow::from).collect(),
@@ -856,10 +894,15 @@ async fn run_machine(hub: Arc<HubCore>, name: String, epoch: u64) {
         if outcome.connected_for.is_some_and(|d| d >= STABLE) {
             backoff.reset();
         }
-        if !hub.set(&name, epoch, outcome.state) || !outcome.retry {
+        let delay = outcome.retry.then(|| backoff.next());
+        let next_retry_ms = delay.map(|d| now_ms() + d.as_millis() as u64);
+        if !hub.settle(&name, epoch, outcome.state, next_retry_ms) {
             return;
         }
-        tokio::time::sleep(backoff.next()).await;
+        let Some(delay) = delay else {
+            return;
+        };
+        tokio::time::sleep(delay).await;
     }
 }
 

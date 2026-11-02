@@ -4,25 +4,19 @@ import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import dev.herdr.android.HerdrApp
+import dev.herdr.android.ui.components.rememberWallClock
 import dev.herdr.android.ui.flows.MachineFlows
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.delay
 
 /**
  * The Agents home fed by the app's hub, [flows] (Machines, Add machine) and
@@ -34,7 +28,7 @@ import kotlinx.coroutines.delay
 fun AgentsRoute(app: HerdrApp, flows: MachineFlows, home: AgentsHome) {
     val snapshot by app.hubHost.snapshot.collectAsState()
     val startError by app.hubHost.startError.collectAsState()
-    val clock = rememberClock()
+    val clock = rememberWallClock()
     val minute by remember(clock) { derivedStateOf { clock.value / 60_000 } }
     val context = LocalContext.current
     val res = context.resources
@@ -66,21 +60,4 @@ fun AgentsRoute(app: HerdrApp, flows: MachineFlows, home: AgentsHome) {
 private fun timeFormat(is24: Boolean): (Long) -> String {
     val pattern = DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a", Locale.getDefault())
     return { ms -> pattern.format(Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())) }
-}
-
-/** Wall-clock milliseconds, refreshed on each whole second while the screen is started. */
-@Composable
-private fun rememberClock(): State<Long> {
-    val now = remember { mutableLongStateOf(System.currentTimeMillis()) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                val t = System.currentTimeMillis()
-                now.longValue = t
-                delay(1_000 - t % 1_000)
-            }
-        }
-    }
-    return now
 }

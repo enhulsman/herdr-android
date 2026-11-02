@@ -25,10 +25,15 @@ import uniffi.herdr_mobile.MachineView
 class MachinesScreenshotTest {
     private val res = RuntimeEnvironment.getApplication().resources
 
-    /** Render 7: workstation connected on an untested core, server unreachable for 2 h. */
+    /** Render 7: workstation connected on an untested core, server unreachable for 2 h, next try in 30 s. */
     private val render7 = listOf(
         machine("workstation", MachineState.Connected("0.1.16", untested = true)),
-        machine("server", MachineState.Unreachable("connection refused"), lastConnectedMs = NOW - 2 * HOUR),
+        machine(
+            "server",
+            MachineState.Unreachable("connection refused"),
+            lastConnectedMs = NOW - 2 * HOUR,
+            nextRetryMs = NOW + 30_000,
+        ),
     )
 
     @Test fun render7Graphite() = capture("machines-graphite", dark = true, render7)
@@ -45,8 +50,8 @@ class MachinesScreenshotTest {
     @Test fun needsUnlockPaper() = capture("machines-unlock-paper", dark = false, unlock)
 
     private val networkOff = listOf(
-        machine("workstation", MachineState.NetworkOff, lastConnectedMs = NOW - 5 * MINUTE),
-        machine("server", MachineState.NetworkOff),
+        machine("workstation", MachineState.NetworkOff, lastConnectedMs = NOW - 5 * MINUTE, nextRetryMs = NOW + 16_000),
+        machine("server", MachineState.NetworkOff, nextRetryMs = NOW + 4_000),
     )
 
     @Test fun networkOffGraphite() = capture("machines-network-off-graphite", dark = true, networkOff)
@@ -55,7 +60,7 @@ class MachinesScreenshotTest {
 
     private val notInstalled = listOf(
         machine("workstation", MachineState.Connected("0.1.16", untested = false)),
-        machine("server", MachineState.NotInstalled),
+        machine("server", MachineState.NotInstalled, nextRetryMs = NOW + 8_000),
     )
 
     @Test fun notInstalledGraphite() = capture("machines-not-installed-graphite", dark = true, notInstalled)
@@ -71,7 +76,7 @@ class MachinesScreenshotTest {
     private val waiting = listOf(
         machine("workstation", MachineState.HostKeyUnconfirmed("SHA256:q3Vb8m2N4sR7tK0yL9wE1aZ5cX6vB3nM8jH2gF4dS0p", "ED25519")),
         machine("server", MachineState.HostKeyMismatch("SHA256:old", "SHA256:new", "ED25519")),
-        machine("website", MachineState.KeyRejected),
+        machine("website", MachineState.KeyRejected, nextRetryMs = NOW + 30_000),
         machine("api", MachineState.TooOld(have = "0.1.2", need = "0.1.10")),
         machine("docs", MachineState.AppTooOld),
     )
@@ -115,8 +120,8 @@ class MachinesScreenshotTest {
         }
     }
 
-    private fun machine(name: String, state: MachineState, lastConnectedMs: Long? = null) =
-        MachineView(name, "$name.example.org", 22u, "me", null, state, lastConnectedMs?.toULong())
+    private fun machine(name: String, state: MachineState, lastConnectedMs: Long? = null, nextRetryMs: Long? = null) =
+        MachineView(name, "$name.example.org", 22u, "me", null, state, lastConnectedMs?.toULong(), nextRetryMs?.toULong())
 
     private companion object {
         const val NOW = 1_800_000_000_000L

@@ -22,9 +22,17 @@ import uniffi.herdr_mobile.MachineView
 class MachineStatusTest {
     private val res: Resources = RuntimeEnvironment.getApplication().resources
 
-    private fun card(state: MachineState, lastConnectedMs: Long? = null): MachineCardUi {
-        val view = MachineView("workstation", "workstation.example.org", 22u, "me", null, state, lastConnectedMs?.toULong())
-        val ui = machinesUi(HubSnapshot(listOf(view), emptyList(), emptyList(), null), null, NOW, res)
+    private fun card(
+        state: MachineState,
+        lastConnectedMs: Long? = null,
+        nextRetryMs: Long? = null,
+        nowMs: Long = NOW,
+    ): MachineCardUi {
+        val view = MachineView(
+            "workstation", "workstation.example.org", 22u, "me", null, state,
+            lastConnectedMs?.toULong(), nextRetryMs?.toULong(),
+        )
+        val ui = machinesUi(HubSnapshot(listOf(view), emptyList(), emptyList(), null), null, nowMs, res)
         return ui.machines.single()
     }
 
@@ -55,6 +63,58 @@ class MachineStatusTest {
         assertNull(c.button)
     }
 
+    // Render 7: "Unreachable · last connected 2h ago · retrying in 30 s".
+    @Test
+    fun unreachableCountsDownToTheNextAttempt() {
+        val c = card(MachineState.Unreachable("connection refused"), NOW - 2 * HOUR, nextRetryMs = NOW + 30_000)
+        assertEquals("Unreachable · last connected 2h ago · retrying in 30 s", c.statusText)
+        assertEquals(Tone.Muted, c.status.last().tone)
+    }
+
+    @Test
+    fun theCountdownRoundsUpAndEndsInRetrying() {
+        fun retry(nextInMs: Long) =
+            card(MachineState.Unreachable("x"), nextRetryMs = NOW + nextInMs).status.last().text
+        assertEquals("retrying in 30 s", retry(29_001))
+        assertEquals("retrying in 29 s", retry(29_000))
+        assertEquals("retrying in 1 s", retry(1))
+        // Due, or a clock that moved past it: the attempt is starting.
+        assertEquals("retrying", retry(0))
+        assertEquals("retrying", retry(-5_000))
+    }
+
+    @Test
+    fun theCountdownTicksWithTheClock() {
+        val next = NOW + 30_000
+        fun at(nowMs: Long) = card(MachineState.Unreachable("x"), nextRetryMs = next, nowMs = nowMs).status.last().text
+        assertEquals("retrying in 30 s", at(NOW))
+        assertEquals("retrying in 20 s", at(NOW + 10_000))
+        assertEquals("retrying in 1 s", at(NOW + 29_500))
+        assertEquals("retrying", at(NOW + 30_000))
+    }
+
+    @Test
+    fun everyRetryingStateCountsDown() {
+        val next = NOW + 4_000
+        assertEquals("Phone key not accepted · retrying in 4 s", card(MachineState.KeyRejected, nextRetryMs = next).statusText)
+        assertEquals("herdr-core not found on this machine · retrying in 4 s", card(MachineState.NotInstalled, nextRetryMs = next).statusText)
+        assertEquals("Network permission is off · retrying in 4 s", card(MachineState.NetworkOff, nextRetryMs = next).statusText)
+    }
+
+    @Test
+    fun theScreenTicksEachSecondOnlyWhileACountdownShows() {
+        val waiting = MachineView("server", "server.example.org", 22u, "me", null, MachineState.Unreachable("x"), null, (NOW + 9_000).toULong())
+        val idle = waiting.copy(state = MachineState.Connected("0.1.16", untested = false), nextRetryMs = null)
+        val counting = HubSnapshot(listOf(waiting), emptyList(), emptyList(), null)
+        val quiet = HubSnapshot(listOf(idle), emptyList(), emptyList(), null)
+        assertEquals(NOW / 1_000, machinesTick(counting, NOW + 999))
+        assertEquals(NOW / 1_000 + 1, machinesTick(counting, NOW + 1_000))
+        // Otherwise once a minute, for "last connected".
+        assertEquals(machinesTick(quiet, NOW), machinesTick(quiet, NOW + 1_000))
+        assertEquals(NOW / 60_000 + 1, machinesTick(quiet, NOW + 60_000))
+    }
+
+    // Without a time from the hub (none should come, but the field is optional).
     @Test
     fun unreachableNeverConnectedLeavesOutLastConnected() {
         assertEquals("Unreachable · retrying", card(MachineState.Unreachable("no route to host")).statusText)

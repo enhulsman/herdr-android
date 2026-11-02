@@ -4,22 +4,21 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import dev.herdr.android.R
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.hub.HubHost
 import dev.herdr.android.hub.UserAuthGate
+import dev.herdr.android.ui.components.rememberWallClock
 import dev.herdr.android.ui.flows.MachineFlows
 import dev.herdr.android.ui.transfer.MachineTransfer
 import dev.herdr.android.ui.transfer.transferNotice
-import kotlinx.coroutines.delay
 
 /** The hub half of [MachinesActions]; MachineFlows.actions adds the flows. */
 fun hubActions(userAuth: UserAuthGate, hubHost: HubHost, onBack: (() -> Unit)? = null): MachinesActions =
@@ -33,8 +32,8 @@ fun hubActions(userAuth: UserAuthGate, hubHost: HubHost, onBack: (() -> Unit)? =
 private val IMPORT_TYPES = arrayOf("application/json", "*/*")
 
 /**
- * The Machines screen fed by the app's hub and [flows]; "last connected"
- * refreshes every 30 s. The system file pickers for export and import are
+ * The Machines screen fed by the app's hub and [flows]; "retrying in 30 s"
+ * counts down and "last connected" ages from the shared wall clock. The system file pickers for export and import are
  * launched here; the app's [MachineTransfer] does the file and hub work in its
  * own scope, so a rotation only re-reads the outcome.
  */
@@ -44,13 +43,9 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     val transferResult by transfer.result.collectAsState()
     val snapshot by app.hubHost.snapshot.collectAsState()
     val startError by app.hubHost.startError.collectAsState()
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            now = System.currentTimeMillis()
-        }
-    }
+    val clock = rememberWallClock()
+    // Each second while a countdown shows, else each minute ("last connected").
+    val tick by remember(clock) { derivedStateOf { machinesTick(snapshot, clock.value) } }
     val res = LocalContext.current.resources
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         transfer.export(uri?.toString())
@@ -71,6 +66,10 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
             onImport = { pick { importPicker.launch(IMPORT_TYPES) } },
         )
     }
-    val ui = machinesUi(snapshot, startError, now, res).copy(transfer = transferResult?.let { transferNotice(it, res) })
+    // Read without subscribing: the route follows [tick], not every clock change.
+    val machines = remember(snapshot, startError, tick, res) {
+        machinesUi(snapshot, startError, Snapshot.withoutReadObservation { clock.value }, res)
+    }
+    val ui = machines.copy(transfer = transferResult?.let { transferNotice(it, res) })
     MachinesScreen(ui, actions)
 }

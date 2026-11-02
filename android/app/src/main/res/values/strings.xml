@@ -89,6 +89,8 @@
     <string name="status_ago_hours">%1$dh ago</string>
     <string name="status_ago_days">%1$dd ago</string>
     <string name="status_retrying">retrying</string>
+    <!-- Seconds until the hub's next attempt, counting down (render 7). -->
+    <string name="status_retrying_in">retrying in %1$d s</string>
     <string name="status_needs_user_auth">Phone key locked</string>
     <string name="status_host_key_unconfirmed">Host key not confirmed yet</string>
     <string name="status_host_key_changed">Host key changed</string>

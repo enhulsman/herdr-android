@@ -10,8 +10,8 @@ import uniffi.herdr_mobile.MachineView
 
 // What the Machines screen shows, worked out from a hub snapshot with every
 // text resolved, so the screen itself only lays it out (MachineStatusTest pins
-// the text per state). Gaps against render 7: the hub does not say when it
-// retries next, so an unreachable machine says "retrying" without "in 30 s".
+// the text per state). States the hub retries by itself count down to its
+// next attempt ("retrying in 30 s", render 7) from the screen's clock.
 
 enum class Tone { Muted, Warning }
 
@@ -62,7 +62,7 @@ fun machinesUi(snapshot: HubSnapshot, startError: String?, nowMs: Long, res: Res
 
 private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCardUi {
     fun s(id: Int, vararg args: Any) = Segment(res.getString(id, *args))
-    val retrying = s(R.string.status_retrying)
+    val retrying = retryingSegment(m.nextRetryMs?.toLong(), nowMs, res)
     var detail: String? = null
     var button: CardButton? = null
     var link: CardLinkUi? = null
@@ -127,6 +127,26 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
         link = link,
     )
 }
+
+/**
+ * "retrying in 30 s" until the hub's next attempt, rounded up so it starts at
+ * the full step; "retrying" once it is due (the hub then shows Connecting) or
+ * when the hub gave no time.
+ */
+private fun retryingSegment(nextRetryMs: Long?, nowMs: Long, res: Resources): Segment {
+    val left = nextRetryMs?.let { (it - nowMs + 999).floorDiv(1_000L) } ?: 0L
+    return Segment(
+        if (left > 0) res.getString(R.string.status_retrying_in, left.toInt())
+        else res.getString(R.string.status_retrying),
+    )
+}
+
+/**
+ * What the Machines screen's text depends on from the clock: whole seconds
+ * while a countdown shows, else whole minutes ("last connected").
+ */
+fun machinesTick(snapshot: HubSnapshot, nowMs: Long): Long =
+    if (snapshot.machines.any { it.nextRetryMs != null }) nowMs / 1_000 else nowMs / 60_000
 
 /** "just now", "5m ago", "2h ago", "3d ago"; a clock that went backwards reads as just now. */
 fun agoText(elapsedMs: Long, res: Resources): String {

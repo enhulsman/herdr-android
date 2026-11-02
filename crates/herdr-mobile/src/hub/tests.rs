@@ -457,6 +457,127 @@ async fn failures_retry_after_1_s_backing_off_to_30_s() {
     assert_eq!(gaps, [1, 2, 4, 8, 16, 30, 30]);
 }
 
+/// How far ahead of the wall clock the next attempt is, in ms; None when the
+/// machine is not waiting out a backoff.
+fn retry_in_ms(s: &HubSnapshot, machine: &str) -> Option<i64> {
+    let at = view(s, machine).next_retry_ms?;
+    Some(at as i64 - now_ms() as i64)
+}
+
+/// The wall clock runs in real time while tokio's is paused, so a step of
+/// `secs` reads as `secs` ahead, less the real time the test took to look.
+fn assert_ahead(ahead: Option<i64>, secs: i64) {
+    let ahead = ahead.expect("a next attempt time");
+    assert!(
+        (secs * 1000 - 500..=secs * 1000).contains(&ahead),
+        "next attempt {ahead} ms ahead, wanted about {secs} s"
+    );
+}
+
+// "Unreachable · ... · retrying in 30 s" (render 7): each backoff step says
+// when the next attempt is, as wall-clock ms like last_connected_ms.
+#[tokio::test(start_paused = true)]
+async fn each_backoff_step_says_when_the_next_attempt_is() {
+    let mut rig = rig("next-retry");
+    rig.add_trusted(WS, WS_KEY);
+    rig.dialer.fail(WS, Some(Fail::Unreachable));
+    let dialer = rig.dialer.clone();
+    rig.hub.resume();
+    for (attempt, secs) in [1, 2, 4, 8, 16, 30, 30].into_iter().enumerate() {
+        let s = rig
+            .until("the next failure", |s| {
+                dialer.dials(WS).len() == attempt + 1
+                    && matches!(state(s, WS), Some(MachineState::Unreachable { .. }))
+                    && view(s, WS).next_retry_ms.is_some()
+            })
+            .await;
+        assert_ahead(retry_in_ms(&s, WS), secs);
+    }
+
+    // The attempt that runs is not waiting out a backoff.
+    rig.dialer.fail(WS, None);
+    let mut core = rig.core().await;
+    let s = rig.hub.snapshot();
+    assert_eq!(state(&s, WS), Some(&MachineState::Connecting));
+    assert_eq!(view(&s, WS).next_retry_ms, None, "absent while connecting");
+    core.connect("0.1.15", vec![]).await;
+    let s = rig.until_state(WS, connected).await;
+    assert_eq!(view(&s, WS).next_retry_ms, None, "absent while connected");
+
+    // A dropped connection retries too; it lasted under 10 s, so the backoff
+    // goes on from where it was: 30 s.
+    drop(core);
+    let s = rig
+        .until_state(WS, |st| matches!(st, MachineState::Unreachable { .. }))
+        .await;
+    assert_ahead(retry_in_ms(&s, WS), 30);
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_retrying_state_says_when_the_next_attempt_is() {
+    let mut rig = rig("next-retry-kinds");
+    rig.add_trusted(WS, WS_KEY);
+    rig.add_trusted(SRV, SRV_KEY);
+    rig.dialer.fail(WS, Some(Fail::NetworkOff));
+    rig.dialer.fail(SRV, Some(Fail::Rejected));
+    rig.hub.resume();
+    let s = rig
+        .until("both named", |s| {
+            state(s, WS) == Some(&MachineState::NetworkOff)
+                && state(s, SRV) == Some(&MachineState::KeyRejected)
+        })
+        .await;
+    assert_ahead(retry_in_ms(&s, WS), 1);
+    assert_ahead(retry_in_ms(&s, SRV), 1);
+
+    // herdr-core missing.
+    rig.dialer.fail(SRV, None);
+    rig.core()
+        .await
+        .exit(127, "herdr-core is not installed here\n");
+    let s = rig
+        .until_state(SRV, |st| *st == MachineState::NotInstalled)
+        .await;
+    assert_ahead(retry_in_ms(&s, SRV), 2);
+
+    // Suspended: nothing is coming.
+    rig.hub.suspend();
+    let s = rig.hub.snapshot();
+    assert_eq!(view(&s, WS).next_retry_ms, None);
+    assert_eq!(view(&s, SRV).next_retry_ms, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn states_that_wait_for_the_person_have_no_next_attempt() {
+    let mut rig = rig("next-retry-waits");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.add_machine(SRV, SRV, 22, "dev").unwrap();
+    rig.dialer.fail(WS, Some(Fail::NeedsUserAuth));
+    rig.hub.resume();
+    let s = rig
+        .until("both waiting", |s| {
+            state(s, WS) == Some(&MachineState::NeedsUserAuth)
+                && matches!(state(s, SRV), Some(MachineState::HostKeyUnconfirmed { .. }))
+        })
+        .await;
+    assert_eq!(view(&s, WS).next_retry_ms, None);
+    assert_eq!(view(&s, SRV).next_retry_ms, None);
+
+    // An older core, after a failure that had a next attempt.
+    rig.dialer.fail(WS, Some(Fail::Unreachable));
+    rig.hub.retry();
+    let s = rig
+        .until_state(WS, |st| matches!(st, MachineState::Unreachable { .. }))
+        .await;
+    assert!(view(&s, WS).next_retry_ms.is_some());
+    rig.dialer.fail(WS, None);
+    rig.core().await.hello("0.1.14").await;
+    let s = rig
+        .until_state(WS, |st| matches!(st, MachineState::TooOld { .. }))
+        .await;
+    assert_eq!(view(&s, WS).next_retry_ms, None);
+}
+
 // Scenario "herdr-core missing".
 #[tokio::test(start_paused = true)]
 async fn a_machine_without_herdr_core_says_so_and_keeps_retrying() {

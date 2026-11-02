@@ -17,6 +17,7 @@ import dev.herdr.android.hub.HubHost
 import dev.herdr.android.hub.UserAuthGate
 import dev.herdr.android.ui.components.rememberWallClock
 import dev.herdr.android.ui.flows.MachineFlows
+import dev.herdr.android.ui.theme.ContrastSetting
 import dev.herdr.android.ui.transfer.MachineTransfer
 import dev.herdr.android.ui.transfer.transferNotice
 
@@ -27,6 +28,10 @@ fun hubActions(userAuth: UserAuthGate, hubHost: HubHost, onBack: (() -> Unit)? =
         onUnlock = { userAuth.unlock() },
         onTryAgain = hubHost::retry,
     )
+
+/** The "Text contrast" row switches [setting]; the theme follows it app-wide. */
+fun withTextContrast(actions: MachinesActions, setting: ContrastSetting): MachinesActions =
+    actions.copy(onTextContrast = setting::toggle)
 
 /** What the import picker offers: JSON, and everything, since some storage apps label JSON as something else. */
 private val IMPORT_TYPES = arrayOf("application/json", "*/*")
@@ -43,6 +48,7 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     val transferResult by transfer.result.collectAsState()
     val snapshot by app.hubHost.snapshot.collectAsState()
     val startError by app.hubHost.startError.collectAsState()
+    val contrast by app.contrast.contrast.collectAsState()
     val clock = rememberWallClock()
     // Each second while a countdown shows, else each minute ("last connected").
     val tick by remember(clock) { derivedStateOf { machinesTick(snapshot, clock.value) } }
@@ -61,14 +67,14 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
         } catch (e: ActivityNotFoundException) {
             transfer.noPicker()
         }
-        flows.actions(hubActions(app.userAuth, app.hubHost, onBack)).copy(
+        withTextContrast(flows.actions(hubActions(app.userAuth, app.hubHost, onBack)), app.contrast).copy(
             onExport = { pick { exportPicker.launch(fileName) } },
             onImport = { pick { importPicker.launch(IMPORT_TYPES) } },
         )
     }
     // Read without subscribing: the route follows [tick], not every clock change.
-    val machines = remember(snapshot, startError, tick, res) {
-        machinesUi(snapshot, startError, Snapshot.withoutReadObservation { clock.value }, res)
+    val machines = remember(snapshot, startError, tick, res, contrast) {
+        machinesUi(snapshot, startError, Snapshot.withoutReadObservation { clock.value }, res, contrast)
     }
     val ui = machines.copy(
         transfer = transferResult?.let { transferNotice(it, res) },

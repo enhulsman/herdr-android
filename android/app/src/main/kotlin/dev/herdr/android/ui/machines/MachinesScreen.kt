@@ -79,6 +79,8 @@ data class MachinesActions(
     val onAddMachine: () -> Unit,
     val onExport: () -> Unit,
     val onImport: () -> Unit,
+    /** The "Text contrast" row: switches to the other choice in place. */
+    val onTextContrast: () -> Unit = {},
     /** The card's "Remove machine", by machine name: opens the confirm. */
     val onRemove: (String) -> Unit = {},
     /** The confirm's Remove. */
@@ -155,6 +157,13 @@ private fun MachinesList(ui: MachinesUi, actions: MachinesActions) {
                 first = true,
                 // Render 7 draws this row without a chevron; the owner asked for one (it opens the line).
                 onClick = actions.onPhoneKey,
+            )
+            // Toggles in place, so no chevron.
+            CardRow(
+                stringResource(R.string.machines_text_contrast),
+                ui.textContrastDetail,
+                chevron = false,
+                onClick = actions.onTextContrast,
             )
             // Shown even with no machines (the spec makes export unconditional), but dim and inert until one exists.
             CardRow(

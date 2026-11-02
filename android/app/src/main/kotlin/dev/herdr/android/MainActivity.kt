@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         // Light or dark bar icons follow the system, as the theme does.
         enableEdgeToEdge(SystemBarStyle.auto(transparent, transparent), SystemBarStyle.auto(transparent, transparent))
         val app = application as HerdrApp
-        setContent { HerdrTheme { Root(app) } }
+        setContent { HerdrTheme(app.contrast) { Root(app) } }
     }
 }
 

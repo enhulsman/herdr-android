@@ -1,6 +1,7 @@
 package dev.herdr.android.ui.machines
 
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.transfer.TransferResult
 import dev.herdr.android.ui.transfer.transferNotice
@@ -117,6 +118,11 @@ class MachinesScreenshotTest {
     @Test fun removeErrorPaper() =
         capture("machines-remove-error-paper", dark = false, render7, error = "Could not save the machine list: disk full")
 
+    /** Text contrast set to Higher: the row says so and the whole screen takes the AA values. */
+    @Test fun contrastHigherGraphite() = capture("machines-contrast-higher-graphite", dark = true, render7, contrast = Contrast.Aa)
+
+    @Test fun contrastHigherPaper() = capture("machines-contrast-higher-paper", dark = false, render7, contrast = Contrast.Aa)
+
     private fun capture(
         name: String,
         dark: Boolean,
@@ -125,12 +131,13 @@ class MachinesScreenshotTest {
         tall: Boolean = false,
         removing: String? = null,
         error: String? = null,
+        contrast: Contrast = Contrast.Default,
     ) {
-        val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res)
+        val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res, contrast)
             .copy(transfer = transfer?.let { transferNotice(it, res) }, removing = removing, error = error)
         if (tall) RuntimeEnvironment.setQualifiers("w412dp-h1400dp-xhdpi")
         captureRoboImage("src/test/snapshots/$name.png") {
-            HerdrTheme(dark = dark) { MachinesScreen(ui, MachinesActions.Preview.copy(onBack = {})) }
+            HerdrTheme(dark = dark, contrast = contrast) { MachinesScreen(ui, MachinesActions.Preview.copy(onBack = {})) }
         }
     }
 

@@ -14,6 +14,7 @@ import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.AlarmScheduler
 import dev.herdr.android.lifecycle.ElapsedClock
 import dev.herdr.android.lifecycle.HandlerScheduler
+import dev.herdr.android.ui.theme.ContrastSetting
 import dev.herdr.android.ui.transfer.ContentResolverStore
 import dev.herdr.android.ui.transfer.MachineTransfer
 import java.io.File
@@ -44,10 +45,15 @@ class HerdrApp : Application() {
     lateinit var transfer: MachineTransfer
         private set
 
+    /** The "Text contrast" setting the theme follows, in its own preferences file. */
+    lateinit var contrast: ContrastSetting
+        private set
+
     private var promptActivity: Activity? = null
 
     override fun onCreate() {
         super.onCreate()
+        contrast = ContrastSetting.open(this)
         keyManager = KeyManager(AndroidKeystoreBackend())
         hubHost = HubHost(
             createHub = { listener ->

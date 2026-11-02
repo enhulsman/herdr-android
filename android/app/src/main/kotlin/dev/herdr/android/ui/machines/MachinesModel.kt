@@ -3,6 +3,7 @@ package dev.herdr.android.ui.machines
 import android.content.res.Resources
 import androidx.compose.runtime.Immutable
 import dev.herdr.android.R
+import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.transfer.TransferNoticeUi
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
@@ -58,10 +59,18 @@ data class MachinesUi(
     val removing: String? = null,
     /** Why the hub refused the last remove, in the notice style. */
     val error: String? = null,
+    /** The "Text contrast" row's second line: "Like the Mac" or "Higher". */
+    val textContrastDetail: String = "",
 )
 
 /** [startError]: why the hub (and with it the phone key) could not start, from HubHost. */
-fun machinesUi(snapshot: HubSnapshot, startError: String?, nowMs: Long, res: Resources): MachinesUi =
+fun machinesUi(
+    snapshot: HubSnapshot,
+    startError: String?,
+    nowMs: Long,
+    res: Resources,
+    contrast: Contrast = Contrast.Default,
+): MachinesUi =
     MachinesUi(
         machines = snapshot.machines.map { machineCard(it, nowMs, res) },
         notice = snapshot.notice,
@@ -69,6 +78,12 @@ fun machinesUi(snapshot: HubSnapshot, startError: String?, nowMs: Long, res: Res
         canExport = snapshot.machines.isNotEmpty(),
         exportDetail = res.getString(
             if (snapshot.machines.isNotEmpty()) R.string.machines_export_detail else R.string.machines_export_detail_empty,
+        ),
+        textContrastDetail = res.getString(
+            when (contrast) {
+                Contrast.Mac -> R.string.machines_text_contrast_mac
+                Contrast.Aa -> R.string.machines_text_contrast_higher
+            },
         ),
     )
 

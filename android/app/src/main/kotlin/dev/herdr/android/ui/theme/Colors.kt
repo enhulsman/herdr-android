@@ -15,8 +15,9 @@ enum class ThemeName(val tokenKey: String) {
 /**
  * Mac: the herdr-app values, kept on purpose (Ezra, 2026-11-01) although dim
  * text and paper's status headers are under 4.5:1. Aa: the replacements in
- * accessibility.followUp, all passing 4.5:1. Decided outdoors at the M1 phone
- * check (task M1.5); flip [Contrast.Default] to switch the whole app.
+ * accessibility.followUp, all passing 4.5:1. The person picks one with the
+ * "Text contrast" setting ([ContrastSetting]); [Contrast.Default] is what a
+ * fresh install gets.
  */
 enum class Contrast {
     Mac,

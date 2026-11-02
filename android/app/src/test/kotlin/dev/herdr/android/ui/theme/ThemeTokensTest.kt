@@ -1,5 +1,8 @@
 package dev.herdr.android.ui.theme
 
+import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -16,7 +19,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import java.io.File
 
 // The Kotlin theme mirrors design-tokens.json, the signed-off contract. Every
@@ -147,6 +153,43 @@ class ThemeTokensTest {
         // "dim stays for rings/counts"
         assertEquals(paperMac.dim, paperAa.dim)
         assertEquals(graphiteMac.dim, graphiteAa.dim)
+    }
+
+    /** What [HerdrTheme] gives its content, driven by the app's [ContrastSetting]. */
+    private fun themedColours(setting: ContrastSetting, dark: Boolean): HerdrColors {
+        var seen: HerdrColors? = null
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        activity.setContent { HerdrTheme(setting, dark = dark) { seen = HerdrTheme.colors } }
+        shadowOf(Looper.getMainLooper()).idle()
+        return seen!!
+    }
+
+    // The "Text contrast" setting: Higher puts the accessibility.followUp values
+    // in front of every screen, in both themes; Like the Mac keeps the herdr-app ones.
+    @Test
+    fun higherTextContrastThemesTheAppWithTheFollowUpValues() {
+        val followUp = tokens.getJSONObject("accessibility").getString("followUp")
+        val dimText = Regex("""dim for text graphite (#[0-9a-fA-F]{6}), paper (#[0-9a-fA-F]{6})""").find(followUp)!!
+        val status = Regex("""paper status (#[0-9a-fA-F]{6}), (#[0-9a-fA-F]{6}), (#[0-9a-fA-F]{6})""").find(followUp)!!
+        val themes = tokens.getJSONObject("colors").getJSONObject("themes")
+
+        val setting = ContrastSetting.open(RuntimeEnvironment.getApplication())
+        val graphiteMac = themedColours(setting, dark = true)
+        val paperMac = themedColours(setting, dark = false)
+        assertEquals(hex(themes.getJSONObject("graphite").getString("dim")), graphiteMac.dimText)
+        assertEquals(hex(themes.getJSONObject("paper").getString("dim")), paperMac.dimText)
+
+        setting.toggle()
+        val graphite = themedColours(setting, dark = true)
+        val paper = themedColours(setting, dark = false)
+        assertEquals(hex(dimText.groupValues[1]), graphite.dimText)
+        assertEquals(hex(dimText.groupValues[2]), paper.dimText)
+        assertEquals(hex(status.groupValues[1]), paper.working)
+        assertEquals(hex(status.groupValues[2]), paper.blocked)
+        assertEquals(hex(status.groupValues[3]), paper.done)
+        // Rings and counts keep dim.
+        assertEquals(hex(themes.getJSONObject("graphite").getString("dim")), graphite.dim)
+        assertEquals(hex(themes.getJSONObject("paper").getString("dim")), paper.dim)
     }
 
     @Test

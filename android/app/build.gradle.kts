@@ -115,7 +115,8 @@ androidComponents {
             group = "build"
             description = "Builds the Rust core and its Kotlin bindings for ${variant.name}."
             release.set(variant.buildType != "debug")
-            features.set(if (variant.buildType == "spike") listOf("vt") else emptyList())
+            // Every build draws terminals since M2: libghostty-vt from scripts/build-ghostty.sh.
+            features.set(listOf("vt"))
             repoRoot.set(rootProject.layout.projectDirectory.dir(".."))
         }
         variant.sources.jniLibs?.addGeneratedSourceDirectory(buildRust, BuildRust::jniLibs)

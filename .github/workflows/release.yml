@@ -66,9 +66,15 @@ jobs:
         with:
           tool: cargo-deny@0.20.2
 
+      - name: libghostty-vt for the host and both Android ABIs (Zig pinned by checksum in the script)
+        run: |
+          scripts/build-ghostty.sh x86_64-linux-gnu
+          scripts/build-ghostty.sh aarch64-linux-android
+          scripts/build-ghostty.sh x86_64-linux-android
+
       - name: Rust tests, release-tag tests, cargo-deny
         run: |
-          cargo test --locked
+          cargo test --locked --features herdr-mobile/vt
           scripts/test-check-release-tag.sh
           scripts/test-release-sign-gate.sh
           cargo deny --locked check advisories licenses sources

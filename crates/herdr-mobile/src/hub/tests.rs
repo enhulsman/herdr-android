@@ -20,6 +20,8 @@ use tokio::time::Instant;
 const WS: &str = "workstation";
 const SRV: &str = "server";
 const WS_KEY: &str = "SHA256:workstation-host-key";
+/// The type every fake machine's host key has, as `ssh-keygen -l` names it.
+const ALGORITHM: &str = "ED25519";
 const SRV_KEY: &str = "SHA256:server-host-key";
 /// Long enough for any backoff step; the paused clock makes it free.
 const WAIT: Duration = Duration::from_secs(600);
@@ -179,8 +181,14 @@ impl Dialer for FakeDialer {
             (Some(Fail::Unreachable), _) => Err(DialError::Failed("connection refused".into())),
             (Some(Fail::NetworkOff), _) => Err(DialError::NetworkOff),
             // The host key is checked before anything is signed, as russh does.
-            (_, None) => Err(DialError::HostKeyUnconfirmed { presented }),
-            (_, Some(k)) if *k != presented => Err(DialError::HostKeyMismatch { presented }),
+            (_, None) => Err(DialError::HostKeyUnconfirmed {
+                presented,
+                algorithm: ALGORITHM.into(),
+            }),
+            (_, Some(k)) if *k != presented => Err(DialError::HostKeyMismatch {
+                presented,
+                algorithm: ALGORITHM.into(),
+            }),
             (Some(Fail::NeedsUserAuth), _) => Err(DialError::NeedsUserAuth),
             (Some(Fail::Rejected), _) => Err(DialError::Rejected),
             (None, _) => {
@@ -354,7 +362,8 @@ async fn a_new_machine_connects_only_after_its_host_key_is_confirmed() {
     assert_eq!(
         state(&s, WS),
         Some(&MachineState::HostKeyUnconfirmed {
-            presented: WS_KEY.into()
+            presented: WS_KEY.into(),
+            algorithm: ALGORITHM.into(),
         })
     );
     // It waits for the person: no retries on its own.
@@ -382,6 +391,7 @@ async fn a_changed_host_key_shows_both_and_only_forgetting_moves_on() {
         Some(&MachineState::HostKeyMismatch {
             confirmed: WS_KEY.into(),
             presented: "SHA256:someone-else".into(),
+            algorithm: ALGORITHM.into(),
         })
     );
     tokio::time::sleep(Duration::from_secs(120)).await;
@@ -791,6 +801,7 @@ async fn moving_a_machine_reconnects_it_and_asks_for_the_new_host_key() {
     rig.until_state(WS, |st| {
         *st == MachineState::HostKeyUnconfirmed {
             presented: "SHA256:new".into(),
+            algorithm: ALGORITHM.into(),
         }
     })
     .await;

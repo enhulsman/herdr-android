@@ -11,9 +11,10 @@ import androidx.compose.ui.platform.LocalContext
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.hub.HubHost
 import dev.herdr.android.hub.UserAuthGate
+import dev.herdr.android.ui.flows.MachineFlows
 import kotlinx.coroutines.delay
 
-/** The hub half of [MachinesActions]; the flow seams stay no-ops until 5d/5e fill them. */
+/** The hub half of [MachinesActions]; MachineFlows.actions adds the flows. */
 fun hubActions(userAuth: UserAuthGate, hubHost: HubHost, onBack: (() -> Unit)? = null): MachinesActions =
     MachinesActions.Preview.copy(
         onBack = onBack,
@@ -21,9 +22,9 @@ fun hubActions(userAuth: UserAuthGate, hubHost: HubHost, onBack: (() -> Unit)? =
         onTryAgain = hubHost::retry,
     )
 
-/** The Machines screen fed by the app's hub; "last connected" refreshes every 30 s. */
+/** The Machines screen fed by the app's hub and [flows]; "last connected" refreshes every 30 s. */
 @Composable
-fun MachinesRoute(app: HerdrApp, onBack: (() -> Unit)?) {
+fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     val snapshot by app.hubHost.snapshot.collectAsState()
     val startError by app.hubHost.startError.collectAsState()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -34,6 +35,6 @@ fun MachinesRoute(app: HerdrApp, onBack: (() -> Unit)?) {
         }
     }
     val res = LocalContext.current.resources
-    val actions = remember(app, onBack) { hubActions(app.userAuth, app.hubHost, onBack) }
+    val actions = remember(app, flows, onBack) { flows.actions(hubActions(app.userAuth, app.hubHost, onBack)) }
     MachinesScreen(machinesUi(snapshot, startError, now, res), actions)
 }

@@ -54,22 +54,25 @@ import dev.herdr.android.ui.theme.HerdrType
 
 /**
  * What the screen can ask for. [onUnlock] and [onTryAgain] go to the hub
- * (hubActions); the rest are seams for the flows 5d and 5e build.
+ * (hubActions); the host-key, phone-key and Add machine seams go to
+ * MachineFlows; [onExport] waits for 5e.
  */
 data class MachinesActions(
     val onBack: (() -> Unit)?,
     val onUnlock: () -> Unit,
     val onTryAgain: () -> Unit,
-    /** Host key to confirm or compare, by machine name (5d). */
+    /** Host key to confirm or compare, by machine name. */
     val onHostKey: (String) -> Unit,
-    /** The authorized_keys line with its copy button, by machine name (5d). */
+    /** The authorized_keys line with its copy button, for the machine that refused the key. */
     val onAddPhoneKey: (String) -> Unit,
+    /** The same line from the "Phone key" row, for any machine. */
+    val onPhoneKey: () -> Unit,
     val onAddMachine: () -> Unit,
     val onExport: () -> Unit,
 ) {
     companion object {
         /** Does nothing; for screenshots and flows not built yet. */
-        val Preview = MachinesActions(null, {}, {}, {}, {}, {}, {})
+        val Preview = MachinesActions(null, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -113,7 +116,14 @@ fun MachinesScreen(ui: MachinesUi, actions: MachinesActions, modifier: Modifier 
             style = caption.copy(color = c.dimText),
         )
         Card {
-            CardRow(stringResource(R.string.machines_phone_key), ui.phoneKeyDetail, first = true)
+            CardRow(
+                stringResource(R.string.machines_phone_key),
+                ui.phoneKeyDetail,
+                first = true,
+                // Render 7 draws this row without a chevron; it still opens the line.
+                chevron = false,
+                onClick = actions.onPhoneKey,
+            )
             // Shown even with no machines: the spec makes export unconditional.
             CardRow(
                 stringResource(R.string.machines_export),
@@ -216,9 +226,16 @@ private fun StatusLine(machine: MachineCardUi) {
     BasicText(text, style = HerdrType.secondary.copy(color = c.muted))
 }
 
-/** A row in a card: label over a dim second line, a chevron when it leads somewhere. */
+/** A row in a card: label over a dim second line, a chevron when it leads somewhere unless [chevron] says otherwise. */
 @Composable
-private fun CardRow(label: String, detail: String?, first: Boolean = false, onClick: (() -> Unit)? = null) {
+private fun CardRow(
+    label: String,
+    detail: String?,
+    first: Boolean = false,
+    /** Null: a chevron exactly when [onClick] is set. */
+    chevron: Boolean? = null,
+    onClick: (() -> Unit)? = null,
+) {
     val c = HerdrTheme.colors
     Column {
         if (!first) Box(Modifier.fillMaxWidth().height(HerdrBorder.thin).background(c.border))
@@ -234,7 +251,7 @@ private fun CardRow(label: String, detail: String?, first: Boolean = false, onCl
                 BasicText(label, style = HerdrType.settingRow.copy(color = c.fg))
                 detail?.let { BasicText(it, style = rowDetail.copy(color = c.dimText)) }
             }
-            if (onClick != null) ChevronIcon(Chevron.Right, 14.dp, c.fg)
+            if (chevron ?: (onClick != null)) ChevronIcon(Chevron.Right, 14.dp, c.fg)
         }
     }
 }

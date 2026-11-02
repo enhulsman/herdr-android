@@ -55,4 +55,58 @@
     <string name="link_compare_host_keys_detail">The machine shows a different key than the one you trusted</string>
     <string name="link_add_phone_key">Add the phone key</string>
     <string name="link_add_phone_key_detail">One line for this machine\'s authorized_keys</string>
+    <!-- Add machine (render 8 shows Name and Host; the rest follows its style). -->
+    <string name="add_title">Add machine</string>
+    <string name="field_name">Name</string>
+    <string name="field_host">Host</string>
+    <string name="field_port">Port</string>
+    <string name="field_user">User</string>
+    <!-- machine-connection spec: OpenSSH only; Tailscale SSH ignores authorized_keys. -->
+    <string name="add_note">The machine needs an OpenSSH server. Tailscale SSH ignores the phone key.</string>
+    <string name="add_save">Add machine</string>
+    <!-- %1$s is host:port. -->
+    <string name="add_waiting">Connecting to %1$s…</string>
+    <string name="error_name_required">Give the machine a name.</string>
+    <!-- %1$s is the name typed. -->
+    <string name="error_name_taken">There is already a machine called %1$s.</string>
+    <string name="error_name_too_long">Use at most 64 characters.</string>
+    <string name="error_name_one_line">Keep the name on one line.</string>
+    <string name="error_host_required">Enter the machine\'s host name or address.</string>
+    <string name="error_host_invalid">Use a host name or address without spaces.</string>
+    <string name="error_port_invalid">Use a port from 1 to 65535.</string>
+    <string name="error_user_required">Enter the user you sign in as on that machine.</string>
+    <string name="error_user_invalid">Use the login name only, without spaces or @.</string>
+
+    <!-- First connection: the host-key confirm (render 8). %1$s is host:port, drawn in the text colour. -->
+    <string name="trust_title">Trust this machine?</string>
+    <string name="trust_body">First connection to %1$s. Check that this fingerprint matches the machine\'s host key.</string>
+    <string name="trust_after">After this, a different key stops the connection.</string>
+    <string name="cancel">Cancel</string>
+    <string name="trust_confirm">Trust and connect</string>
+
+    <!-- A changed host key (no render; machine-connection spec "Host key changed"). -->
+    <string name="changed_title">Host key changed</string>
+    <!-- %1$s is the machine's name, drawn in the text colour. -->
+    <string name="changed_body">%1$s showed a different host key than the one you trusted, so the app stopped connecting to it.</string>
+    <string name="changed_trusted">Trusted key</string>
+    <string name="changed_presented">Key it shows now</string>
+    <string name="changed_why">This is expected after the machine was reinstalled or got new SSH host keys. Otherwise something may be intercepting the connection: check the new fingerprint on the machine itself first.</string>
+    <string name="changed_forget">Forget this machine\'s key</string>
+    <string name="forget_title">Forget the trusted key?</string>
+    <!-- %1$s is the machine's name. -->
+    <string name="forget_body">The app stops trusting %1$s\'s old key. On the next connection it shows the new fingerprint and connects only after you trust it.</string>
+    <string name="forget_confirm">Forget key</string>
+
+    <!-- The phone key line (no render). -->
+    <string name="phone_key_title">Phone key</string>
+    <!-- %1$s is the machine's name, drawn in the text colour. -->
+    <string name="phone_key_where_machine">Add this line to ~/.ssh/authorized_keys of the user you sign in as on %1$s.</string>
+    <string name="phone_key_where_any">Add this line to ~/.ssh/authorized_keys of the user you sign in as on each machine.</string>
+    <string name="phone_key_restricted">With this key, SSH runs only herdr-core: no terminal session, no forwarding. herdr-core can still run commands as this user, so treat the key like a shell login.</string>
+    <string name="phone_key_copy">Copy</string>
+    <string name="phone_key_copied">Copied</string>
+    <!-- The clipboard entry's label (ClipData), shown by some keyboards. -->
+    <string name="phone_key_clip_label">authorized_keys line</string>
+    <!-- %1$s is why, from KeyManager. -->
+    <string name="phone_key_unavailable">The phone key is not available: %1$s</string>
 </resources>

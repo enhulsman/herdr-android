@@ -153,3 +153,10 @@ fun herdrColors(theme: ThemeName, contrast: Contrast = Contrast.Default): HerdrC
         ThemeName.Graphite -> if (contrast == Contrast.Mac) GraphiteMac else GraphiteAa
         ThemeName.Paper -> if (contrast == Contrast.Mac) PaperMac else PaperAa
     }
+
+/**
+ * The dim layer behind a dialog or sheet: `.scrim` in design/renders/screens.html
+ * (#00000080), the same in both themes. Not in design-tokens.json, whose colours
+ * come from the herdr-app presets; the renders are the contract for it.
+ */
+val HerdrScrim = Color(0x80000000)

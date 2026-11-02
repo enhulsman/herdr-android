@@ -62,14 +62,18 @@ pub enum MachineState {
     },
     /// The key needs a fingerprint or device credential; prompt, then retry.
     NeedsUserAuth,
-    /// First connection: confirm this host key to continue.
+    /// First connection: confirm this host key to continue. `algorithm` is
+    /// the presented key's type as `ssh-keygen -l` names it ("ED25519").
     HostKeyUnconfirmed {
         presented: String,
+        algorithm: String,
     },
-    /// The machine presented a different host key than the confirmed one.
+    /// The machine presented a different host key than the confirmed one;
+    /// `algorithm` is the presented key's type (the confirmed one's is not kept).
     HostKeyMismatch {
         confirmed: String,
         presented: String,
+        algorithm: String,
     },
     /// The machine does not accept the phone key yet; retrying.
     KeyRejected,
@@ -851,12 +855,20 @@ async fn run_machine(hub: Arc<HubCore>, name: String, epoch: u64) {
 fn dial_failure(e: DialError, target: &Target) -> Outcome {
     match e {
         DialError::NeedsUserAuth => Outcome::wait(MachineState::NeedsUserAuth),
-        DialError::HostKeyUnconfirmed { presented } => {
-            Outcome::wait(MachineState::HostKeyUnconfirmed { presented })
-        }
-        DialError::HostKeyMismatch { presented } => Outcome::wait(MachineState::HostKeyMismatch {
+        DialError::HostKeyUnconfirmed {
+            presented,
+            algorithm,
+        } => Outcome::wait(MachineState::HostKeyUnconfirmed {
+            presented,
+            algorithm,
+        }),
+        DialError::HostKeyMismatch {
+            presented,
+            algorithm,
+        } => Outcome::wait(MachineState::HostKeyMismatch {
             confirmed: target.host_key.clone().unwrap_or_default(),
             presented,
+            algorithm,
         }),
         DialError::Rejected => Outcome::retry(MachineState::KeyRejected),
         DialError::NetworkOff => Outcome::retry(MachineState::NetworkOff),

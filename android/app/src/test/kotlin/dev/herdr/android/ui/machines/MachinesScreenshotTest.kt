@@ -67,8 +67,8 @@ class MachinesScreenshotTest {
 
     /** No signed-off render: the states that wait for the person, for review of their text. */
     private val waiting = listOf(
-        machine("workstation", MachineState.HostKeyUnconfirmed("SHA256:q3Vb8m2N4sR7tK0yL9wE1aZ5cX6vB3nM8jH2gF4dS0p")),
-        machine("server", MachineState.HostKeyMismatch("SHA256:old", "SHA256:new")),
+        machine("workstation", MachineState.HostKeyUnconfirmed("SHA256:q3Vb8m2N4sR7tK0yL9wE1aZ5cX6vB3nM8jH2gF4dS0p", "ED25519")),
+        machine("server", MachineState.HostKeyMismatch("SHA256:old", "SHA256:new", "ED25519")),
         machine("website", MachineState.KeyRejected),
         machine("api", MachineState.TooOld(have = "0.1.2", need = "0.1.10")),
         machine("docs", MachineState.AppTooOld),

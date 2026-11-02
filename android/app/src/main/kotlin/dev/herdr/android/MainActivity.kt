@@ -3,20 +3,25 @@ package dev.herdr.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateOf
+import dev.herdr.android.ui.addmachine.AddMachineRoute
+import dev.herdr.android.ui.flows.MachineFlows
+import dev.herdr.android.ui.flows.Screen
+import dev.herdr.android.ui.hostkey.HostKeyChangedActions
+import dev.herdr.android.ui.hostkey.HostKeyChangedScreen
+import dev.herdr.android.ui.hostkey.TrustDialog
+import dev.herdr.android.ui.hostkey.hostKeyChange
 import dev.herdr.android.ui.machines.MachinesRoute
+import dev.herdr.android.ui.phonekey.PhoneKeyRoute
 import dev.herdr.android.ui.theme.HerdrTheme
-
-/** The app's screens; switched by state, without a navigation library. */
-enum class Screen {
-    /** The start screen until the Agents home (step 6) takes over. */
-    Machines,
-}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,12 +34,39 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Switches screens by [MachineFlows] state; system back closes a dialog, then returns to Machines. */
 @Composable
 private fun Root(app: HerdrApp) {
-    val screen by rememberSaveable { mutableStateOf(Screen.Machines) }
-    when (screen) {
-        // The start screen has no back arrow; once the Agents home is the start,
-        // Machines gets onBack = { screen = Screen.Agents }.
-        Screen.Machines -> MachinesRoute(app, onBack = null)
+    val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
+    val snapshot by app.hubHost.snapshot.collectAsState()
+    LaunchedEffect(snapshot) { flows.onSnapshot(snapshot) }
+    BackHandler(enabled = flows.screen != Screen.Machines || flows.trusting != null || flows.confirmingForget) {
+        flows.back()
+    }
+    Box {
+        when (flows.screen) {
+            // The start screen has no back arrow; once the Agents home is the start,
+            // Machines gets onBack = { screen = Screen.Agents }.
+            Screen.Machines -> MachinesRoute(app, flows, onBack = null)
+            Screen.AddMachine -> AddMachineRoute(flows, snapshot)
+            // onSnapshot returns to Machines once the machine no longer shows a changed key.
+            Screen.HostKeyChanged -> hostKeyChange(snapshot, flows.machine)?.let { change ->
+                HostKeyChangedScreen(
+                    change,
+                    flows.confirmingForget,
+                    flows.error,
+                    HostKeyChangedActions(
+                        onBack = { flows.back() },
+                        onForget = flows::askForget,
+                        onConfirmForget = flows::forget,
+                        onCancelForget = flows::cancelForget,
+                    ),
+                )
+            }
+            Screen.PhoneKey -> PhoneKeyRoute(app.keyManager, flows.machine, onBack = { flows.back() })
+        }
+        flows.trustPrompt(snapshot)?.let { prompt ->
+            TrustDialog(prompt, flows.error, onTrust = flows::trust, onCancel = flows::cancelTrust)
+        }
     }
 }

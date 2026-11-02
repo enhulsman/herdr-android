@@ -213,10 +213,25 @@ class HubHostTest {
 
 class FakeHub : HubInterface {
     val calls = mutableListOf<String>()
-    override fun addMachine(name: String, host: String, port: UShort, user: String) { calls += "add $name" }
-    override fun confirmHostKey(name: String, fingerprint: String) { calls += "confirm $name" }
+
+    /** Thrown by the next add, confirm or forget, as the hub would refuse it. */
+    var refuse: Exception? = null
+
+    private fun refused() = refuse?.let { refuse = null; throw it }
+
+    override fun addMachine(name: String, host: String, port: UShort, user: String) {
+        refused()
+        calls += "add $name $host $port $user"
+    }
+    override fun confirmHostKey(name: String, fingerprint: String) {
+        refused()
+        calls += "confirm $name $fingerprint"
+    }
     override fun exportMachines(): String = "{}"
-    override fun forgetHostKey(name: String) { calls += "forget $name" }
+    override fun forgetHostKey(name: String) {
+        refused()
+        calls += "forget $name"
+    }
     override fun importMachines(json: String): UInt = 0u
     override fun markSeen(machine: String, address: String) { calls += "seen $address" }
     override fun removeMachine(name: String) { calls += "remove $name" }

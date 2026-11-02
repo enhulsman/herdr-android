@@ -656,7 +656,9 @@ fn the_hub_asks_for_the_host_key_and_enforces_it() {
     assert_eq!(
         machine_state(&s),
         MachineState::HostKeyUnconfirmed {
-            presented: sshd.host_key_fingerprint.clone()
+            presented: sshd.host_key_fingerprint.clone(),
+            // The throwaway sshd's host key is ed25519; ssh-keygen -l says (ED25519).
+            algorithm: "ED25519".into(),
         }
     );
     assert_eq!(
@@ -681,6 +683,7 @@ fn the_hub_asks_for_the_host_key_and_enforces_it() {
         MachineState::HostKeyMismatch {
             confirmed: "SHA256:not-this-one".into(),
             presented: sshd.host_key_fingerprint.clone(),
+            algorithm: "ED25519".into(),
         }
     );
     assert_eq!(signer.calls.load(Ordering::Relaxed), 0);

@@ -83,7 +83,7 @@ class MachineStatusTest {
 
     @Test
     fun anUnconfirmedHostKeyLeadsToTheHostKeyCheck() {
-        val c = card(MachineState.HostKeyUnconfirmed("SHA256:abc"))
+        val c = card(MachineState.HostKeyUnconfirmed("SHA256:abc", "ED25519"))
         assertEquals("Host key not confirmed yet", c.statusText)
         assertEquals(CardLinkUi(CardLink.CheckHostKey, "Check the host key", "Connects once you trust its fingerprint"), c.link)
         assertNull(c.button)
@@ -91,7 +91,7 @@ class MachineStatusTest {
 
     @Test
     fun aChangedHostKeyDoesNotConnectAndLeadsToBothFingerprints() {
-        val c = card(MachineState.HostKeyMismatch(confirmed = "SHA256:old", presented = "SHA256:new"))
+        val c = card(MachineState.HostKeyMismatch(confirmed = "SHA256:old", presented = "SHA256:new", algorithm = "ED25519"))
         assertEquals("Host key changed · not connecting", c.statusText)
         assertEquals(CardLink.CompareHostKeys, c.link?.kind)
         assertEquals("Compare the host keys", c.link?.label)

@@ -59,10 +59,12 @@ pub(crate) enum DialError {
     /// No host key is confirmed yet: the machine presented this one.
     HostKeyUnconfirmed {
         presented: String,
+        algorithm: String,
     },
     /// The machine presented a different key than the confirmed one.
     HostKeyMismatch {
         presented: String,
+        algorithm: String,
     },
     /// The machine does not accept the phone key (the line is not installed).
     Rejected,
@@ -103,13 +105,21 @@ async fn dial(t: Target, key: PublicKey, signer: Arc<dyn SshSigner>) -> Result<L
     let session = open_session(&t.host, t.port, &t.user, key, t.host_key, false, signer)
         .await
         .map_err(|e| match e {
-            SessionError::HostKeyUnconfirmed { presented } => {
-                DialError::HostKeyUnconfirmed { presented }
-            }
+            SessionError::HostKeyUnconfirmed {
+                presented,
+                algorithm,
+            } => DialError::HostKeyUnconfirmed {
+                presented,
+                algorithm,
+            },
+            SessionError::HostKeyMismatch {
+                presented,
+                algorithm,
+            } => DialError::HostKeyMismatch {
+                presented,
+                algorithm,
+            },
             SessionError::Ssh(SshError::NeedsUserAuth) => DialError::NeedsUserAuth,
-            SessionError::Ssh(SshError::HostKeyMismatch { presented }) => {
-                DialError::HostKeyMismatch { presented }
-            }
             SessionError::Ssh(SshError::Rejected) => DialError::Rejected,
             SessionError::Ssh(SshError::NetworkPermissionOff) => DialError::NetworkOff,
             SessionError::Ssh(e) => failed(e),

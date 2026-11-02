@@ -242,9 +242,15 @@ pub(crate) struct Session {
 pub(crate) enum SessionError {
     Ssh(SshError),
     /// No host key is pinned and an unpinned one is not accepted: the machine
-    /// presented this one, and nothing was signed.
+    /// presented this one (of type `algorithm`), and nothing was signed.
     HostKeyUnconfirmed {
         presented: String,
+        algorithm: String,
+    },
+    /// The machine presented a key (of type `algorithm`) other than the pinned one.
+    HostKeyMismatch {
+        presented: String,
+        algorithm: String,
     },
 }
 
@@ -277,22 +283,28 @@ pub(crate) async fn open_session(
         ..Default::default()
     });
     let connected = client::connect(config, (host, port), handler).await;
-    let presented_fingerprint = presented.lock().unwrap().clone();
+    let presented_key = presented.lock().unwrap().clone();
     let mut handle = match connected {
         Ok(handle) => handle,
         Err(e) => {
-            return Err(match (pinned, presented_fingerprint) {
-                (Some(pinned), Some(presented)) if pinned != presented => {
-                    SshError::HostKeyMismatch { presented }.into()
+            return Err(match (pinned, presented_key) {
+                (Some(pinned), Some((presented, algorithm))) if pinned != presented => {
+                    SessionError::HostKeyMismatch {
+                        presented,
+                        algorithm,
+                    }
                 }
-                (None, Some(presented)) if !accept_unpinned => {
-                    SessionError::HostKeyUnconfirmed { presented }
+                (None, Some((presented, algorithm))) if !accept_unpinned => {
+                    SessionError::HostKeyUnconfirmed {
+                        presented,
+                        algorithm,
+                    }
                 }
                 _ => connect_error(e).into(),
             });
         }
     };
-    let host_key_fingerprint = presented_fingerprint.unwrap_or_default();
+    let host_key_fingerprint = presented_key.map(|(f, _)| f).unwrap_or_default();
 
     let mut callback = CallbackSigner {
         signer,
@@ -333,8 +345,11 @@ async fn run(
         .await
         .map_err(|e| match e {
             SessionError::Ssh(e) => e,
+            SessionError::HostKeyMismatch { presented, .. } => {
+                SshError::HostKeyMismatch { presented }
+            }
             // Unreachable: any key is accepted here.
-            SessionError::HostKeyUnconfirmed { presented } => {
+            SessionError::HostKeyUnconfirmed { presented, .. } => {
                 SshError::HostKeyMismatch { presented }
             }
         })?;
@@ -379,7 +394,8 @@ async fn exec(
 pub(crate) struct HostKeyCheck {
     pinned: Option<String>,
     accept_unpinned: bool,
-    presented: Arc<Mutex<Option<String>>>,
+    /// The fingerprint and type of the key the machine presented.
+    presented: Arc<Mutex<Option<(String, String)>>>,
 }
 
 impl client::Handler for HostKeyCheck {
@@ -397,8 +413,23 @@ impl client::Handler for HostKeyCheck {
             .pinned
             .as_ref()
             .map_or(self.accept_unpinned, |pinned| *pinned == fingerprint);
-        *self.presented.lock().unwrap() = Some(fingerprint);
+        *self.presented.lock().unwrap() = Some((fingerprint, host_key_type(key)));
         Ok(accepted)
+    }
+}
+
+/// The key type as `ssh-keygen -l` prints it after the fingerprint ("ED25519",
+/// "ECDSA", "RSA"), so the person can tell which host key file to compare with.
+pub(crate) fn host_key_type(key: &PublicKey) -> String {
+    use ssh_key::Algorithm;
+    match key.algorithm() {
+        Algorithm::Ed25519 => "ED25519".into(),
+        Algorithm::Ecdsa { .. } => "ECDSA".into(),
+        Algorithm::Rsa { .. } => "RSA".into(),
+        Algorithm::Dsa => "DSA".into(),
+        Algorithm::SkEd25519 => "ED25519-SK".into(),
+        Algorithm::SkEcdsaSha2NistP256 => "ECDSA-SK".into(),
+        other => other.as_str().to_uppercase(),
     }
 }
 
@@ -542,6 +573,18 @@ mod tests {
             )
         );
         assert!(!line.contains('\n'));
+    }
+
+    #[test]
+    fn host_key_types_are_named_as_ssh_keygen_names_them() {
+        use russh::keys::ssh_key::public::Ed25519PublicKey;
+        let ed25519 = PublicKey::new(KeyData::Ed25519(Ed25519PublicKey([7; 32])), "");
+        assert_eq!(host_key_type(&ed25519), "ED25519");
+        let line = ssh_public_key_line(spki(&test_key(1)), "x".into()).unwrap();
+        assert_eq!(
+            host_key_type(&PublicKey::from_openssh(&line).unwrap()),
+            "ECDSA"
+        );
     }
 
     #[test]

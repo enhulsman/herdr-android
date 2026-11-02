@@ -463,3 +463,54 @@ async fn empty_input_while_watching_sends_nothing_and_keeps_the_size() {
         "the watcher stays attached: {sent:?}"
     );
 }
+
+/// Hiding the keyboard while typing (decisions.md 2026-11-02): the phone's
+/// new size goes to the core as RESIZE on the active attach, and the size
+/// event that follows is the phone's own, so nothing reattaches.
+#[tokio::test(start_paused = true)]
+async fn the_phone_resizing_while_typing_sends_resize_and_keeps_the_attach() {
+    let (client, mut core) = connect();
+    let mut viewer = typing(&client, &mut core).await;
+    assert!(viewer.resize_phone(60, 45), "the VT takes the new size");
+    assert_eq!(viewer.size(), (60, 45));
+    let f = core.next().await;
+    assert_eq!((f.channel, f.kind), (9, wire::RESIZE));
+    assert_eq!(f.payload, [60u16.to_le_bytes(), 45u16.to_le_bytes()].concat());
+
+    assert_eq!(viewer.size_changed(60, 45).await.unwrap(), None);
+    let frames = marker(&client, &mut core).await;
+    assert_sends_nothing(&frames, "the phone's own size event");
+    assert_eq!(viewer.mode(), Mode::Typing);
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_phone_resizing_while_watching_sends_nothing_and_types_at_the_new_size() {
+    let (client, mut core) = connect();
+    let mut viewer = watching(&client, &mut core).await;
+    assert!(!viewer.resize_phone(60, 45), "the VT keeps the desk's size");
+    assert_eq!(viewer.size(), DESK);
+    let frames = marker(&client, &mut core).await;
+    assert_sends_nothing(&frames, "a watcher's own size change");
+
+    let typed = tokio::spawn(async move {
+        let r = viewer.input(b"y").await;
+        (viewer, r)
+    });
+    let close = core.next().await;
+    assert_eq!((close.channel, close.kind), (7, wire::CLOSE));
+    let params = core.attach(9, (60, 45)).await;
+    assert_eq!((params["cols"].clone(), params["rows"].clone()), (json!(60), json!(45)));
+    let (_viewer, attached) = typed.await.unwrap();
+    let attached = attached.unwrap().unwrap();
+    assert_eq!((attached.cols, attached.rows), (60, 45));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_zero_or_unchanged_phone_size_is_ignored() {
+    let (client, mut core) = connect();
+    let mut viewer = typing(&client, &mut core).await;
+    assert!(!viewer.resize_phone(0, 45));
+    assert!(!viewer.resize_phone(PHONE.0, PHONE.1));
+    let frames = marker(&client, &mut core).await;
+    assert_sends_nothing(&frames, "no size change");
+}

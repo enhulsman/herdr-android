@@ -475,7 +475,10 @@ async fn the_phone_resizing_while_typing_sends_resize_and_keeps_the_attach() {
     assert_eq!(viewer.size(), (60, 45));
     let f = core.next().await;
     assert_eq!((f.channel, f.kind), (9, wire::RESIZE));
-    assert_eq!(f.payload, [60u16.to_le_bytes(), 45u16.to_le_bytes()].concat());
+    assert_eq!(
+        f.payload,
+        [60u16.to_le_bytes(), 45u16.to_le_bytes()].concat()
+    );
 
     assert_eq!(viewer.size_changed(60, 45).await.unwrap(), None);
     let frames = marker(&client, &mut core).await;
@@ -499,7 +502,10 @@ async fn the_phone_resizing_while_watching_sends_nothing_and_types_at_the_new_si
     let close = core.next().await;
     assert_eq!((close.channel, close.kind), (7, wire::CLOSE));
     let params = core.attach(9, (60, 45)).await;
-    assert_eq!((params["cols"].clone(), params["rows"].clone()), (json!(60), json!(45)));
+    assert_eq!(
+        (params["cols"].clone(), params["rows"].clone()),
+        (json!(60), json!(45))
+    );
     let (_viewer, attached) = typed.await.unwrap();
     let attached = attached.unwrap().unwrap();
     assert_eq!((attached.cols, attached.rows), (60, 45));

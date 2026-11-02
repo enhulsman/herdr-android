@@ -14,7 +14,8 @@
 #   - no other line carries the same key without these limits, in this file
 #     or in the other files sshd reads keys from (its AuthorizedKeysFile list
 #     with --sshd-settings, else ~/.ssh/authorized_keys and authorized_keys2);
-#     an AuthorizedKeysCommand cannot be checked and counts as a FAIL;
+#     systemd's `userdbctl ssh-authorized-keys %u` is asked for its keys,
+#     any other AuthorizedKeysCommand cannot be checked and counts as a FAIL;
 #   - only you can change the file.
 # It does not need the phone's private key.
 #
@@ -304,6 +305,39 @@ load_settings() {
   keysfile=$(awk 'tolower($1) == "authorizedkeysfile" {$1 = ""; print}' <<< "$settings_text")
 }
 
+# systemd's sshd drop-in (20-systemd-userdb.conf) sets this command: it
+# returns the keys in the user record, for most users none.
+is_userdb() {
+  local words
+  read -r -a words <<< "$1"
+  [[ ${#words[@]} -eq 3 && ${words[0]##*/} == userdbctl &&
+    ${words[1]} == ssh-authorized-keys && ${words[2]} == %u ]]
+}
+
+# Asks userdbctl for this user's keys (the user may read their own record's
+# keys) and checks them as a file: no copy, or only restricted ones.
+check_userdb() {
+  local words out
+  read -r -a words <<< "$1"
+  out=$(mktemp)
+  if ! "${words[0]}" ssh-authorized-keys "$(id -un)" > "$out" 2> /dev/null; then
+    rm -f "$out"
+    fail "sshd also takes keys from AuthorizedKeysCommand ($1), and it did not answer: keys it returns are not verified"
+    return
+  fi
+  if [[ $blobs != " " ]]; then
+    check_copies "userdbctl " "$out"
+  else
+    copies=0
+  fi
+  rm -f "$out"
+  if [[ $copies -eq 0 ]]; then
+    pass "sshd also takes keys from userdbctl (systemd user records): no copy of the phone key"
+  else
+    pass "sshd also takes keys from userdbctl (systemd user records): its copies of the phone key are checked above"
+  fi
+}
+
 check_settings() {
   if [[ $have_settings -eq 0 ]]; then
     [[ -n $settings ]] && return
@@ -329,6 +363,8 @@ check_settings() {
   fi
   if [[ -z $keyscommand || ${keyscommand,,} == none ]]; then
     pass "sshd takes keys from files only (no AuthorizedKeysCommand)"
+  elif is_userdb "$keyscommand"; then
+    check_userdb "$keyscommand"
   else
     fail "sshd also takes keys from AuthorizedKeysCommand ($keyscommand): keys it returns are not verified"
   fi

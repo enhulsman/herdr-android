@@ -272,6 +272,56 @@ an_authorized_keys_command_fails_as_unverified() {
   expect fail '^FAIL.*AuthorizedKeysCommand' -- --sshd-settings "$scratch/sshd-t"
 }
 
+# userdb <exit status> <line>...: a stand-in userdbctl that prints the lines
+# for `ssh-authorized-keys <this user>`, and settings that point sshd at it
+# the way systemd's sshd drop-in does.
+userdb() {
+  local status=$1
+  shift
+  mkdir -p "$scratch/bin"
+  {
+    echo '#!/bin/sh'
+    echo "[ \"\$1\" = ssh-authorized-keys ] && [ \"\$2\" = $(id -un) ] || exit 3"
+    printf 'cat <<'"'"'EOF'"'"'\n'
+    [[ $# -gt 0 ]] && printf '%s\n' "$@"
+    printf 'EOF\nexit %s\n' "$status"
+  } > "$scratch/bin/userdbctl"
+  chmod 755 "$scratch/bin/userdbctl"
+  printf '%s\n' 'pubkeyauthentication yes' 'permituserenvironment no' \
+    'authorizedkeysfile .ssh/authorized_keys' \
+    "authorizedkeyscommand $scratch/bin/userdbctl ssh-authorized-keys %u" > "$scratch/sshd-t"
+}
+
+systemd_userdb_without_the_key_passes() {
+  local HOME_DIR
+  other_home
+  userdb 0
+  expect pass '^PASS.*userdbctl.*no copy' -- --sshd-settings "$scratch/sshd-t"
+  userdb 0 "ssh-ed25519 $other_blob laptop"
+  expect pass '^PASS.*userdbctl.*no copy' -- --sshd-settings "$scratch/sshd-t"
+}
+
+systemd_userdb_with_an_unrestricted_copy_fails() {
+  local HOME_DIR
+  other_home
+  userdb 0 "ecdsa-sha2-nistp256 $blob old-copy"
+  expect fail '^FAIL.*userdbctl.*restrict' -- --sshd-settings "$scratch/sshd-t"
+}
+
+systemd_userdb_with_a_restricted_copy_passes() {
+  local HOME_DIR
+  other_home
+  userdb 0 "$good"
+  expect pass '^PASS.*userdbctl' -- --sshd-settings "$scratch/sshd-t"
+}
+
+systemd_userdb_that_fails_to_answer_fails() {
+  local HOME_DIR
+  other_home
+  userdb 1
+  expect fail '^FAIL.*userdbctl' -- --sshd-settings "$scratch/sshd-t"
+}
+
 an_unknown_flag_is_a_usage_error() {
   local status=0
   count=$((count + 1))
@@ -332,7 +382,7 @@ live_wrong_command_is_caught() {
 }
 
 mkdir -p "$scratch/home"
-for test in $(declare -F | awk '{print $3}' | grep -vE '^(keys|expect|have_sshd|other_home)$'); do
+for test in $(declare -F | awk '{print $3}' | grep -vE '^(keys|expect|have_sshd|other_home|userdb)$'); do
   "$test"
 done
 

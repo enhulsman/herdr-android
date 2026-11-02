@@ -45,4 +45,4 @@ out=android/app/build/generated/uniffi/kotlin
 rm -rf "$out"
 cargo run -p uniffi-bindgen --locked -- generate \
   --library "target/aarch64-linux-android/$profile/libherdr_mobile.so" \
-  --language kotlin --no-format --out-dir "$out"
+  --language kotlin --no-format --config scripts/uniffi-kotlin.toml --out-dir "$out"

@@ -13,7 +13,7 @@
 //! a real core also needs `HERDR_CORE_BIN` (scripts/fetch-herdr-core.sh) and
 //! skips without it unless `HERDR_REQUIRE_CORE` is set.
 
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -162,47 +162,63 @@ fn sshd(name: &str, authorized: &str, path_dirs: &[&str], env: &[(&str, String)]
         format!("PATH={}", session_path(&home, path_dirs)),
     ];
     set_env.extend(env.iter().map(|(k, v)| format!("{k}={v}")));
-    let port = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    let config = format!(
-        "Port {port}\nListenAddress 127.0.0.1\nHostKey {host}\nAuthorizedKeysFile {keys}\n\
-         PidFile {pid}\nUsePAM no\nStrictModes no\nPasswordAuthentication no\n\
-         KbdInteractiveAuthentication no\nPubkeyAuthentication yes\nLogLevel VERBOSE\n\
-         SetEnv {set_env}\n",
-        host = host_key.display(),
-        keys = dir.join("authorized_keys").display(),
-        pid = dir.join("sshd.pid").display(),
-        set_env = set_env.join(" "),
-    );
-    std::fs::write(dir.join("sshd_config"), config).unwrap();
-    let log = std::fs::File::create(dir.join("sshd.log")).unwrap();
-    let child = Command::new(SSHD)
-        .args(["-D", "-e", "-f"])
-        .arg(dir.join("sshd_config"))
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(log)
-        .spawn()
-        .expect("sshd starts");
-    let sshd = Sshd {
-        child,
-        dir,
-        port,
-        host_key_fingerprint,
-    };
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while TcpStream::connect(("127.0.0.1", port)).is_err() {
-        assert!(
-            Instant::now() < deadline,
-            "sshd did not listen: {}",
-            sshd.log()
+    let set_env = set_env.join(" ");
+
+    // A free port can be taken again between asking for it and sshd binding
+    // it (by a parallel test asking for one too), and a connect proves only
+    // that something listens there. So sshd is ready when its own log says it
+    // listens on the port, and starts over on a new port when the port is taken.
+    let mut last_log = String::new();
+    for _ in 0..5 {
+        let port = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let config = format!(
+            "Port {port}\nListenAddress 127.0.0.1\nHostKey {host}\nAuthorizedKeysFile {keys}\n\
+             PidFile {pid}\nUsePAM no\nStrictModes no\nPasswordAuthentication no\n\
+             KbdInteractiveAuthentication no\nPubkeyAuthentication yes\nLogLevel VERBOSE\n\
+             SetEnv {set_env}\n",
+            host = host_key.display(),
+            keys = dir.join("authorized_keys").display(),
+            pid = dir.join("sshd.pid").display(),
         );
-        std::thread::sleep(Duration::from_millis(50));
+        std::fs::write(dir.join("sshd_config"), config).unwrap();
+        let log = std::fs::File::create(dir.join("sshd.log")).unwrap();
+        let mut child = Command::new(SSHD)
+            .args(["-D", "-e", "-f"])
+            .arg(dir.join("sshd_config"))
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(log)
+            .spawn()
+            .expect("sshd starts");
+        let listening = format!("Server listening on 127.0.0.1 port {port}.");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let log = std::fs::read_to_string(dir.join("sshd.log")).unwrap_or_default();
+            if log.contains(&listening) {
+                return Some(Sshd {
+                    child,
+                    dir,
+                    port,
+                    host_key_fingerprint,
+                });
+            }
+            let exited = child.try_wait().unwrap().is_some();
+            if exited || log.contains("Address already in use") || Instant::now() >= deadline {
+                // Taken (or stuck): stop this sshd, keep the scratch dir.
+                let _ = child.kill();
+                let _ = child.wait();
+                last_log = log;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
-    Some(sshd)
+    let _ = std::fs::remove_dir_all(&dir);
+    panic!("sshd did not listen in 5 tries: {last_log}");
 }
 
 /// A stand-in herdr-core at `dir` under the session HOME that prints `says`
@@ -246,6 +262,43 @@ fn run(
         signer,
         10_000,
     )
+}
+
+// The harness itself.
+
+/// Many throwaway sshds started at once each end up behind their own port:
+/// a test that reached another test's sshd would see the wrong host key and
+/// the wrong authorized key, and fail for reasons that are not its own.
+#[test]
+fn parallel_sshds_each_present_their_own_host_key() {
+    const N: usize = 20;
+    let phone = key(30);
+    let line = spike_line(&phone);
+    let start = std::sync::Barrier::new(N);
+    let presented: Vec<Option<(String, Result<String, SshError>)>> = std::thread::scope(|s| {
+        let handles: Vec<_> = (0..N)
+            .map(|i| {
+                let (phone, line, start) = (&phone, &line, &start);
+                s.spawn(move || {
+                    start.wait();
+                    let sshd = sshd(&format!("par{i}"), line, &[], &[])?;
+                    let ran = run(&sshd, phone, None, signer(phone.clone(), false), "x")
+                        .map(|r| r.host_key_fingerprint);
+                    Some((sshd.host_key_fingerprint.clone(), ran))
+                })
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    for (i, p) in presented.into_iter().enumerate() {
+        let Some((own, ran)) = p else { return };
+        match ran {
+            Ok(fingerprint) => {
+                assert_eq!(fingerprint, own, "sshd par{i} answered with another key")
+            }
+            Err(e) => panic!("sshd par{i}: {e:?}"),
+        }
+    }
 }
 
 // The spike's sign-in (M0.6).

@@ -69,7 +69,8 @@
     "sectionHeaderHeight": 40,
     "rowMinHeight": 64,
     "systemBars": "edge to edge; status bar 36, gesture bar 28 in the renders",
-    "terminalFit": "watching: desk grid scaled to fit the width, area below the grid in canvas colour behind a dashed top border; typing: phone grid at 12.2 sp, about 56 columns on 412 dp",
+    "terminalFit": "watching: desk grid scaled to fit the width, area below the grid in canvas colour behind a dashed top border; typing: phone grid at 12.2 sp, about 53 columns on 412 dp; keyboard hidden while typing: the phone grid grows to the full height, keys row stays; both modes draw the grid inside terminalPadding (the Mac pane's padding, painted in the terminal background)",
+    "terminalPadding": {"x": 10, "y": 6, "source": "herdr-app settings.rs terminal_padding default [10, 6]"},
     "wide": "v1.1 (M4): rail at 600 dp and wider; not specified here"
   },
   "colors": {
@@ -334,13 +335,13 @@
         "family": "mono",
         "size": 12.2,
         "lineHeight": 1.25,
-        "note": "about 56 columns at 412 dp"
+        "note": "about 53 columns at 412 dp inside 10 dp side padding"
       },
       "terminalWatch": {
         "family": "mono",
-        "size": "fit: width / (cols * 0.6)",
+        "size": "fit: (width - 2 * terminalPadding.x) / (cols * 0.6)",
         "lineHeight": 1.25,
-        "note": "96 columns at 412 dp = 7.15 sp"
+        "note": "96 columns at 412 dp = 6.8 sp"
       }
     },
     "fontFamily": {

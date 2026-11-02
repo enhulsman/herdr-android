@@ -120,7 +120,7 @@ impl Task {
             let over = match Viewer::watch(&conn.client, &self.address, self.phone).await {
                 Ok((viewer, attached)) => {
                     self.check_observe_size(&conn, before, &attached);
-                    self.attached(&conn, viewer, attached).await
+                    self.attached(&conn, viewer, attached, before).await
                 }
                 Err(e) => {
                     self.state(
@@ -244,12 +244,22 @@ impl Task {
         }
     }
 
-    async fn attached(&mut self, conn: &Conn, mut viewer: Viewer, attached: Attached) -> Over {
+    /// Runs one attach. `seen` is the size the event stream reported when the
+    /// attach was asked for: a size reported since then (even before the
+    /// attach reply) is applied, so a resize during the attach is not lost.
+    async fn attached(
+        &mut self,
+        conn: &Conn,
+        mut viewer: Viewer,
+        attached: Attached,
+        mut seen: Option<(u16, u16)>,
+    ) -> Over {
         let Some(mut vt) = self.fresh_vt(&attached) else {
             return Over::Pause;
         };
         let mut sizes = conn.sizes.clone();
-        sizes.mark_unchanged();
+        // Look at the current size once at the start, whatever was marked seen.
+        sizes.mark_changed();
         let mut dirty = false;
         let mut next_frame = Instant::now();
         loop {
@@ -286,6 +296,10 @@ impl Task {
                         continue;
                     }
                     let size = sizes.borrow_and_update().get(&self.address).copied();
+                    if size == seen {
+                        continue;
+                    }
+                    seen = size;
                     if let Some((c, r)) = size {
                         let before = (c, r);
                         match viewer.size_changed(c, r).await {

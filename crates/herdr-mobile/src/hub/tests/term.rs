@@ -519,3 +519,48 @@ async fn suspending_the_hub_closes_the_connection_under_the_open_terminal() {
         "the view's client clone is closed too"
     );
 }
+
+// Codex review: a desk resize reported while the attach is in flight must
+// not be lost; the phone ends up at the new size.
+#[tokio::test(start_paused = true)]
+async fn a_resize_during_the_attach_is_not_lost() {
+    let mut rig = rig("term-attach-race");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![sized("t3", 80, 24)]).await;
+    rig.until_state(WS, connected).await;
+    let mut o = open(&rig);
+    let req = core.request().await;
+    assert_eq!(req["method"], "terminal.attach");
+    // The desk resizes, then the (older) attach reply arrives.
+    core.event(1, "size", "t3", json!({"cols": 120, "rows": 40}))
+        .await;
+    let t = json!({"address": "t3", "cols": 80, "rows": 24});
+    core.reply_to(&req, json!({"channel": 5, "terminal": t}))
+        .await;
+    // Whatever else the phone asks (the observe check), it reattaches at 120x40.
+    loop {
+        let f = core.frame().await;
+        if f.channel != 0 {
+            continue;
+        }
+        let req: Value = serde_json::from_slice(&f.payload).unwrap();
+        match req["method"].as_str() {
+            Some("terminal.get") => {
+                let t = json!({"address": "t3", "cols": 120, "rows": 40});
+                core.reply_to(&req, t).await;
+            }
+            Some("terminal.attach") => {
+                assert_eq!(req["params"]["observe"], true);
+                let t = json!({"address": "t3", "cols": 120, "rows": 40});
+                core.reply_to(&req, json!({"channel": 6, "terminal": t}))
+                    .await;
+                break;
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+    let s = o.screen.until_state(|s| s.cols == 120).await;
+    assert_eq!((s.phase, s.rows), (TermPhase::Watching, 40));
+}

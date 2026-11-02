@@ -520,3 +520,54 @@ async fn a_zero_or_unchanged_phone_size_is_ignored() {
     let frames = marker(&client, &mut core).await;
     assert_sends_nothing(&frames, "no size change");
 }
+
+/// Codex review: the phone resizes twice before the core's size event for
+/// the first arrives. Both events are the phone's own: no reattach.
+#[tokio::test(start_paused = true)]
+async fn late_size_events_for_the_phones_own_resizes_change_nothing() {
+    let (client, mut core) = connect();
+    let mut viewer = typing(&client, &mut core).await;
+    assert!(viewer.resize_phone(60, 45));
+    assert!(viewer.resize_phone(60, 40));
+    assert_eq!(viewer.size_changed(60, 45).await.unwrap(), None);
+    assert_eq!(viewer.size_changed(60, 40).await.unwrap(), None);
+    let frames = marker(&client, &mut core).await;
+    for f in &frames {
+        assert!(f.kind != wire::CLOSE, "reattached on its own size: {f:?}");
+    }
+    assert_eq!(viewer.mode(), Mode::Typing);
+
+    // A size the phone never asked for is the desk's: reattach as a watcher.
+    let resized = tokio::spawn(async move {
+        let r = viewer.size_changed(DESK.0, DESK.1).await;
+        (viewer, r)
+    });
+    let close = core.next().await;
+    assert_eq!((close.channel, close.kind), (9, wire::CLOSE));
+    core.attach(10, DESK).await;
+    let (_viewer, r) = resized.await.unwrap();
+    assert_eq!(r.unwrap().unwrap().mode, Mode::Watching);
+}
+
+/// Once its own size event arrived, an older one the phone asked for earlier
+/// is no longer pending: a later event of that size is the desk's.
+#[tokio::test(start_paused = true)]
+async fn an_acknowledged_phone_size_is_no_longer_pending() {
+    let (client, mut core) = connect();
+    let mut viewer = typing(&client, &mut core).await;
+    assert!(viewer.resize_phone(60, 45));
+    assert!(viewer.resize_phone(60, 40));
+    for _ in 0..2 {
+        assert_eq!(core.next().await.kind, wire::RESIZE);
+    }
+    assert_eq!(viewer.size_changed(60, 40).await.unwrap(), None);
+    let resized = tokio::spawn(async move {
+        let r = viewer.size_changed(60, 45).await;
+        (viewer, r)
+    });
+    let close = core.next().await;
+    assert_eq!(close.kind, wire::CLOSE);
+    core.attach(10, (60, 45)).await;
+    let (_viewer, r) = resized.await.unwrap();
+    assert!(r.unwrap().is_some(), "an acknowledged size is not pending");
+}

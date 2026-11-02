@@ -19,7 +19,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [x] M0.5 Spike A, device smoke test: load the `.so` on the Pixel, feed a recorded synthetic Claude Code stream, read the grid, draw one 200x60 frame. Fail -> switch to the Termux fallback and amend design.md before M1
 - [x] M0.6 Spike B, russh signing through a Keystore key with 30-minute user authentication. Fail -> wrapped Ed25519 key; write the key type into design.md
 - [x] M0.7 Spike C, push end to end: watcher-side `ece` encryption, POST with the `up*` token to ntfy, decrypt in the UnifiedPush connector on the phone; record whether VAPID is needed and that the binary body arrives intact
-- [ ] M0.8 Phone check: Obtainium (read-only token, background install off) installs v0.0.1, updates to v0.0.2 keeping data and the Keystore key
+- [x] M0.8 Phone check: Obtainium (read-only token, background install off) installs v0.0.1, updates to v0.0.2 keeping data and the Keystore key
 
 ## M1. Connect and list agents
 
@@ -27,7 +27,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [x] M1.2 Tests: protocol suite against scratch cores, pinned and latest; throwaway-sshd test of the `authorized_keys` line
 - [x] M1.3 Machines screen: key, restricted line, host key confirm, reconnect, lifecycle, export/import
 - [x] M1.4 Agents home: attention order, kinds, progress, names, "Other terminals", "as of", duplicate skipping
-- [ ] M1.5 Phone check: WSL agents listed; refused-command check on WSL; fingerprint UX judged (keep C or fall back to B); dim text and paper status colours judged outdoors (keep the Mac values or switch to the AA values in `design-tokens.json`)
+- [x] M1.5 Phone check: WSL agents listed; refused-command check on WSL; fingerprint UX judged (keep C or fall back to B); dim text and paper status colours judged outdoors (keep the Mac values or switch to the AA values in `design-tokens.json`)
 
 ## M2. Live terminal and keyboard
 

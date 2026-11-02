@@ -166,6 +166,27 @@ impl Viewer {
         Ok(attached)
     }
 
+    /// The phone's own size changed (the keyboard showed or hid). While
+    /// typing it goes to the core as RESIZE on the active attach and the
+    /// caller resizes its VT (`true`); while watching it is only kept for the
+    /// next active attach. A zero or unchanged size does nothing.
+    pub fn resize_phone(&mut self, cols: u16, rows: u16) -> bool {
+        if cols == 0 || rows == 0 || (cols, rows) == self.phone {
+            return false;
+        }
+        self.phone = (cols, rows);
+        if self.mode != Mode::Typing {
+            return false;
+        }
+        let Some(stream) = &self.stream else {
+            return false;
+        };
+        let payload = [cols.to_le_bytes(), rows.to_le_bytes()].concat();
+        self.client.send(stream.channel(), wire::RESIZE, &payload);
+        self.size = (cols, rows);
+        true
+    }
+
     /// The core's `size` event for this terminal. The phone's own size
     /// change needs nothing; any other means a fresh VT: `Some` after
     /// attaching again, as a watcher.

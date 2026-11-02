@@ -1,0 +1,43 @@
+grid 60x16
+default fg=ffffff bg=000000
+cursor 9,14 underline
+row 0: ╭──────────────────────────────────────────────────────────╮
+  0-59 fg=d77757
+row 1: │ Do you want to make this edit to retry.rs?               │
+  0-0 fg=d77757
+  2-43 bold
+  59-59 fg=d77757
+row 2: │                                                          │
+  0-0 fg=d77757
+  59-59 fg=d77757
+row 3: │ ❯ 1. Yes                                                 │
+  0-0 fg=d77757
+  2-9 fg=000000 bg=ffffff
+  59-59 fg=d77757
+row 4: │   2. Yes, and don't ask again                            │
+  0-0 fg=d77757
+  59-59 fg=d77757
+row 5: │   3. No, and tell the agent what to do differently       │
+  0-0 fg=d77757
+  59-59 fg=d77757
+row 6: │                                                          │
+  0-0 fg=d77757
+  59-59 fg=d77757
+row 7:   log line 04
+  2-12 fg=808080
+row 8:   log line 05
+  2-12 fg=808080
+row 9:   log line 06
+  2-12 fg=808080
+row 10:   log line 07
+  2-12 fg=808080
+row 11:   log line 08
+  2-12 fg=808080
+row 12:   log line 09
+  2-12 fg=808080
+row 13: 
+row 14: │                                                          │
+  0-0 fg=d77757
+  59-59 fg=d77757
+row 15: ╰──────────────────────────────────────────────────────────╯
+  0-59 fg=d77757

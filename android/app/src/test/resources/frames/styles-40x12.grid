@@ -1,0 +1,50 @@
+grid 40x12
+default fg=ffffff bg=000000
+cursor 15,10 bar
+row 0: bold italic faint line curl dbl strike
+  0-3 bold
+  5-10 italic
+  12-16 faint
+  18-21 underline
+  23-26 underline
+  28-30 underline
+  32-37 strike
+row 1: inverse        redinv all
+  0-6 fg=000000 bg=ffffff
+  15-20 fg=000000 bg=cc6666
+  22-24 bold italic underline strike
+row 2: rgybmcwKRW
+  0-0 fg=cc6666
+  1-1 fg=b5bd68
+  2-2 fg=f0c674
+  3-3 fg=81a2be
+  4-4 fg=b294bb
+  5-5 fg=8abeb7
+  6-6 fg=c5c8c6
+  7-7 fg=666666
+  8-8 fg=d54e53
+  9-9 fg=eaeaea
+  11-11 bg=cc6666
+  12-12 bg=b5bd68
+  13-13 bg=f0c674
+  14-14 bg=7aa6da
+row 3: 208 on 22 truecolour
+  0-2 fg=ff8700
+  3-8 fg=ff8700 bg=005f00
+  10-13 fg=d77757
+  14-19 fg=d77757 bg=141e28
+row 4: 日本語 x 😀 é ✻ ❯
+  0-0 wide
+  2-2 wide
+  4-4 wide
+  9-9 wide
+row 5: ╭──────╮
+  0-7 fg=b294bb bold
+row 6:  dark on light
+  0-14 fg=010203 bg=faf0e6
+row 7: this line is long enough to wrap over th
+row 8: e edge of the grid
+row 9: 
+row 10: 日  cursor here
+  0-0 wide
+row 11: xx

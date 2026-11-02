@@ -28,7 +28,14 @@
 //! | 13 | width: 0 narrow, 1 wide, 2 spacer after a wide cell, 3 spacer at a line end |
 //! | 14..16 | reserved, 0 |
 
+// The terminal view (M2.2) and input (M2.3) call the grid and the key
+// encoder; until then only the tests do.
+#[cfg_attr(not(test), allow(dead_code))]
 mod ffi;
+#[cfg_attr(not(test), allow(dead_code))]
+mod grid;
+#[cfg_attr(not(test), allow(dead_code))]
+mod keys;
 
 use std::ffi::c_void;
 use std::fmt;
@@ -76,6 +83,8 @@ pub struct Terminal {
     state: ffi::RenderState,
     rows_iter: ffi::RowIterator,
     cells: ffi::RowCells,
+    keys: ffi::KeyEncoder,
+    key_event: ffi::KeyEvent,
     cols: u16,
     rows: u16,
     sent_first_frame: bool,
@@ -98,6 +107,8 @@ impl Terminal {
             state: ptr::null_mut(),
             rows_iter: ptr::null_mut(),
             cells: ptr::null_mut(),
+            keys: ptr::null_mut(),
+            key_event: ptr::null_mut(),
             cols,
             rows,
             sent_first_frame: false,
@@ -118,6 +129,14 @@ impl Terminal {
             check(
                 "ghostty_render_state_row_cells_new",
                 ffi::ghostty_render_state_row_cells_new(ptr::null(), &mut t.cells),
+            )?;
+            check(
+                "ghostty_key_encoder_new",
+                ffi::ghostty_key_encoder_new(ptr::null(), &mut t.keys),
+            )?;
+            check(
+                "ghostty_key_event_new",
+                ffi::ghostty_key_event_new(ptr::null(), &mut t.key_event),
             )?;
         }
         Ok(t)
@@ -379,6 +398,12 @@ fn attributes(style: &ffi::Style) -> u8 {
 impl Drop for Terminal {
     fn drop(&mut self) {
         unsafe {
+            if !self.key_event.is_null() {
+                ffi::ghostty_key_event_free(self.key_event);
+            }
+            if !self.keys.is_null() {
+                ffi::ghostty_key_encoder_free(self.keys);
+            }
             if !self.cells.is_null() {
                 ffi::ghostty_render_state_row_cells_free(self.cells);
             }
@@ -400,14 +425,14 @@ mod tests {
     use super::*;
     use crate::synthetic;
 
-    struct Parsed {
-        cols: u16,
-        rows: u16,
-        cursor: (u16, u16),
-        flags: u8,
-        fg: u32,
-        bg: u32,
-        rows_sent: Vec<(u16, Vec<[u8; CELL_LEN]>)>,
+    pub(super) struct Parsed {
+        pub cols: u16,
+        pub rows: u16,
+        pub cursor: (u16, u16),
+        pub flags: u8,
+        pub fg: u32,
+        pub bg: u32,
+        pub rows_sent: Vec<(u16, Vec<[u8; CELL_LEN]>)>,
     }
 
     fn u16_at(b: &[u8], i: usize) -> u16 {
@@ -417,7 +442,7 @@ mod tests {
         u32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]])
     }
 
-    fn parse(b: &[u8]) -> Parsed {
+    pub(super) fn parse(b: &[u8]) -> Parsed {
         let cols = u16_at(b, 0);
         let count = usize::from(u16_at(b, 10));
         let row_len = 2 + usize::from(cols) * CELL_LEN;
@@ -499,6 +524,70 @@ mod tests {
             ffi::CELLS_DATA_HAS_STYLING
         );
         assert_eq!(enum_value("GhosttyCellData", "WIDE"), ffi::CELL_DATA_WIDE);
+        assert_eq!(enum_value("GhosttyCellWide", "WIDE"), ffi::CELL_WIDE_WIDE);
+        assert_eq!(
+            enum_value("GhosttyCellWide", "SPACER_HEAD"),
+            ffi::CELL_WIDE_SPACER_HEAD
+        );
+        for (k, ours) in [
+            ("CURSOR_VISUAL_STYLE", ffi::DATA_CURSOR_VISUAL_STYLE),
+            (
+                "CURSOR_VIEWPORT_WIDE_TAIL",
+                ffi::DATA_CURSOR_VIEWPORT_WIDE_TAIL,
+            ),
+        ] {
+            assert_eq!(enum_value("GhosttyRenderStateData", k), ours, "{k}");
+        }
+        for (k, ours) in [
+            ("BAR", ffi::CURSOR_BAR),
+            ("UNDERLINE", ffi::CURSOR_UNDERLINE),
+            ("BLOCK_HOLLOW", ffi::CURSOR_BLOCK_HOLLOW),
+        ] {
+            assert_eq!(
+                enum_value("GhosttyRenderStateCursorVisualStyle", k),
+                ours,
+                "{k}"
+            );
+        }
+        for (k, ours) in [
+            ("GRAPHEMES_LEN", ffi::CELLS_DATA_GRAPHEMES_LEN),
+            ("GRAPHEMES_BUF", ffi::CELLS_DATA_GRAPHEMES_BUF),
+        ] {
+            assert_eq!(enum_value("GhosttyRenderStateRowCellsData", k), ours, "{k}");
+        }
+        assert_eq!(
+            enum_value("GhosttyKeyAction", "PRESS"),
+            ffi::KEY_ACTION_PRESS
+        );
+        for (k, ours) in [
+            ("UNIDENTIFIED", ffi::KEY_UNIDENTIFIED),
+            ("BACKQUOTE", ffi::KEY_BACKQUOTE),
+            ("BACKSLASH", ffi::KEY_BACKSLASH),
+            ("BRACKET_LEFT", ffi::KEY_BRACKET_LEFT),
+            ("BRACKET_RIGHT", ffi::KEY_BRACKET_RIGHT),
+            ("COMMA", ffi::KEY_COMMA),
+            ("DIGIT_0", ffi::KEY_DIGIT_0),
+            ("DIGIT_9", ffi::KEY_DIGIT_0 + 9),
+            ("EQUAL", ffi::KEY_EQUAL),
+            ("A", ffi::KEY_A),
+            ("Z", ffi::KEY_A + 25),
+            ("MINUS", ffi::KEY_MINUS),
+            ("PERIOD", ffi::KEY_PERIOD),
+            ("QUOTE", ffi::KEY_QUOTE),
+            ("SEMICOLON", ffi::KEY_SEMICOLON),
+            ("SLASH", ffi::KEY_SLASH),
+            ("BACKSPACE", ffi::KEY_BACKSPACE),
+            ("ENTER", ffi::KEY_ENTER),
+            ("SPACE", ffi::KEY_SPACE),
+            ("TAB", ffi::KEY_TAB),
+            ("ARROW_DOWN", ffi::KEY_ARROW_DOWN),
+            ("ARROW_LEFT", ffi::KEY_ARROW_LEFT),
+            ("ARROW_RIGHT", ffi::KEY_ARROW_RIGHT),
+            ("ARROW_UP", ffi::KEY_ARROW_UP),
+            ("ESCAPE", ffi::KEY_ESCAPE),
+        ] {
+            assert_eq!(enum_value("GhosttyKey", k), ours, "GhosttyKey {k}");
+        }
         assert_eq!(
             enum_value("GhosttyCellWide", "SPACER_TAIL"),
             ffi::CELL_WIDE_SPACER_TAIL

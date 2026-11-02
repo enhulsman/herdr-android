@@ -29,6 +29,16 @@ pub type RenderState = *mut RenderStateImpl;
 pub type RowIterator = *mut RowIteratorImpl;
 pub type RowCells = *mut RowCellsImpl;
 pub type Cell = u64;
+#[repr(C)]
+pub struct KeyEncoderImpl {
+    _private: [u8; 0],
+}
+#[repr(C)]
+pub struct KeyEventImpl {
+    _private: [u8; 0],
+}
+pub type KeyEncoder = *mut KeyEncoderImpl;
+pub type KeyEvent = *mut KeyEventImpl;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
@@ -111,10 +121,17 @@ pub const DATA_DIRTY: c_int = 3;
 pub const DATA_ROW_ITERATOR: c_int = 4;
 pub const DATA_COLOR_BACKGROUND: c_int = 5;
 pub const DATA_COLOR_FOREGROUND: c_int = 6;
+pub const DATA_CURSOR_VISUAL_STYLE: c_int = 10;
 pub const DATA_CURSOR_VISIBLE: c_int = 11;
 pub const DATA_CURSOR_VIEWPORT_HAS_VALUE: c_int = 14;
 pub const DATA_CURSOR_VIEWPORT_X: c_int = 15;
 pub const DATA_CURSOR_VIEWPORT_Y: c_int = 16;
+pub const DATA_CURSOR_VIEWPORT_WIDE_TAIL: c_int = 17;
+
+// GhosttyRenderStateCursorVisualStyle
+pub const CURSOR_BAR: c_int = 0;
+pub const CURSOR_UNDERLINE: c_int = 2;
+pub const CURSOR_BLOCK_HOLLOW: c_int = 3;
 
 // GhosttyRenderStateRowData
 pub const ROW_DATA_DIRTY: c_int = 1;
@@ -124,6 +141,8 @@ pub const ROW_DATA_VIEWPORT_Y: c_int = 6;
 // GhosttyRenderStateRowCellsData
 pub const CELLS_DATA_RAW: c_int = 1;
 pub const CELLS_DATA_STYLE: c_int = 2;
+pub const CELLS_DATA_GRAPHEMES_LEN: c_int = 3;
+pub const CELLS_DATA_GRAPHEMES_BUF: c_int = 4;
 pub const CELLS_DATA_BG_COLOR: c_int = 5;
 pub const CELLS_DATA_FG_COLOR: c_int = 6;
 pub const CELLS_DATA_HAS_STYLING: c_int = 8;
@@ -133,7 +152,42 @@ pub const CELL_DATA_CODEPOINT: c_int = 1;
 pub const CELL_DATA_WIDE: c_int = 3;
 
 // GhosttyCellWide
+pub const CELL_WIDE_WIDE: c_int = 1;
 pub const CELL_WIDE_SPACER_TAIL: c_int = 2;
+pub const CELL_WIDE_SPACER_HEAD: c_int = 3;
+
+// GhosttyKeyAction
+pub const KEY_ACTION_PRESS: c_int = 1;
+
+// GhosttyMods
+pub const MODS_SHIFT: u16 = 1;
+pub const MODS_CTRL: u16 = 1 << 1;
+pub const MODS_ALT: u16 = 1 << 2;
+
+// GhosttyKey: the keys the phone sends (checked against the type manifest).
+pub const KEY_UNIDENTIFIED: c_int = 0;
+pub const KEY_BACKQUOTE: c_int = 1;
+pub const KEY_BACKSLASH: c_int = 2;
+pub const KEY_BRACKET_LEFT: c_int = 3;
+pub const KEY_BRACKET_RIGHT: c_int = 4;
+pub const KEY_COMMA: c_int = 5;
+pub const KEY_DIGIT_0: c_int = 6;
+pub const KEY_EQUAL: c_int = 16;
+pub const KEY_A: c_int = 20;
+pub const KEY_MINUS: c_int = 46;
+pub const KEY_PERIOD: c_int = 47;
+pub const KEY_QUOTE: c_int = 48;
+pub const KEY_SEMICOLON: c_int = 49;
+pub const KEY_SLASH: c_int = 50;
+pub const KEY_BACKSPACE: c_int = 53;
+pub const KEY_ENTER: c_int = 58;
+pub const KEY_SPACE: c_int = 63;
+pub const KEY_TAB: c_int = 64;
+pub const KEY_ARROW_DOWN: c_int = 75;
+pub const KEY_ARROW_LEFT: c_int = 76;
+pub const KEY_ARROW_RIGHT: c_int = 77;
+pub const KEY_ARROW_UP: c_int = 78;
+pub const KEY_ESCAPE: c_int = 120;
 
 unsafe extern "C" {
     pub fn ghostty_terminal_new(
@@ -183,6 +237,28 @@ unsafe extern "C" {
     ) -> GhosttyResult;
 
     pub fn ghostty_cell_get(cell: Cell, data: c_int, out: *mut c_void) -> GhosttyResult;
+
+    pub fn ghostty_key_encoder_new(
+        allocator: *const c_void,
+        encoder: *mut KeyEncoder,
+    ) -> GhosttyResult;
+    pub fn ghostty_key_encoder_free(encoder: KeyEncoder);
+    pub fn ghostty_key_encoder_setopt_from_terminal(encoder: KeyEncoder, terminal: Terminal);
+    pub fn ghostty_key_encoder_encode(
+        encoder: KeyEncoder,
+        event: KeyEvent,
+        out: *mut c_char,
+        out_size: usize,
+        out_len: *mut usize,
+    ) -> GhosttyResult;
+    pub fn ghostty_key_event_new(allocator: *const c_void, event: *mut KeyEvent) -> GhosttyResult;
+    pub fn ghostty_key_event_free(event: KeyEvent);
+    pub fn ghostty_key_event_set_action(event: KeyEvent, action: c_int);
+    pub fn ghostty_key_event_set_key(event: KeyEvent, key: c_int);
+    pub fn ghostty_key_event_set_mods(event: KeyEvent, mods: u16);
+    pub fn ghostty_key_event_set_consumed_mods(event: KeyEvent, mods: u16);
+    pub fn ghostty_key_event_set_utf8(event: KeyEvent, utf8: *const c_char, len: usize);
+    pub fn ghostty_key_event_set_unshifted_codepoint(event: KeyEvent, codepoint: u32);
 
     #[allow(dead_code, reason = "used by the layout test")]
     pub fn ghostty_type_json() -> *const c_char;

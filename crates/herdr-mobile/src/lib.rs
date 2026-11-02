@@ -1,6 +1,7 @@
 uniffi::setup_scaffolding!();
 
 mod hub;
+pub mod keys_row;
 mod link;
 mod machines;
 mod ssh;

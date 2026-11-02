@@ -1,0 +1,122 @@
+[38;2;215;119;87m╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✻ Welcome to the agent                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+
+[38;2;153;153;153m>[0m each after [38;5;197mthe[39m of [1mtimeout[22m [38;5;131mso[39m
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(0s · ↓ 0.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(1s · ↓ 0.1k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(2s · ↓ 0.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(3s · ↓ 0.3k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(4s · ↓ 0.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(5s · ↓ 0.5k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(6s · ↓ 0.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(7s · ↓ 0.7k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mRead[22m(src/list.kt)
+  ⎿  Read 80 lines
+
+⏺ [1mthe[22m [3m日本語[23m exhaust [38;5;202mthe[39m peer list of retry テスト [1mpeer[22m [1mmachines[22m exhaust the [38;5;32mretry[39m we so [1mcannot[22m length [1mpeer[22m buffer machines [1mrenders[22m so its [1mexhaust[22m timeout [38;5;202mpeer[39m
+⏺ a [38;5;214mテスト[39m [3mretry[23m retry so parser [38;5;184mmemory[39m [1mchecks[22m length length length [3m日本語[23m [38;5;188mso[39m settings the [38;5;16mnow[39m allocating
+⏺ renders and [1mallocating[22m [1mtimeout[22m settings bad [3mreads[23m [38;5;133mtimeout[39m [1mwe[22m we parser checks peer now exhaust exhaust so settings allocating each before 日本語 テスト exhaust [3mcannot[23m 日本語 [3mrenders[23m [38;5;136mparser[39m [38;5;157mテスト[39m reads its once we we [38;5;63mreads[39m after page done renders timeout the done done [38;5;219mmemory[39m
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m done buffer buffer [3mlength[23m テスト [3mparser[23m
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(1s · ↓ 0.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(2s · ↓ 0.9k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(3s · ↓ 1.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(4s · ↓ 1.1k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(5s · ↓ 1.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(6s · ↓ 1.3k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(7s · ↓ 1.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(8s · ↓ 1.5k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mUpdate[22m(src/machines.rs)
+  ⎿  Updated src/machines.rs with 2 additions and 1 removal
+[48;2;92;34;43m   132 -  [3mwe[23m 日本語 reads done each[K[0m
+[48;2;34;92;43m   132 +  machines [3mlist[23m its 日本語 [1mso[22m list[K[0m
+[48;2;34;92;43m   133 +  page [1mpage[22m peer done[K[0m
+
+⏺ once checks frame the parser parser and exhaust length and reads page [3mframe[23m [38;5;196mretry[39m we timeout timeout settings [38;5;131mreads[39m once 日本語 after frame its frame once a timeout [1mnow[22m peer page done each once cannot each now we parser [1msettings[22m the each we [38;5;20mlist[39m [1mso[22m [1mcannot[22m cannot and timeout of frame cannot page timeout
+⏺ list reads [3mits[23m machines a a reads [1mnow[22m renders 日本語 list [38;5;115mframe[39m checks reads テスト memory we so reads page list peer [38;5;86mreads[39m now done memory so [3ma[23m テスト of the length checks and [3mits[23m [38;5;226mexhaust[39m 日本語 of the once [3mpage[23m
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m テスト bad [38;5;122mtimeout[39m frame allocating [1mallocating[22m
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(2s · ↓ 1.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(3s · ↓ 1.7k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(4s · ↓ 1.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(5s · ↓ 1.9k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(6s · ↓ 2.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(7s · ↓ 2.1k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(8s · ↓ 2.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(9s · ↓ 2.3k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mSearch[22m(src/machines.rs)
+  ⎿  Read 186 lines
+
+⏺ we [38;5;127mテスト[39m each page after exhaust memory [3mpeer[23m and after its [3monce[23m peer checks cannot reads [3mexhaust[23m [1mlist[22m retry exhaust テスト once [38;5;180mbefore[39m checks a of and the cannot [3mchecks[23m [38;5;88mcannot[39m [38;5;105mテスト[39m reads length [3mits[23m buffer [38;5;221mbad[39m parser 日本語 page cannot renders
+⏺ done a allocating [38;5;16mchecks[39m after [38;5;57mテスト[39m a memory [1msettings[22m [3mbad[23m timeout memory [1mlength[22m before once done buffer its checks after of machines
+⏺ reads [3m日本語[23m retry frame renders bad now [3mwe[23m allocating each peer [3mテスト[23m timeout [1mframe[22m bad settings of [38;5;177mso[39m [3mreads[23m so [1mnow[22m [3mreads[23m [1mretry[22m of buffer
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m cannot parser page the [38;5;191mbad[39m reads
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(3s · ↓ 2.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(4s · ↓ 2.5k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(5s · ↓ 2.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(6s · ↓ 2.7k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(7s · ↓ 2.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(8s · ↓ 2.9k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(9s · ↓ 3.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(10s · ↓ 3.1k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mRead[22m(src/machines.rs)
+  ⎿  Read 373 lines
+
+⏺ [38;5;212mand[39m [3mallocating[23m the allocating allocating of so retry 日本語 so [38;5;21mpage[39m cannot settings after reads [1m日本語[22m settings settings [38;5;138mrenders[39m reads memory checks a [3mbuffer[23m now and テスト the 日本語
+⏺ of its [1mbuffer[22m [3mrenders[23m and memory bad [1mcannot[22m buffer [38;5;228mmachines[39m [1mlist[22m done bad [3mwe[23m [38;5;142mreads[39m of settings allocating [1mテスト[22m exhaust [3mbefore[23m of frame reads retry exhaust once so [38;5;216mcannot[39m parser and [38;5;54mallocating[39m page [3mmemory[23m
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m now settings [38;5;210mbefore[39m done a a
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(4s · ↓ 3.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(5s · ↓ 3.3k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(6s · ↓ 3.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(7s · ↓ 3.5k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(8s · ↓ 3.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(9s · ↓ 3.7k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(10s · ↓ 3.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(11s · ↓ 3.9k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mBash[22m(src/frame.rs)
+  ⎿  Read 270 lines
+
+⏺ [1mmemory[22m each peer timeout we page 日本語 of list [38;5;152mreads[39m cannot after settings bad its list [38;5;212mof[39m reads and after [3mparser[23m so settings allocating retry now bad [38;5;79mallocating[39m [38;5;203msettings[39m テスト [1mretry[22m machines [1msettings[22m before [3mparser[23m each
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m checks the before after exhaust [3m日本語[23m
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(5s · ↓ 4.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(6s · ↓ 4.1k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(7s · ↓ 4.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(8s · ↓ 4.3k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(9s · ↓ 4.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(10s · ↓ 4.5k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(11s · ↓ 4.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(12s · ↓ 4.7k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mSearch[22m(src/settings.kt)
+  ⎿  Read 168 lines
+
+⏺ reads checks parser done settings the settings done [1mthe[22m before allocating [3msettings[23m cannot [38;5;208mretry[39m [3meach[23m [38;5;98ma[39m and [1mcannot[22m [38;5;190msettings[39m [1mafter[22m [1mwe[22m done checks
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m [3mdone[23m the renders checks [38;5;188msettings[39m [1mlist[22m
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(6s · ↓ 4.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(7s · ↓ 4.9k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(8s · ↓ 5.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(9s · ↓ 5.1k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(10s · ↓ 5.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(11s · ↓ 5.3k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(12s · ↓ 5.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(13s · ↓ 5.5k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mUpdate[22m(src/frame.rs)
+  ⎿  Updated src/frame.rs with 2 additions and 1 removal
+[48;2;92;34;43m    77 -  [1mcannot[22m [3mbefore[23m peer done list[K[0m
+[48;2;34;92;43m    77 +  [1mparser[22m [1mdone[22m so once テスト テスト[K[0m
+[48;2;34;92;43m    78 +  checks [3mof[23m length [3mbad[23m[K[0m
+
+⏺ renders bad [38;5;222m日本語[39m parser parser memory so the list [1mdone[22m before reads memory 日本語 [3mchecks[23m memory reads [3mnow[23m memory
+⏺ checks and frame [3mand[23m a parser now [38;5;45mpeer[39m we page exhaust 日本語 before exhaust settings timeout [1mretry[22m [3mparser[23m after
+⏺ machines timeout テスト retry timeout cannot of of reads machines settings list checks length peer before allocating peer the bad [38;5;56mテスト[39m 日本語 memory retry once checks and [3mnow[23m done [1mbad[22m peer renders peer so of [1mreads[22m テスト a 日本語
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m [1mlist[22m cannot now allocating we and
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(7s · ↓ 5.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(8s · ↓ 5.7k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(9s · ↓ 5.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(10s · ↓ 5.9k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(11s · ↓ 6.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(12s · ↓ 6.1k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(13s · ↓ 6.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(14s · ↓ 6.3k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mBash[22m(src/settings.kt)
+  ⎿  Read 56 lines
+
+⏺ [38;5;79mof[39m done after parser テスト parser before buffer peer [1ma[22m the renders [1mthe[22m [3mpeer[23m each once [38;5;41mpage[39m [3mrenders[23m memory its parser [3monce[23m reads the retry memory page allocating memory peer [1m日本語[22m list
+⏺ exhaust bad frame [1mexhaust[22m frame the reads its so peer exhaust retry length peer frame the machines machines once [38;5;74mof[39m [38;5;158mmemory[39m checks [38;5;163monce[39m [3mframe[23m exhaust length checks [1mlength[22m of frame [1monce[22m frame
+⏺ list once [38;5;57mits[39m renders テスト [3mnow[23m exhaust [3mtimeout[23m before before once machines retry before renders done a checks timeout memory [3mbefore[23m done the buffer [38;5;143mmachines[39m reads we [3mnow[23m [1mparser[22m 日本語 テスト allocating memory exhaust allocating memory cannot now buffer [1mbad[22m peer [3mbad[23m
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m [1mテスト[22m bad the allocating 日本語 a
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(8s · ↓ 6.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(9s · ↓ 6.5k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(10s · ↓ 6.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(11s · ↓ 6.7k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(12s · ↓ 6.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(13s · ↓ 6.9k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(14s · ↓ 7.0k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(15s · ↓ 7.1k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mSearch[22m(src/settings.kt)
+  ⎿  Read 114 lines
+
+⏺ its settings machines retry we reads parser retry a [38;5;184mof[39m so and of [38;5;124ma[39m [3mthe[23m cannot list reads exhaust renders page
+⏺ [1mafter[22m buffer exhaust buffer its the after peer allocating renders settings renders bad bad [3mretry[23m we we of [1mof[22m timeout peer a settings settings after reads the [3mrenders[23m so buffer [38;5;97mbuffer[39m a [3mframe[23m after page [38;5;184mand[39m [1mexhaust[22m reads allocating the parser now [38;5;75mpage[39m of reads
+⏺ the once its allocating length [3mreads[23m retry allocating 日本語 now we now before so length peer done [3mpeer[23m done frame [38;5;53mmachines[39m and allocating [38;5;72mlist[39m each each settings machines after parser exhaust
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯[0m
+  ? for shortcuts[4A[J[?2026l
+[38;2;153;153;153m>[0m page settings [38;5;224mallocating[39m a [38;5;148mexhaust[39m [3mlength[23m
+
+[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(9s · ↓ 7.2k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(10s · ↓ 7.3k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✳[0m Thinking… [2m(11s · ↓ 7.4k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✶[0m Thinking… [2m(12s · ↓ 7.5k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✻[0m Thinking… [2m(13s · ↓ 7.6k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✽[0m Thinking… [2m(14s · ↓ 7.7k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m·[0m Thinking… [2m(15s · ↓ 7.8k tokens · esc to interrupt)[22m[?2026l[?2026h[2K[38;2;215;119;87m✢[0m Thinking… [2m(16s · ↓ 7.9k tokens · esc to interrupt)[22m[?2026l[2K[38;2;78;186;101m⏺[0m [1mRead[22m(src/settings.kt)
+  ⎿  Read 325 lines
+
+⏺ list before and 日本語 the list and checks retry [38;5;97mafter[39m 日本語 page its length each [38;5;221mthe[39m peer [1mrenders[22m テスト machines memory [1mretry[22m the its cannot machines [1mbad[22m bad before exhaust and reads
+⏺ retry bad [1mmachines[22m 日本語 page memory the after now frame each checks renders frame renders done its buffer length 日本語 and [1mthe[22m once [3msettings[23m checks buffer [38;5;62mchecks[39m page cannot its timeout each
+[?2026h[38;2;153;153;153m╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────�

@@ -15,6 +15,7 @@ use herdr_proto::compat::{self, Compat};
 use herdr_proto::events::EventLines;
 use herdr_proto::handshake::{self, Hello};
 use herdr_proto::rpc::{Client, Ended, Stream, StreamItem};
+use herdr_proto::viewer::{Mode, Viewer};
 use herdr_proto::wire;
 use serde_json::{Value, json};
 use tokio::io::AsyncReadExt as _;
@@ -500,4 +501,144 @@ fn terminals_of_a_machine_the_core_added_are_skipped() {
         );
     });
     drop(core);
+}
+
+/// `terminal.get`'s size for a terminal.
+async fn size_of(client: &Client, address: &str) -> (u64, u64) {
+    let t = client
+        .call("terminal.get", json!({"terminal": address}))
+        .await
+        .unwrap();
+    (t["cols"].as_u64().unwrap(), t["rows"].as_u64().unwrap())
+}
+
+/// Reads the attach stream until `marker` has arrived; returns all of it.
+async fn read_until(viewer: &mut Viewer, marker: &[u8]) -> Vec<u8> {
+    let mut seen = Vec::new();
+    let got = tokio::time::timeout(WAIT, async {
+        while !seen.windows(marker.len()).any(|w| w == marker) {
+            match viewer.recv().await {
+                StreamItem::Data(d) => seen.extend_from_slice(&d),
+                other => panic!("attach stream ended: {}", describe(&other)),
+            }
+        }
+    })
+    .await;
+    assert!(
+        got.is_ok(),
+        "no {:?} in {:?}",
+        String::from_utf8_lossy(marker),
+        String::from_utf8_lossy(&seen)
+    );
+    seen
+}
+
+/// The size rule end to end (task M2.1; terminal-view "Opening an agent",
+/// terminal-input "Typing on the phone", "Back at the desk", "Desk colours
+/// kept"): a desk viewer at 180x50 with its own colours and cell size, the
+/// phone watching, typing, and the desk typing again.
+#[test]
+fn the_desk_keeps_its_size_and_colours_until_the_phone_types() {
+    let Some(core) = Core::new("size") else {
+        return;
+    };
+    runtime().block_on(async {
+        let desk = core.connect().await;
+        let phone = core.connect().await;
+        let (snapshot, mut events) = phone.client.subscribe(json!({})).await.unwrap();
+        let mut lines = EventLines::new(&snapshot);
+
+        // Waits for the phone's line, asks the terminal for its colours and
+        // cell size (answered by the core from the size leader's display
+        // facts), prints the answers with ESC as `E`, then waits for the desk.
+        let script = concat!(
+            "read _; stty raw -echo; ",
+            r"printf '\033]10;?\033\\\033]11;?\033\\\033[16t'; sleep 1; ",
+            "dd bs=4096 count=1 2>/dev/null | tr '\\033' E; ",
+            r"printf '\r\nEND\r\n'; stty sane; read _; sleep 60"
+        );
+        let run = desk
+            .client
+            .call("terminal.run", json!({"argv": ["sh", "-c", script]}))
+            .await
+            .unwrap();
+        let address = run["address"].as_str().unwrap().to_owned();
+        let display =
+            json!({"fg": "#102030", "bg": "#405060", "cursor": "#708090", "cell": [11, 23]});
+        let attach = desk
+            .client
+            .call(
+                "terminal.attach",
+                json!({"terminal": address, "cols": 180, "rows": 50, "display": display}),
+            )
+            .await
+            .unwrap();
+        let desk_channel = attach["channel"].as_u64().unwrap() as u32;
+        let _desk_stream = desk.client.open_stream(desk_channel);
+        assert_eq!(size_of(&phone.client, &address).await, (180, 50));
+
+        // Watching: drawn at the desk's size, which stays.
+        let (mut viewer, attached) = Viewer::watch(&phone.client, &address, (60, 30))
+            .await
+            .unwrap();
+        assert_eq!(
+            (attached.cols, attached.rows, attached.mode),
+            (180, 50, Mode::Watching)
+        );
+        assert_eq!(size_of(&phone.client, &address).await, (180, 50));
+
+        // Typing: the phone's size, the desk's colours and cell size.
+        let attached = viewer.input(b"go\r").await.unwrap().expect("reattached");
+        assert_eq!(
+            (attached.cols, attached.rows, attached.mode),
+            (60, 30, Mode::Typing)
+        );
+        assert_eq!(size_of(&phone.client, &address).await, (60, 30));
+        let answers = read_until(&mut viewer, b"END").await;
+        let answers = String::from_utf8_lossy(&answers);
+        assert!(answers.contains("10;rgb:1010/2020/3030"), "fg: {answers:?}");
+        assert!(answers.contains("11;rgb:4040/5050/6060"), "bg: {answers:?}");
+        assert!(answers.contains("E[6;23;11t"), "cell size: {answers:?}");
+        until(&mut events, &mut lines, |l| {
+            find(l, &address).is_some_and(|t| t["cols"] == 60)
+        })
+        .await;
+        assert_eq!(
+            viewer.size_changed(60, 30).await.unwrap(),
+            None,
+            "its own size"
+        );
+
+        // Back at the desk: its input takes its size back; the phone watches again.
+        desk.client.send(desk_channel, wire::DATA, b"ok\r");
+        until(&mut events, &mut lines, |l| {
+            find(l, &address).is_some_and(|t| t["cols"] == 180)
+        })
+        .await;
+        assert_eq!(size_of(&phone.client, &address).await, (180, 50));
+        let attached = viewer
+            .size_changed(180, 50)
+            .await
+            .unwrap()
+            .expect("reattached");
+        assert_eq!(
+            (attached.cols, attached.rows, attached.mode),
+            (180, 50, Mode::Watching)
+        );
+        assert_eq!(
+            size_of(&phone.client, &address).await,
+            (180, 50),
+            "watching again"
+        );
+
+        // Leaving: the phone holds no viewer, the desk keeps leading.
+        drop(viewer);
+        desk.client
+            .send(desk_channel, wire::RESIZE, &[100, 0, 40, 0]);
+        until(&mut events, &mut lines, |l| {
+            find(l, &address).is_some_and(|t| t["cols"] == 100)
+        })
+        .await;
+        assert_eq!(size_of(&phone.client, &address).await, (100, 40));
+    });
 }

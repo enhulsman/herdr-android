@@ -9,4 +9,5 @@ pub mod compat;
 pub mod events;
 pub mod handshake;
 pub mod rpc;
+pub mod viewer;
 pub mod wire;

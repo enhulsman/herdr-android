@@ -39,11 +39,16 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - name: Android NDK, libghostty-vt for the host (the vt feature's tests)
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          scripts/build-ghostty.sh x86_64-linux-gnu
+
       - run: cargo fmt --all --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo clippy --locked --all-targets --features herdr-mobile/vt -- -D warnings
       # The SSH tests (crates/herdr-mobile/tests/sshd.rs) start a throwaway sshd.
       - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
-      - run: cargo test --locked
+      - run: cargo test --locked --features herdr-mobile/vt
         env:
           HERDR_REQUIRE_SSHD: "1"
       - run: scripts/test-check-release-tag.sh
@@ -93,6 +98,11 @@ jobs:
         with:
           # The open-source provider; the default one is proprietary.
           cache-provider: basic
+
+      - name: libghostty-vt for both Android ABIs (Zig pinned by checksum in the script)
+        run: |
+          scripts/build-ghostty.sh aarch64-linux-android
+          scripts/build-ghostty.sh x86_64-linux-android
 
       - name: Unit tests and debug APK (builds the Rust core through scripts/build-rust-android.sh)
         working-directory: android

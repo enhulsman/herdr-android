@@ -13,6 +13,7 @@ import dev.herdr.android.key.KeyManager
 import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.AlarmScheduler
 import dev.herdr.android.lifecycle.ElapsedClock
+import dev.herdr.android.lifecycle.HandlerScheduler
 import dev.herdr.android.ui.transfer.ContentResolverStore
 import dev.herdr.android.ui.transfer.MachineTransfer
 import java.io.File
@@ -61,8 +62,10 @@ class HerdrApp : Application() {
             ContentResolverStore(contentResolver),
             CoroutineScope(SupervisorJob() + Dispatchers.IO),
         )
+        val main = Handler(mainLooper)
         foreground = ForegroundTracker(
-            AlarmScheduler(getSystemService(AlarmManager::class.java), Handler(mainLooper)),
+            HandlerScheduler(main, ElapsedClock.SYSTEM),
+            AlarmScheduler(getSystemService(AlarmManager::class.java), main),
             ElapsedClock.SYSTEM,
             onResume = hubHost::resume,
             onSuspend = hubHost::suspend,

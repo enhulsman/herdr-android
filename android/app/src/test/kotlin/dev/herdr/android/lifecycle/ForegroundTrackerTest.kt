@@ -5,16 +5,19 @@ import org.junit.Test
 
 // machine-connection spec, "Connections end in the background": the app closes
 // its connections 60 s after it leaves the foreground. The tracker counts
-// started activities; a fake clock and alarm stand in for elapsedRealtime and
-// AlarmManager (uptime stops in deep sleep, elapsed realtime does not).
+// started activities; a fake device stands in for elapsedRealtime, a main-thread
+// Handler timer (runs on uptime, which stops in deep sleep) and the inexact
+// AlarmManager alarm (elapsed realtime, may be deferred). Whichever of the two
+// fires first suspends; the other is cancelled.
 class ForegroundTrackerTest {
-    private val clock = FakeScheduler()
+    private val clock = FakeDevice()
     private var resumes = 0
     private var suspends = 0
     private var foregrounds = 0
     private val events = mutableListOf<String>()
     private val tracker = ForegroundTracker(
-        clock,
+        clock.timer,
+        clock.alarm,
         clock,
         onResume = { resumes++; events += "resume" },
         onSuspend = { suspends++; events += "suspend" },
@@ -155,6 +158,71 @@ class ForegroundTrackerTest {
     }
 
     @Test
+    fun theInProcessTimerSuspendsAtSixtySecondsAndCancelsTheAlarm() {
+        // Android 12+ may hold an inexact alarm back long after its time even
+        // while the process is awake; the in-process timer does not wait for it.
+        clock.alarmsDeferred = true
+        tracker.activityStarted()
+        tracker.activityStopped()
+        clock.advance(59_999)
+        assertEquals(0, suspends)
+        clock.advance(1)
+        assertEquals(1, suspends)
+        assertEquals(0, clock.alarm.pending)
+        assertEquals(0, clock.timer.pending)
+        clock.deliverDeferredAlarms()
+        clock.advance(10 * 60_000)
+        assertEquals(1, suspends)
+    }
+
+    @Test
+    fun theAlarmFiringFirstSuspendsOnceAndCancelsTheTimer() {
+        tracker.activityStarted()
+        tracker.activityStopped()
+        // Deep sleep: uptime stands still, so the Handler timer cannot fire;
+        // the wakeup alarm can.
+        clock.sleep(60_000)
+        clock.deliverDeferredAlarms()
+        assertEquals(1, suspends)
+        assertEquals(0, clock.timer.pending)
+        assertEquals(0, clock.alarm.pending)
+        clock.advance(10 * 60_000)
+        assertEquals(1, suspends)
+        assertEquals(listOf("resume", "suspend"), events)
+    }
+
+    @Test
+    fun aReturnBeforeTheDeadlineCancelsBothTimerAndAlarm() {
+        tracker.activityStarted()
+        tracker.activityStopped()
+        assertEquals(1, clock.timer.pending)
+        assertEquals(1, clock.alarm.pending)
+        clock.advance(30_000)
+        tracker.activityStarted()
+        assertEquals(0, clock.timer.pending)
+        assertEquals(0, clock.alarm.pending)
+        clock.advance(10 * 60_000)
+        clock.deliverDeferredAlarms()
+        assertEquals(0, suspends)
+    }
+
+    @Test
+    fun aStaleDeliveryAfterACancelNeverSuspendsTheFreshConnections() {
+        // A cancel can lose the race with a delivery already queued on the
+        // main thread; such a late callback must do nothing.
+        clock.alarmsDeferred = true
+        clock.alarm.cancelIgnored = true
+        tracker.activityStarted()
+        tracker.activityStopped()
+        clock.advance(60_000)
+        assertEquals(1, suspends)
+        tracker.activityStarted()
+        clock.deliverDeferredAlarms()
+        assertEquals(1, suspends)
+        assertEquals(listOf("resume", "suspend", "resume"), events)
+    }
+
+    @Test
     fun isForegroundFollowsTheCount() {
         assertEquals(false, tracker.isForeground)
         tracker.activityStarted()
@@ -165,40 +233,75 @@ class ForegroundTrackerTest {
 }
 
 /**
- * A virtual clock with uptime and elapsed realtime, and alarms on elapsed
- * realtime. [advance] moves both and delivers due alarms; [sleep] moves only
- * elapsed realtime and delivers nothing, as a deferred inexact alarm in doze.
+ * A virtual device with uptime and elapsed realtime. [timer] runs tasks on
+ * uptime, as a main-thread Handler (its delay is fixed when posted); [alarm]
+ * runs them on elapsed realtime, as an inexact AlarmManager alarm.
+ * [advance] moves both clocks and delivers what falls due, in time order,
+ * except alarms while [alarmsDeferred]; [sleep] moves only elapsed realtime and
+ * delivers nothing (deep sleep); [deliverDeferredAlarms] delivers every alarm
+ * already due (a held-back alarm finally running).
  */
-class FakeScheduler : Scheduler, ElapsedClock {
+class FakeDevice : ElapsedClock {
     var uptime = 0L
         private set
     private var elapsed = 0L
-    private val pending = mutableListOf<Entry>()
+    var alarmsDeferred = false
 
-    private inner class Entry(val due: Long, val task: () -> Unit) : Cancellable {
-        override fun cancel() {
-            pending.remove(this)
+    inner class Queue(private val onUptime: Boolean) : Scheduler {
+        val entries = mutableListOf<Entry>()
+        val pending: Int get() = entries.size
+
+        /** The cancel is lost, as one racing a delivery already queued. */
+        var cancelIgnored = false
+
+        inner class Entry(val due: Long, val task: () -> Unit) : Cancellable {
+            override fun cancel() {
+                if (!cancelIgnored) entries.remove(this)
+            }
+        }
+
+        override fun scheduleAt(elapsedRealtimeMs: Long, task: () -> Unit): Cancellable {
+            val due = if (onUptime) uptime + maxOf(0L, elapsedRealtimeMs - elapsed) else elapsedRealtimeMs
+            return Entry(due, task).also { entries += it }
+        }
+
+        /** Ms from now until the next entry is due on this queue's clock. */
+        fun nextIn(): Long? = entries.minOfOrNull { it.due - if (onUptime) uptime else elapsed }
+
+        fun runNext() {
+            val now = if (onUptime) uptime else elapsed
+            val next = entries.filter { it.due <= now }.minByOrNull { it.due } ?: return
+            entries.remove(next)
+            next.task()
         }
     }
 
-    override fun elapsedRealtime(): Long = elapsed
+    val timer = Queue(onUptime = true)
+    val alarm = Queue(onUptime = false)
 
-    override fun scheduleAt(elapsedRealtimeMs: Long, task: () -> Unit): Cancellable =
-        Entry(elapsedRealtimeMs, task).also { pending += it }
+    override fun elapsedRealtime(): Long = elapsed
 
     fun sleep(ms: Long) {
         elapsed += ms
     }
 
     fun advance(ms: Long) {
-        val until = elapsed + ms
-        uptime += ms
+        var left = ms
         while (true) {
-            val next = pending.filter { it.due <= until }.minByOrNull { it.due } ?: break
-            pending.remove(next)
-            elapsed = maxOf(elapsed, next.due)
-            next.task()
+            val t = timer.nextIn()
+            val a = if (alarmsDeferred) null else alarm.nextIn()
+            val step = listOfNotNull(t, a).minOrNull()?.coerceAtLeast(0) ?: break
+            if (step > left) break
+            uptime += step
+            elapsed += step
+            left -= step
+            if (t != null && t <= step) timer.runNext() else alarm.runNext()
         }
-        elapsed = until
+        uptime += left
+        elapsed += left
+    }
+
+    fun deliverDeferredAlarms() {
+        while (alarm.entries.any { it.due <= elapsed }) alarm.runNext()
     }
 }

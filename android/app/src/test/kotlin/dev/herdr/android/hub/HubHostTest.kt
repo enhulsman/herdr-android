@@ -1,6 +1,6 @@
 package dev.herdr.android.hub
 
-import dev.herdr.android.lifecycle.FakeScheduler
+import dev.herdr.android.lifecycle.FakeDevice
 import dev.herdr.android.lifecycle.ForegroundTracker
 import java.nio.file.Files
 import java.security.KeyPairGenerator
@@ -120,9 +120,10 @@ class HubHostTest {
         },
         mainExecutor = main,
     )
-    private val clock = FakeScheduler()
+    private val clock = FakeDevice()
     private val tracker = ForegroundTracker(
-        clock,
+        clock.timer,
+        clock.alarm,
         clock,
         onResume = flaky::resume,
         onSuspend = flaky::suspend,

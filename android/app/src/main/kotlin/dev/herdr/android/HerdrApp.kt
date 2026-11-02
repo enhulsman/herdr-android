@@ -10,14 +10,19 @@ import dev.herdr.android.hub.HubHost
 import dev.herdr.android.hub.UserAuthGate
 import dev.herdr.android.key.AndroidKeystoreBackend
 import dev.herdr.android.key.KeyManager
+import dev.herdr.android.key.KeystoreFrameCipher
 import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.AlarmScheduler
 import dev.herdr.android.lifecycle.ElapsedClock
 import dev.herdr.android.lifecycle.HandlerScheduler
+import dev.herdr.android.ui.terminal.TerminalCache
+import dev.herdr.android.ui.terminal.ZoomMemory
 import dev.herdr.android.ui.theme.ContrastSetting
 import dev.herdr.android.ui.transfer.ContentResolverStore
 import dev.herdr.android.ui.transfer.MachineTransfer
 import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,6 +54,16 @@ class HerdrApp : Application() {
     lateinit var contrast: ContrastSetting
         private set
 
+    /** The instant-open cache of each terminal's last screen; used on [terminalCacheExecutor] only. */
+    lateinit var terminalCache: TerminalCache
+        private set
+
+    /** One thread for the cache's files and Keystore calls, so loads and stores stay in order. */
+    val terminalCacheExecutor: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "terminal-cache") }
+
+    /** The zoom each terminal was left at while watching, for this run of the app. */
+    val terminalZoom = ZoomMemory()
+
     private var promptActivity: Activity? = null
 
     override fun onCreate() {
@@ -78,6 +93,17 @@ class HerdrApp : Application() {
             onForeground = hubHost::foreground,
         )
         registerActivityLifecycleCallbacks(Callbacks())
+        terminalCache = TerminalCache(File(noBackupFilesDir, "terminal-cache"), KeystoreFrameCipher(), System::currentTimeMillis)
+        terminalCacheExecutor.execute { terminalCache.prune() }
+        // A machine removed (or renamed) takes its cached screens with it.
+        var machines: Set<String>? = null
+        hubHost.addSnapshotListener { snapshot ->
+            val names = snapshot.machines.map { it.name }.toSet()
+            if (names != machines) {
+                machines = names
+                terminalCacheExecutor.execute { terminalCache.keepMachines(names) }
+            }
+        }
     }
 
     /** The machine list and seen turns: app-private and outside every backup. */

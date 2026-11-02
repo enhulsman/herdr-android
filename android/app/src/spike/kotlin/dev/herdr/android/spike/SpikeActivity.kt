@@ -25,10 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -66,7 +65,8 @@ private fun SpikeScreen() {
             .safeDrawingPadding(),
     ) {
         val widthPx = constraints.maxWidth
-        val renderer = remember(widthPx) { FrameRenderer(COLS, ROWS, widthPx) }
+        val resources = LocalContext.current.resources
+        val renderer = remember(widthPx) { FrameRenderer(COLS, ROWS, widthPx, resources) }
         var tick by remember { mutableIntStateOf(0) }
         var report by remember { mutableStateOf("Running…") }
         val heightDp = with(LocalDensity.current) { renderer.bitmap.height.toDp() }
@@ -87,13 +87,6 @@ private fun SpikeScreen() {
             Canvas(Modifier.fillMaxWidth().height(heightDp)) {
                 tick // redraw on every frame the loop applies
                 drawImage(renderer.bitmap.asImageBitmap())
-                if (renderer.cursorShown) {
-                    drawRect(
-                        Color(0x99EEEEEF),
-                        Offset(renderer.cursorX * renderer.cellWidth, renderer.cursorY * renderer.cellHeight),
-                        Size(renderer.cellWidth, renderer.cellHeight),
-                    )
-                }
             }
             BasicText(
                 report,

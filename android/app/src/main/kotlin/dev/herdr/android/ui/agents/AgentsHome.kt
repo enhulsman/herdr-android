@@ -11,9 +11,9 @@ import uniffi.herdr_mobile.AgentRow
 import uniffi.herdr_mobile.HubSnapshot
 
 /**
- * The Agents home's own state: which agent's read-only sheet is open (M1 pick
- * 1b, until the terminal arrives in M2) and whether "Other terminals" is
- * expanded (collapsed by default, agent-list spec).
+ * The Agents home's own state: which agent's terminal is open (M2; in M1 a
+ * read-only sheet, pick 1b) and whether "Other terminals" is expanded
+ * (collapsed by default, agent-list spec).
  *
  * Opening an agent tells the hub the person saw it, so a finished, unseen agent
  * turns idle (agent-list spec, "finished, unseen -> opened on the phone"). A

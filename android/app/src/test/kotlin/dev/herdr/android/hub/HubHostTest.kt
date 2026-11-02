@@ -178,6 +178,54 @@ class HubHostTest {
         assertEquals(listOf("resume", "retry"), fake.calls)
     }
 
+    private var networkOn = false
+    private val permissioned = HubHost(
+        createHub = { fake },
+        mainExecutor = main,
+        networkAllowed = { networkOn },
+    )
+    private val permissionTracker = ForegroundTracker(
+        clock.timer,
+        clock.alarm,
+        clock,
+        onResume = permissioned::resume,
+        onSuspend = permissioned::suspend,
+        onForeground = permissioned::ensureStarted,
+    )
+
+    @Test
+    fun theHubHearsTheNetworkPermissionBeforeItConnects() {
+        permissionTracker.activityStarted()
+        // A repeat after it is harmless: the hub ignores an unchanged value.
+        assertEquals(listOf("network false", "resume"), fake.network.take(2))
+    }
+
+    @Test
+    fun everyReturnToTheForegroundReadsTheNetworkPermissionAgain() {
+        // Off in Android settings, then on, within the 60 s: no new resume.
+        permissionTracker.activityStarted()
+        permissionTracker.activityStopped()
+        clock.advance(20_000)
+        networkOn = true
+        permissionTracker.activityStarted()
+        assertEquals("network true", fake.network.last())
+        // And after the 60 s, before the hub connects again.
+        networkOn = false
+        permissionTracker.activityStopped()
+        clock.advance(70_000)
+        fake.network.clear()
+        permissionTracker.activityStarted()
+        assertEquals(listOf("network false", "resume"), fake.network.take(2))
+    }
+
+    @Test
+    fun tryAgainReadsTheNetworkPermissionToo() {
+        permissionTracker.activityStarted()
+        networkOn = true
+        permissioned.retry()
+        assertEquals("network true", fake.network.last())
+    }
+
     @Test
     fun theRealHubReportsAnAddedMachineThroughTheListener() {
         // The generated bindings and the host build of the Rust library, end to end.
@@ -214,6 +262,9 @@ class HubHostTest {
 
 class FakeHub : HubInterface {
     val calls = mutableListOf<String>()
+
+    /** setNetworkAllowed and resume in order, apart from [calls]. */
+    val network = mutableListOf<String>()
 
     /** Thrown by the next add, confirm, forget, remove or import, as the hub would refuse it. */
     var refuse: Exception? = null
@@ -252,7 +303,11 @@ class FakeHub : HubInterface {
         refused()
         calls += "remove $name"
     }
-    override fun resume() { calls += "resume" }
+    override fun resume() {
+        calls += "resume"
+        network += "resume"
+    }
+    override fun setNetworkAllowed(allowed: Boolean) { network += "network $allowed" }
     override fun retry() { calls += "retry" }
     override fun snapshot(): HubSnapshot = HubSnapshot(emptyList(), emptyList(), emptyList(), null)
     override fun suspend() { calls += "suspend" }

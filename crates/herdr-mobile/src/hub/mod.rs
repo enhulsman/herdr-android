@@ -315,6 +315,9 @@ struct State {
     /// Why the list file must not be written: an unreadable one could not be
     /// set aside, and writing would destroy it.
     list_frozen: Option<String>,
+    /// GrapheneOS's Network permission, as the app last saw it. While it is
+    /// off nothing dials: the lookup would fail before any socket is refused.
+    network_allowed: bool,
 }
 
 pub(crate) struct HubCore {
@@ -487,6 +490,7 @@ impl HubCore {
             saved_memory,
             notice: None,
             list_frozen: frozen,
+            network_allowed: true,
         };
         let snapshot = build_snapshot(&state);
         Arc::new(HubCore {
@@ -559,6 +563,10 @@ impl HubCore {
             return;
         };
         live.stop();
+        if !st.network_allowed {
+            live.state = MachineState::NetworkOff;
+            return;
+        }
         live.epoch = epoch;
         live.state = MachineState::Connecting;
         let task = self
@@ -598,20 +606,48 @@ impl HubCore {
     pub(crate) fn suspend(self: &Arc<Self>) {
         self.with(|hub, st| {
             st.paused = true;
-            let now = now_ms();
-            let mut was_connected = false;
-            for (name, live) in st.live.iter_mut() {
-                live.stop();
-                if matches!(live.state, MachineState::Connected { .. })
-                    && let Some(m) = st.list.get_mut(name)
-                {
-                    m.last_connected_ms = Some(now);
-                    was_connected = true;
-                }
-                live.state = MachineState::Paused;
+            hub.stop_all(st, MachineState::Paused);
+        });
+    }
+
+    /// Ends every connection and shows `state` on every machine, noting when
+    /// a connected one was last connected.
+    fn stop_all(&self, st: &mut State, state: MachineState) {
+        let now = now_ms();
+        let mut was_connected = false;
+        for (name, live) in st.live.iter_mut() {
+            live.stop();
+            if matches!(live.state, MachineState::Connected { .. })
+                && let Some(m) = st.list.get_mut(name)
+            {
+                m.last_connected_ms = Some(now);
+                was_connected = true;
             }
-            if was_connected {
-                hub.save_list(st);
+            live.state = state.clone();
+        }
+        if was_connected {
+            self.save_list(st);
+        }
+    }
+
+    /// The app read GrapheneOS's Network permission (at every return to the
+    /// foreground). Off: every machine says so and nothing dials. On again:
+    /// every machine tries at once, in the foreground.
+    pub(crate) fn set_network_allowed(self: &Arc<Self>, allowed: bool) {
+        self.with(|hub, st| {
+            if st.network_allowed == allowed {
+                return;
+            }
+            st.network_allowed = allowed;
+            if !allowed {
+                let state = if st.paused {
+                    MachineState::Paused
+                } else {
+                    MachineState::NetworkOff
+                };
+                hub.stop_all(st, state);
+            } else if !st.paused {
+                hub.kick(st);
             }
         });
     }

@@ -25,6 +25,7 @@ android {
         versionName = appVersion
         versionCode = major * 10000 + minor * 100 + patch
         manifestPlaceholders["appLabel"] = "herdr"
+        manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
@@ -35,6 +36,8 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["appLabel"] = "herdr debug"
+            // The system's default icon, so it never passes for the release.
+            manifestPlaceholders["appIcon"] = "@android:drawable/sym_def_app_icon"
         }
         // The terminal spike (task M0.5, src/spike/): optimized Rust with
         // libghostty-vt linked in, not debuggable so frame times are realistic.

@@ -11,7 +11,9 @@
         android:name=".HerdrApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="${appIcon}"
         android:label="${appLabel}"
+        android:roundIcon="${appIcon}"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name=".MainActivity"

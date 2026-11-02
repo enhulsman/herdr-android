@@ -44,3 +44,5 @@ release archives (renamed only, as Android resource names must be lowercase).
 - Protocol code adapted from herdr (Apache-2.0): `crates/herdr-proto/`, licence in
   `crates/herdr-proto/LICENSE-herdr-Apache-2.0`.
 - herdr-app icons (Apache-2.0), used in the design renders: `design/renders/icons/`.
+- The app's launcher icon (`android/app/src/main/res/drawable/ic_launcher_foreground.xml`)
+  is the ram from herdr's logo (Apache-2.0), via `design/renders/icons/herdr.svg`.

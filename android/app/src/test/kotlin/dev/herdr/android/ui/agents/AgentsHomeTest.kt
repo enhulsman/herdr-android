@@ -170,4 +170,77 @@ class AgentsHomeTest {
         // Opening marked the server's t1; the workstation's t1 finishing is not the one open.
         assertEquals(listOf("seen server t1"), hub.calls)
     }
+
+    // agent-list spec, "Jump to the next agent that needs you", scenario "Clearing
+    // a backlog": three agents need Ezra and he swipes up on the title bar twice;
+    // the second and third open in turn, and a third swipe gives the end-of-queue
+    // haptic. The hub re-sorts as he goes: an answered agent works, an opened
+    // finish turns idle, and either drops below the ones still waiting.
+    private fun key(a: String) = AgentKey("workstation", a)
+
+    @Test
+    fun clearingABacklogOfAgentsThatTurnWorkingOnceAnswered() {
+        val needs = AgentAttention.NEEDS_YOU
+        val working = AgentAttention.WORKING
+        val idle = AgentAttention.IDLE
+        publish(snapshot(ws, listOf(row("a", needs), row("b", needs), row("c", needs), row("d", idle))))
+        home.open(key("a"))
+        publish(snapshot(ws, listOf(row("b", needs), row("c", needs), row("a", working), row("d", idle))))
+        assertTrue(home.step(forward = true))
+        assertEquals(key("b"), home.openKey)
+        publish(snapshot(ws, listOf(row("c", needs), row("a", working), row("b", working), row("d", idle))))
+        assertTrue(home.step(forward = true))
+        assertEquals(key("c"), home.openKey)
+        publish(snapshot(ws, listOf(row("a", working), row("b", working), row("c", working), row("d", idle))))
+        assertFalse(home.step(forward = true))
+        assertEquals(key("c"), home.openKey)
+    }
+
+    @Test
+    fun clearingABacklogOfFinishesThatTurnIdleOnceOpened() {
+        val done = AgentAttention.DONE
+        val working = AgentAttention.WORKING
+        val idle = AgentAttention.IDLE
+        publish(snapshot(ws, listOf(row("a", done), row("b", done), row("c", done), row("d", working))))
+        home.open(key("a"))
+        publish(snapshot(ws, listOf(row("b", done), row("c", done), row("d", working), row("a", idle))))
+        assertTrue(home.step(forward = true))
+        assertEquals(key("b"), home.openKey)
+        publish(snapshot(ws, listOf(row("c", done), row("d", working), row("a", idle), row("b", idle))))
+        assertTrue(home.step(forward = true))
+        assertEquals(key("c"), home.openKey)
+        publish(snapshot(ws, listOf(row("d", working), row("a", idle), row("b", idle), row("c", idle))))
+        assertFalse(home.step(forward = true))
+        assertEquals(key("c"), home.openKey)
+        assertEquals(listOf("seen workstation a", "seen workstation b", "seen workstation c"), hub.calls)
+    }
+
+    @Test
+    fun swipingDownWalksBackThroughTheOnesStillWaiting() {
+        val needs = AgentAttention.NEEDS_YOU
+        val working = AgentAttention.WORKING
+        publish(snapshot(ws, listOf(row("a", needs), row("b", needs), row("c", needs))))
+        home.open(key("a"))
+        assertTrue(home.step(forward = true))
+        assertTrue(home.step(forward = true))
+        // b was answered meanwhile; a still waits.
+        publish(snapshot(ws, listOf(row("a", needs), row("c", needs), row("b", working))))
+        assertTrue(home.step(forward = false))
+        assertEquals(key("a"), home.openKey)
+        assertFalse(home.step(forward = false))
+    }
+
+    @Test
+    fun openingFromTheListStartsANewWalk() {
+        val needs = AgentAttention.NEEDS_YOU
+        val working = AgentAttention.WORKING
+        publish(snapshot(ws, listOf(row("a", needs), row("b", needs), row("c", needs))))
+        home.open(key("c"))
+        home.close()
+        publish(snapshot(ws, listOf(row("a", needs), row("b", needs), row("c", working))))
+        home.open(key("a"))
+        assertTrue(home.step(forward = true))
+        assertEquals(key("b"), home.openKey)
+        assertFalse(home.step(forward = true))
+    }
 }

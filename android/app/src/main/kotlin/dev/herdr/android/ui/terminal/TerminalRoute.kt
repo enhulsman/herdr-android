@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -17,12 +16,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.herdr.android.HerdrApp
@@ -95,17 +91,10 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
         onDispose { if (before != null) window.setSoftInputMode(before) }
     }
 
-    val inputView = remember(context) { TerminalInputView(context) }
-    inputView.sink = remember(session) {
+    val sink = remember(session) {
         object : KeyboardSink {
             override fun type(text: String) = session.type(text)
             override fun backspace() = session.backspace()
-        }
-    }
-    val input = remember(inputView) {
-        object : TerminalInputHandle {
-            override fun show() = inputView.showKeyboard()
-            override fun hide() = inputView.hideKeyboard()
         }
     }
     val imeVisible = WindowInsets.isImeVisible
@@ -134,23 +123,17 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     }
 
     val ui = remember(snapshot, key, res) { terminalUi(snapshot, key, res) }
-    val agents by rememberUpdatedState(snapshot.agents)
     val actions = remember(key, home) {
         TerminalActions(
             onBack = home::close,
             onOpen = home::open,
-            onSwipe = { forward ->
-                attentionStep(agents, key, forward)?.let {
-                    home.open(it)
-                    true
-                } ?: false
-            },
+            onSwipe = home::step,
             onPhoneGrid = { phone = it },
             onWatchView = { app.terminalZoom[key] = it.zoom },
         )
     }
     Box {
-        AndroidView({ inputView }, Modifier.size(1.dp))
+        val input = TerminalKeyboard(key, sink)
         TerminalScreen(ui, session, screen, actions, input)
     }
 }

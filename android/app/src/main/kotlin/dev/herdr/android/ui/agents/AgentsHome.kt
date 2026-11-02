@@ -6,6 +6,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import dev.herdr.android.hub.HubHost
+import dev.herdr.android.ui.terminal.attentionStep
 import uniffi.herdr_mobile.AgentAttention
 import uniffi.herdr_mobile.AgentRow
 import uniffi.herdr_mobile.HubSnapshot
@@ -43,7 +44,32 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
      */
     private var finishMarked = false
 
+    /**
+     * The agents in list order as they were when the person opened a terminal
+     * (from the list or the queue strip): the title-bar swipe walks this order,
+     * so the agents it opens keep their places while the hub re-sorts them.
+     */
+    private var walk: List<AgentKey> = emptyList()
+
     fun open(key: AgentKey) {
+        // Taken before marking seen re-sorts the list.
+        walk = hubHost.snapshot.value.agents.map { AgentKey(it.machine, it.address) }
+        show(key)
+    }
+
+    /**
+     * A vertical swipe on the open terminal's title bar (agent-list spec, "Jump
+     * to the next agent that needs you"): opens the next ([forward]) or
+     * previous agent in the queue; false at its end.
+     */
+    fun step(forward: Boolean): Boolean {
+        val current = openKey ?: return false
+        val next = attentionStep(hubHost.snapshot.value.agents, current, forward, walk) ?: return false
+        show(next)
+        return true
+    }
+
+    private fun show(key: AgentKey) {
         openKey = key
         val row = row(hubHost.snapshot.value, key)
         finishMarked = row?.attention == AgentAttention.DONE
@@ -53,6 +79,7 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
     fun close() {
         openKey = null
         finishMarked = false
+        walk = emptyList()
     }
 
     /** Follows the hub: a terminal that went away closes its sheet; a finish in view is seen. */

@@ -37,6 +37,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -347,7 +348,8 @@ private fun TerminalArea(
                 // A desk-sized grid while typing starts, or a zoomed one, never draws over the bars.
                 .clipToBounds()
                 .semantics { contentDescription = label }
-                .pointerInput(screen.typing) {
+                // Keyed by what the handlers act on: moving to another agent's terminal swaps them.
+                .pointerInput(screen, input, screen.typing) {
                     detectTapGestures(
                         onTap = {
                             screen.inputOpen = true
@@ -356,7 +358,7 @@ private fun TerminalArea(
                         onLongPress = { screen.selecting = true },
                     )
                 }
-                .pointerInput(screen.typing, shape?.cols, shape?.rows, widthPx, heightPx) {
+                .pointerInput(session, screen, actions, screen.typing, shape?.cols, shape?.rows, widthPx, heightPx) {
                     detectTransformGestures { centroid, pan, zoom, _ ->
                         var dy = pan.y
                         if (watch != null) {
@@ -419,7 +421,7 @@ private fun TerminalArea(
         }
         if (screen.selecting && shape != null) {
             // The screen as it was when the long press opened the layer.
-            val text = remember { grid.text() }
+            val text = remember(grid) { grid.text() }
             SelectionLayer(text, grid) { screen.selecting = false }
         }
     }
@@ -611,6 +613,8 @@ private fun KeysRow(
     val c = HerdrTheme.colors
     val view = LocalView.current
     val threshold = with(LocalDensity.current) { 24.dp.toPx() }
+    // The gesture outlives a recomposition; the shelf it opens is the current terminal's.
+    val shelf by rememberUpdatedState(onShelf)
     Column(
         Modifier
             .fillMaxWidth()
@@ -619,7 +623,7 @@ private fun KeysRow(
                 var travelled = 0f
                 detectVerticalDragGestures(
                     onDragStart = { travelled = 0f },
-                    onDragEnd = { if (abs(travelled) >= threshold) onShelf(travelled < 0) },
+                    onDragEnd = { if (abs(travelled) >= threshold) shelf(travelled < 0) },
                 ) { change, dy ->
                     change.consume()
                     travelled += dy

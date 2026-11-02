@@ -1,5 +1,5 @@
 //! libghostty-vt behind a small safe wrapper, and the frame format Kotlin draws
-//! from (task M0.5, the device smoke test).
+//! from (M0.5; graphemes, scrollback and cursor shape since M2).
 //!
 //! # Frame format (little-endian)
 //!
@@ -11,22 +11,27 @@
 //! | 2..4 | rows (u16) |
 //! | 4..6 | cursor x (u16) |
 //! | 6..8 | cursor y (u16) |
-//! | 8 | flags: bit 0 full frame (every row follows), bit 1 cursor shown |
-//! | 9 | reserved, 0 |
+//! | 8 | flags: bit 0 full frame (every row follows), bit 1 cursor shown, bit 2 live (the view is at the bottom) |
+//! | 9 | cursor shape: see the `SHAPE_*` constants |
 //! | 10..12 | number of rows that follow (u16) |
 //! | 12..16 | default foreground, `0x00RRGGBB` |
 //! | 16..20 | default background, `0x00RRGGBB` |
+//! | 20..24 | rows in screen and scrollback together (u32) |
+//! | 24..28 | the view's first row in that space (u32): `total - rows` when live |
+//! | 28..32 | reserved, 0 |
 //!
-//! Then each changed row: its y (u16) and `cols` cells of [`CELL_LEN`] bytes:
+//! Then each changed row: its y (u16), `cols` cells of [`CELL_LEN`] bytes, then
+//! the row's extra codepoints (u32 each), cell by cell, in cell order:
 //!
 //! | bytes | field |
 //! |---|---|
-//! | 0..4 | codepoint (u32), 0 for no text; only the base codepoint of a grapheme |
+//! | 0..4 | codepoint (u32), 0 for no text: the grapheme's first codepoint |
 //! | 4..8 | foreground: `0x01RRGGBB` when the cell has its own colour, else 0 |
 //! | 8..12 | background: the same |
 //! | 12 | attributes: see the `ATTR_*` constants |
 //! | 13 | width: 0 narrow, 1 wide, 2 spacer after a wide cell, 3 spacer at a line end |
-//! | 14..16 | reserved, 0 |
+//! | 14 | how many more codepoints the grapheme has (combining marks, ZWJ parts) |
+//! | 15 | reserved, 0 |
 
 // The terminal view (M2.2) and input (M2.3) call the grid and the key
 // encoder; until then only the tests do.
@@ -41,10 +46,15 @@ use std::ffi::c_void;
 use std::fmt;
 use std::ptr;
 
-pub const HEADER_LEN: usize = 20;
+pub const HEADER_LEN: usize = 32;
 pub const CELL_LEN: usize = 16;
 pub const FLAG_FULL: u8 = 1;
 pub const FLAG_CURSOR: u8 = 2;
+pub const FLAG_LIVE: u8 = 4;
+pub const SHAPE_BAR: u8 = 0;
+pub const SHAPE_BLOCK: u8 = 1;
+pub const SHAPE_UNDERLINE: u8 = 2;
+pub const SHAPE_BLOCK_HOLLOW: u8 = 3;
 pub const COLOR_SET: u32 = 0x0100_0000;
 pub const ATTR_BOLD: u8 = 1;
 pub const ATTR_ITALIC: u8 = 1 << 1;
@@ -88,6 +98,8 @@ pub struct Terminal {
     cols: u16,
     rows: u16,
     sent_first_frame: bool,
+    /// The view moved or the grid changed size: the next frame sends every row.
+    force_full: bool,
 }
 
 // The handles are only used through &mut self, so one thread at a time.
@@ -112,6 +124,7 @@ impl Terminal {
             cols,
             rows,
             sent_first_frame: false,
+            force_full: false,
         };
         unsafe {
             check(
@@ -147,6 +160,64 @@ impl Terminal {
         unsafe { ffi::ghostty_terminal_vt_write(self.terminal, bytes.as_ptr(), bytes.len()) }
     }
 
+    pub fn size(&self) -> (u16, u16) {
+        (self.cols, self.rows)
+    }
+
+    /// A new grid size (the phone's own, while it types). Content reflows.
+    pub fn resize(&mut self, cols: u16, rows: u16) -> Result<(), Failure> {
+        if cols == 0 || rows == 0 {
+            return Err(Failure {
+                call: "Terminal::resize (cols and rows must be above 0)",
+                code: -2,
+            });
+        }
+        check("ghostty_terminal_resize", unsafe {
+            ffi::ghostty_terminal_resize(self.terminal, cols, rows, 10, 20)
+        })?;
+        (self.cols, self.rows) = (cols, rows);
+        self.force_full = true;
+        Ok(())
+    }
+
+    /// Moves the view through the scrollback; up is negative. A view that is
+    /// not at the bottom stays where it is while output arrives.
+    pub fn scroll(&mut self, rows: i32) {
+        let delta = rows as isize as u64;
+        unsafe {
+            ffi::ghostty_terminal_scroll_viewport(
+                self.terminal,
+                ffi::ScrollViewport {
+                    tag: ffi::SCROLL_DELTA,
+                    value: [delta, 0],
+                },
+            );
+        }
+        self.force_full = true;
+    }
+
+    /// Back to the bottom, following output again ("Live").
+    pub fn scroll_to_live(&mut self) {
+        unsafe {
+            ffi::ghostty_terminal_scroll_viewport(
+                self.terminal,
+                ffi::ScrollViewport {
+                    tag: ffi::SCROLL_BOTTOM,
+                    value: [0, 0],
+                },
+            );
+        }
+        self.force_full = true;
+    }
+
+    unsafe fn terminal_get<T: Default>(&self, call: &'static str, data: i32) -> Result<T, Failure> {
+        let mut value = T::default();
+        let code = unsafe {
+            ffi::ghostty_terminal_get(self.terminal, data, (&raw mut value).cast::<c_void>())
+        };
+        check(call, code).map(|()| value)
+    }
+
     /// Encodes the rows that changed since the last frame; the first frame has
     /// every row. See the module docs for the format.
     pub fn frame(&mut self) -> Result<Vec<u8>, Failure> {
@@ -156,7 +227,12 @@ impl Terminal {
                 ffi::ghostty_render_state_update(self.state, self.terminal),
             )?;
             let dirty: i32 = self.state_get("dirty", ffi::DATA_DIRTY)?;
-            let full = !self.sent_first_frame || dirty == ffi::DIRTY_FULL;
+            let full = !self.sent_first_frame || self.force_full || dirty == ffi::DIRTY_FULL;
+            let shape: i32 = self.state_get("cursor style", ffi::DATA_CURSOR_VISUAL_STYLE)?;
+            let bar: ffi::Scrollbar =
+                self.terminal_get("scrollbar", ffi::TERMINAL_DATA_SCROLLBAR)?;
+            let live: bool =
+                self.terminal_get("viewport active", ffi::TERMINAL_DATA_VIEWPORT_ACTIVE)?;
             let fg: ffi::ColorRgb = self.state_get("foreground", ffi::DATA_COLOR_FOREGROUND)?;
             let bg: ffi::ColorRgb = self.state_get("background", ffi::DATA_COLOR_BACKGROUND)?;
             let shown: bool = self.state_get("cursor visible", ffi::DATA_CURSOR_VISIBLE)?;
@@ -183,11 +259,18 @@ impl Terminal {
             if shown && in_view {
                 flags |= FLAG_CURSOR;
             }
+            if live {
+                flags |= FLAG_LIVE;
+            }
             out.push(flags);
-            out.push(0);
+            out.push(u8::try_from(shape).unwrap_or(SHAPE_BLOCK));
             out.extend_from_slice(&0u16.to_le_bytes()); // row count, set below
             out.extend_from_slice(&fg.word().to_le_bytes());
             out.extend_from_slice(&bg.word().to_le_bytes());
+            let clamp = |n: u64| u32::try_from(n).unwrap_or(u32::MAX);
+            out.extend_from_slice(&clamp(bar.total).to_le_bytes());
+            out.extend_from_slice(&clamp(bar.offset).to_le_bytes());
+            out.extend_from_slice(&[0; 4]);
 
             let mut count: u16 = 0;
             if full || dirty != ffi::DIRTY_FALSE {
@@ -215,6 +298,7 @@ impl Terminal {
                 ffi::ghostty_render_state_clean(self.state),
             )?;
             self.sent_first_frame = true;
+            self.force_full = false;
             Ok(out)
         }
     }
@@ -222,6 +306,12 @@ impl Terminal {
     /// The screen as text: one line per row, trailing spaces and empty rows
     /// removed, wide characters once. For tests and the on-device check.
     pub fn text(&mut self) -> Result<String, Failure> {
+        self.view_text()
+    }
+
+    /// What the view shows (scrolled back or live) as text, whole graphemes:
+    /// one line per row, trailing spaces and empty rows removed.
+    pub fn view_text(&mut self) -> Result<String, Failure> {
         let mut lines = Vec::with_capacity(usize::from(self.rows));
         unsafe {
             check(
@@ -235,11 +325,14 @@ impl Terminal {
                 while ffi::ghostty_render_state_row_cells_next(self.cells) {
                     let raw: ffi::Cell = self.cells_get("cell", ffi::CELLS_DATA_RAW)?;
                     let wide: i32 = cell_get(raw, "cell width", ffi::CELL_DATA_WIDE)?;
-                    if wide == ffi::CELL_WIDE_SPACER_TAIL {
+                    if wide == ffi::CELL_WIDE_SPACER_TAIL || wide == ffi::CELL_WIDE_SPACER_HEAD {
                         continue;
                     }
-                    let cp: u32 = cell_get(raw, "codepoint", ffi::CELL_DATA_CODEPOINT)?;
-                    line.push(char::from_u32(cp).filter(|_| cp != 0).unwrap_or(' '));
+                    let grapheme = self.grapheme()?;
+                    if grapheme.is_empty() {
+                        line.push(' ');
+                    }
+                    line.extend(grapheme.iter().filter_map(|&c| char::from_u32(c)));
                 }
                 lines.push(line.trim_end().to_owned());
             }
@@ -250,14 +343,39 @@ impl Terminal {
         Ok(lines.join("\n"))
     }
 
+    /// The current cell's codepoints, empty for no text.
+    unsafe fn grapheme(&self) -> Result<Vec<u32>, Failure> {
+        unsafe {
+            let len: u32 = self.cells_get("grapheme length", ffi::CELLS_DATA_GRAPHEMES_LEN)?;
+            let mut cps = vec![0u32; len as usize];
+            if len > 0 {
+                check(
+                    "grapheme",
+                    ffi::ghostty_render_state_row_cells_get(
+                        self.cells,
+                        ffi::CELLS_DATA_GRAPHEMES_BUF,
+                        cps.as_mut_ptr().cast::<c_void>(),
+                    ),
+                )?;
+            }
+            Ok(cps)
+        }
+    }
+
     unsafe fn encode_row(&mut self, out: &mut Vec<u8>) -> Result<(), Failure> {
         unsafe {
             self.load_cells()?;
+            let mut extras: Vec<u32> = Vec::new();
             let mut written: u16 = 0;
             while written < self.cols && ffi::ghostty_render_state_row_cells_next(self.cells) {
                 let raw: ffi::Cell = self.cells_get("cell", ffi::CELLS_DATA_RAW)?;
-                let cp: u32 = cell_get(raw, "codepoint", ffi::CELL_DATA_CODEPOINT)?;
                 let wide: i32 = cell_get(raw, "cell width", ffi::CELL_DATA_WIDE)?;
+                let spacer = wide == ffi::CELL_WIDE_SPACER_TAIL || wide == ffi::CELL_WIDE_SPACER_HEAD;
+                let grapheme = if spacer { Vec::new() } else { self.grapheme()? };
+                let cp = grapheme.first().copied().unwrap_or(0);
+                // At most 255 extra codepoints per cell; longer clusters are cut.
+                let more = &grapheme[grapheme.len().min(1)..];
+                let more = &more[..more.len().min(255)];
                 let fg = self.cell_color(ffi::CELLS_DATA_FG_COLOR);
                 let bg = self.cell_color(ffi::CELLS_DATA_BG_COLOR);
                 let styled: bool = self.cells_get("has styling", ffi::CELLS_DATA_HAS_STYLING)?;
@@ -280,12 +398,17 @@ impl Terminal {
                 out.extend_from_slice(&bg.to_le_bytes());
                 out.push(attrs);
                 out.push(u8::try_from(wide).unwrap_or(0));
-                out.extend_from_slice(&[0, 0]);
+                out.push(more.len() as u8);
+                out.push(0);
+                extras.extend_from_slice(more);
                 written += 1;
             }
             // A row is never shorter than the grid; pad defensively so offsets hold.
             for _ in written..self.cols {
                 out.extend_from_slice(&[0; CELL_LEN]);
+            }
+            for c in extras {
+                out.extend_from_slice(&c.to_le_bytes());
             }
         }
         Ok(())
@@ -432,7 +555,12 @@ mod tests {
         pub flags: u8,
         pub fg: u32,
         pub bg: u32,
+        pub shape: u8,
+        pub total: u32,
+        pub offset: u32,
         pub rows_sent: Vec<(u16, Vec<[u8; CELL_LEN]>)>,
+        /// Each sent row's cells as text: the whole grapheme, "" for none.
+        pub texts: Vec<Vec<String>>,
     }
 
     fn u16_at(b: &[u8], i: usize) -> u16 {
@@ -443,31 +571,48 @@ mod tests {
     }
 
     pub(super) fn parse(b: &[u8]) -> Parsed {
-        let cols = u16_at(b, 0);
+        let cols = usize::from(u16_at(b, 0));
         let count = usize::from(u16_at(b, 10));
-        let row_len = 2 + usize::from(cols) * CELL_LEN;
-        assert_eq!(b.len(), HEADER_LEN + count * row_len, "frame length");
-        let rows_sent = (0..count)
-            .map(|r| {
-                let at = HEADER_LEN + r * row_len;
-                let cells = (0..usize::from(cols))
-                    .map(|c| {
-                        b[at + 2 + c * CELL_LEN..at + 2 + (c + 1) * CELL_LEN]
-                            .try_into()
-                            .unwrap()
-                    })
-                    .collect();
-                (u16_at(b, at), cells)
-            })
-            .collect();
+        assert_eq!(&b[28..32], &[0; 4], "reserved header bytes");
+        let mut at = HEADER_LEN;
+        let mut rows_sent = Vec::new();
+        let mut texts = Vec::new();
+        for _ in 0..count {
+            let y = u16_at(b, at);
+            at += 2;
+            let cells: Vec<[u8; CELL_LEN]> = (0..cols)
+                .map(|c| b[at + c * CELL_LEN..at + (c + 1) * CELL_LEN].try_into().unwrap())
+                .collect();
+            at += cols * CELL_LEN;
+            let mut text = Vec::new();
+            for cell in &cells {
+                assert_eq!(cell[15], 0, "reserved cell byte");
+                let mut t = String::new();
+                if let Some(c) = char::from_u32(u32_at(cell, 0)).filter(|c| *c != '\0') {
+                    t.push(c);
+                }
+                for _ in 0..cell[14] {
+                    t.push(char::from_u32(u32_at(b, at)).unwrap());
+                    at += 4;
+                }
+                text.push(t);
+            }
+            rows_sent.push((y, cells));
+            texts.push(text);
+        }
+        assert_eq!(b.len(), at, "frame length");
         Parsed {
-            cols,
+            cols: cols as u16,
             rows: u16_at(b, 2),
             cursor: (u16_at(b, 4), u16_at(b, 6)),
             flags: b[8],
+            shape: b[9],
             fg: u32_at(b, 12),
             bg: u32_at(b, 16),
+            total: u32_at(b, 20),
+            offset: u32_at(b, 24),
             rows_sent,
+            texts,
         }
     }
 
@@ -592,6 +737,27 @@ mod tests {
             enum_value("GhosttyCellWide", "SPACER_TAIL"),
             ffi::CELL_WIDE_SPACER_TAIL
         );
+        assert_eq!(size("GhosttyTerminalScrollbar"), size_of::<ffi::Scrollbar>());
+        assert_eq!(
+            size("GhosttyTerminalScrollViewport"),
+            size_of::<ffi::ScrollViewport>()
+        );
+        assert_eq!(
+            offset("GhosttyTerminalScrollViewport", "value"),
+            std::mem::offset_of!(ffi::ScrollViewport, value)
+        );
+        for (k, ours) in [
+            ("BOTTOM", ffi::SCROLL_BOTTOM),
+            ("DELTA", ffi::SCROLL_DELTA),
+        ] {
+            assert_eq!(enum_value("GhosttyTerminalScrollViewportTag", k), ours, "{k}");
+        }
+        for (k, ours) in [
+            ("SCROLLBAR", ffi::TERMINAL_DATA_SCROLLBAR),
+            ("VIEWPORT_ACTIVE", ffi::TERMINAL_DATA_VIEWPORT_ACTIVE),
+        ] {
+            assert_eq!(enum_value("GhosttyTerminalData", k), ours, "{k}");
+        }
     }
 
     #[test]
@@ -709,5 +875,104 @@ mod tests {
             rows_sent += f.rows_sent.len();
         }
         assert!(rows_sent > 60, "output keeps changing rows");
+    }
+
+    #[test]
+    fn graphemes_reach_the_frame_whole() {
+        let mut t = Terminal::new(10, 1).unwrap();
+        // Grapheme clustering on (mode 2027), as programs that want it ask:
+        // e + combining acute, a ZWJ sequence (wide), a flag, then plain text
+        t.write(b"\x1b[?2027h");
+        t.write("e\u{301}\u{1f469}\u{200d}\u{1f4bb}\u{1f1f3}\u{1f1f1}x".as_bytes());
+        let f = parse(&t.frame().unwrap());
+        let text = &f.texts[0];
+        assert_eq!(text[0], "e\u{301}");
+        assert_eq!(text[1], "\u{1f469}\u{200d}\u{1f4bb}");
+        assert_eq!(f.rows_sent[0].1[1][13], 1, "the sequence is wide");
+        assert_eq!(text[2], "", "its spacer has no text");
+        let flag = text.iter().position(|c| c.starts_with('\u{1f1f3}')).unwrap();
+        assert_eq!(text[flag], "\u{1f1f3}\u{1f1f1}");
+        assert!(text.contains(&"x".to_owned()));
+        assert_eq!(cp(&f.rows_sent[0].1[0]), u32::from('e'), "base codepoint stays first");
+    }
+
+    #[test]
+    fn the_header_carries_the_cursor_shape() {
+        let mut t = Terminal::new(10, 2).unwrap();
+        t.write(b"\x1b[6 q");
+        assert_eq!(parse(&t.frame().unwrap()).shape, SHAPE_BAR);
+        t.write(b"\x1b[4 q");
+        assert_eq!(parse(&t.frame().unwrap()).shape, SHAPE_UNDERLINE);
+        t.write(b"\x1b[2 q");
+        assert_eq!(parse(&t.frame().unwrap()).shape, SHAPE_BLOCK);
+    }
+
+    fn numbered(n: usize) -> Vec<u8> {
+        (0..n).map(|i| format!("line {i}\r\n")).collect::<String>().into_bytes()
+    }
+
+    #[test]
+    fn scrolling_back_holds_the_view_until_live() {
+        let mut t = Terminal::new(20, 5).unwrap();
+        t.write(&numbered(50));
+        let f = parse(&t.frame().unwrap());
+        assert_eq!(f.flags & FLAG_LIVE, FLAG_LIVE);
+        assert!(f.total >= 50, "scrollback is counted: {}", f.total);
+        assert_eq!(f.offset + 5, f.total, "at the bottom");
+
+        t.scroll(-10);
+        let f = parse(&t.frame().unwrap());
+        assert_eq!(f.flags & FLAG_LIVE, 0, "scrolled up");
+        assert_eq!(f.flags & FLAG_FULL, FLAG_FULL, "a scrolled view sends every row");
+        assert_eq!(f.offset + 15, f.total);
+        let top = f.texts[0].concat();
+        assert!(top.starts_with("line "), "{top}");
+        assert_eq!(f.flags & FLAG_CURSOR, 0, "the cursor is below the view");
+
+        // new output does not move a scrolled view
+        t.write(&numbered(3));
+        let g = parse(&t.frame().unwrap());
+        assert_eq!(g.flags & FLAG_LIVE, 0);
+        let still: Vec<String> = t.view_text().unwrap().lines().map(str::to_owned).collect();
+        assert_eq!(still[0], top.trim_end());
+
+        t.scroll_to_live();
+        let h = parse(&t.frame().unwrap());
+        assert_eq!(h.flags & FLAG_LIVE, FLAG_LIVE);
+        assert_eq!(h.offset + 5, h.total);
+        assert!(t.view_text().unwrap().ends_with("line 2"));
+    }
+
+    #[test]
+    fn scrolling_past_either_end_is_clamped() {
+        let mut t = Terminal::new(20, 5).unwrap();
+        t.write(&numbered(8));
+        t.scroll(-1000);
+        let f = parse(&t.frame().unwrap());
+        assert_eq!(f.offset, 0);
+        assert_eq!(t.view_text().unwrap().lines().next(), Some("line 0"));
+        t.scroll(1000);
+        assert_eq!(parse(&t.frame().unwrap()).flags & FLAG_LIVE, FLAG_LIVE);
+    }
+
+    #[test]
+    fn resizing_changes_the_frame_size_and_resends_every_row() {
+        let mut t = Terminal::new(40, 10).unwrap();
+        t.write(b"hello");
+        t.frame().unwrap();
+        t.resize(30, 6).unwrap();
+        assert_eq!(t.size(), (30, 6));
+        let f = parse(&t.frame().unwrap());
+        assert_eq!((f.cols, f.rows), (30, 6));
+        assert_eq!(f.flags & FLAG_FULL, FLAG_FULL);
+        assert_eq!(f.rows_sent.len(), 6);
+        assert!(t.resize(0, 6).is_err());
+    }
+
+    #[test]
+    fn view_text_reads_graphemes_and_skips_spacers() {
+        let mut t = Terminal::new(10, 2).unwrap();
+        t.write("e\u{301}\u{65e5}x\r\n  ".as_bytes());
+        assert_eq!(t.view_text().unwrap(), "e\u{301}\u{65e5}x");
     }
 }

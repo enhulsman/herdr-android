@@ -189,6 +189,31 @@ pub const KEY_ARROW_RIGHT: c_int = 77;
 pub const KEY_ARROW_UP: c_int = 78;
 pub const KEY_ESCAPE: c_int = 120;
 
+/// `GhosttyTerminalScrollViewport`: a tag and a 16-byte union.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ScrollViewport {
+    pub tag: c_int,
+    pub value: [u64; 2],
+}
+
+// GhosttyTerminalScrollViewportTag
+pub const SCROLL_BOTTOM: c_int = 1;
+pub const SCROLL_DELTA: c_int = 2;
+
+/// `GhosttyTerminalScrollbar`, in rows.
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct Scrollbar {
+    pub total: u64,
+    pub offset: u64,
+    pub len: u64,
+}
+
+// GhosttyTerminalData
+pub const TERMINAL_DATA_SCROLLBAR: c_int = 9;
+pub const TERMINAL_DATA_VIEWPORT_ACTIVE: c_int = 32;
+
 unsafe extern "C" {
     pub fn ghostty_terminal_new(
         allocator: *const c_void,
@@ -198,6 +223,16 @@ unsafe extern "C" {
     ) -> GhosttyResult;
     pub fn ghostty_terminal_free(terminal: Terminal);
     pub fn ghostty_terminal_vt_write(terminal: Terminal, data: *const u8, len: usize);
+    pub fn ghostty_terminal_resize(
+        terminal: Terminal,
+        cols: u16,
+        rows: u16,
+        cell_width_px: u32,
+        cell_height_px: u32,
+    ) -> GhosttyResult;
+    pub fn ghostty_terminal_scroll_viewport(terminal: Terminal, behavior: ScrollViewport);
+    pub fn ghostty_terminal_get(terminal: Terminal, data: c_int, out: *mut c_void)
+    -> GhosttyResult;
 
     pub fn ghostty_render_state_new(
         allocator: *const c_void,

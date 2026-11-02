@@ -400,8 +400,8 @@ mod tests {
     }
 
     /// The frame Kotlin draws carries the same grid, read with herdr-app's
-    /// rules (inverse swaps, hidden text is blank), except that a cell's text
-    /// is only its first codepoint: combining marks are not in the frame yet.
+    /// rules (inverse swaps, hidden text is blank), each cell's text the
+    /// whole grapheme.
     #[test]
     fn frames_carry_the_golden_grid() {
         for (name, stream, _) in GOLDENS {
@@ -413,7 +413,7 @@ mod tests {
             assert_eq!(f.rows_sent.len(), usize::from(rows), "{name}");
             let (dfg, dbg) = (grid.fg, grid.bg);
             assert_eq!((f.fg, f.bg), (word(dfg), word(dbg)), "{name} defaults");
-            for (y, cells) in f.rows_sent {
+            for ((y, cells), texts) in f.rows_sent.into_iter().zip(f.texts) {
                 for (x, cell) in cells.iter().enumerate() {
                     let want = &grid.cells[usize::from(y)][x];
                     let at = format!("{name} cell {x},{y}");
@@ -431,10 +431,9 @@ mod tests {
                         (fg, bg) = (bg.unwrap_or(dbg), Some(fg));
                     }
                     assert_eq!((fg, bg), (want.fg, want.bg), "{at} colours");
-                    let cp = u32_at(cell, 0);
-                    let shown = cell[13] < 2 && attrs & ATTR_INVISIBLE == 0 && cp != 0;
-                    let first = want.text.chars().next().map_or(0, u32::from);
-                    assert_eq!(if shown { cp } else { 0 }, first, "{at} text");
+                    let shown = cell[13] < 2 && attrs & ATTR_INVISIBLE == 0;
+                    let text = if shown { texts[x].as_str() } else { "" };
+                    assert_eq!(text, want.text, "{at} text");
                     assert_eq!(cell[13] == 1, want.wide, "{at} wide");
                     for (bit, on) in [
                         (ATTR_BOLD, want.bold),

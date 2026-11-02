@@ -205,6 +205,81 @@ class MachineFlowsTest {
     }
 
     @Test
+    fun thePendingConfirmComesBackAfterTheAppWasSuspendedInTheBackground() {
+        flows.actions(MachinesActions.Preview).onAddMachine()
+        flows.save(workstation)
+        publish(machine("workstation", unconfirmed))
+        assertEquals("workstation", flows.trusting)
+
+        // Backgrounded for 60 s: the hub closes every connection.
+        publish(machine("workstation", MachineState.Paused))
+        assertNull(flows.trusting)
+        // The form keeps waiting for its machine: its own saved name is no conflict.
+        assertEquals(Screen.AddMachine, flows.screen)
+        assertEquals("workstation", flows.waitingFor)
+
+        // Back in the foreground: the machine reconnects and presents its key again.
+        publish(machine("workstation", MachineState.Connecting))
+        assertNull(flows.trusting)
+        val s = publish(machine("workstation", unconfirmed))
+        assertEquals("workstation", flows.trusting)
+        assertEquals(Screen.AddMachine, flows.screen)
+        val prompt = flows.trustPrompt(s)!!
+        assertEquals(PRESENTED, prompt.fingerprint)
+        // Nothing was trusted by itself.
+        assertEquals(listOf("add workstation workstation.example.org 22 dev"), hub.calls)
+
+        flows.trust(prompt)
+        assertEquals(
+            listOf("add workstation workstation.example.org 22 dev", "confirm workstation $PRESENTED"),
+            hub.calls,
+        )
+        assertNull(flows.trusting)
+        assertNull(flows.waitingFor)
+        assertEquals(Screen.Machines, flows.screen)
+    }
+
+    @Test
+    fun theConfirmAfterASuspendShowsTheKeyPresentedNowAndConfirmsOnlyThatOne() {
+        flows.actions(MachinesActions.Preview).onAddMachine()
+        flows.save(workstation)
+        publish(machine("workstation", unconfirmed))
+        publish(machine("workstation", MachineState.Paused))
+        val s = publish(machine("workstation", MachineState.HostKeyUnconfirmed(OTHER, "ECDSA")))
+        val prompt = flows.trustPrompt(s)!!
+        assertEquals(OTHER, prompt.fingerprint)
+        assertEquals("ECDSA", prompt.algorithm)
+        flows.trust(prompt)
+        assertEquals("confirm workstation $OTHER", hub.calls.last())
+        assertTrue(hub.calls.none { it == "confirm workstation $PRESENTED" })
+    }
+
+    @Test
+    fun aPendingMachineThatEndsElsewhereAfterASuspendReturnsToMachines() {
+        flows.actions(MachinesActions.Preview).onAddMachine()
+        flows.save(workstation)
+        publish(machine("workstation", unconfirmed))
+        publish(machine("workstation", MachineState.Paused))
+        publish(machine("workstation", MachineState.Unreachable("connection refused")))
+        assertEquals(Screen.Machines, flows.screen)
+        assertNull(flows.waitingFor)
+        assertNull(flows.trusting)
+        assertTrue(hub.calls.none { it.startsWith("confirm") })
+    }
+
+    @Test
+    fun aMachineCardConfirmClosedBySuspendDoesNotReopenByItself() {
+        // Only the form's pending machine comes back; a card's dialog is reopened from the card.
+        flows.openMachines()
+        publish(machine("workstation", unconfirmed))
+        flows.actions(MachinesActions.Preview).onHostKey("workstation")
+        publish(machine("workstation", MachineState.Paused))
+        publish(machine("workstation", unconfirmed))
+        assertNull(flows.trusting)
+        assertEquals(Screen.Machines, flows.screen)
+    }
+
+    @Test
     fun aRefusedAddStaysOnTheFormWithTheReason() {
         flows.actions(MachinesActions.Preview).onAddMachine()
         hub.refuse = HubException.Storage("Could not save the machine list: disk full.")
@@ -297,5 +372,6 @@ class MachineFlowsTest {
         // Invented fingerprints.
         const val TRUSTED = "SHA256:Zt7oP1qW3eR5tY7uI9oP2aS4dF6gH8jK0lZ2xC4vB6n"
         const val PRESENTED = "SHA256:q3Vb8m2N4sR7tK0yL9wE1aZ5cX6vB3nM8jH2gF4dS0p"
+        const val OTHER = "SHA256:Hk2mR8vT1nB6xQ4wZ9cL3pJ7sD5fG0aY2uE8iO6tN1r"
     }
 }

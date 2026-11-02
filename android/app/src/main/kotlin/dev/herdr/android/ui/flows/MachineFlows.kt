@@ -51,7 +51,12 @@ class MachineFlows(private val hubHost: HubHost) {
     var machine by mutableStateOf<String?>(null)
         private set
 
-    /** A machine just added from the form, until the hub reports its first host key. */
+    /**
+     * A machine just added from the form, until its setup ends: trusted,
+     * cancelled, or another outcome. Kept while its trust dialog is open, so
+     * a suspension in the background (Paused, then Connecting) brings the
+     * dialog back once the hub reports the unconfirmed key again.
+     */
     var waitingFor by mutableStateOf<String?>(null)
         private set
 
@@ -106,15 +111,16 @@ class MachineFlows(private val hubHost: HubHost) {
     /** The trust dialog's content, or null when no dialog should show. */
     fun trustPrompt(snapshot: HubSnapshot): HostKeyPrompt? = trusting?.let { hostKeyPrompt(snapshot, it) }
 
-    /** Follows the hub: opens the confirm for a machine just added, closes views whose state moved on. */
+    /**
+     * Follows the hub: opens the confirm for a machine just added (again after
+     * a suspension), closes views whose state moved on.
+     */
     fun onSnapshot(snapshot: HubSnapshot) {
         waitingFor?.let { name ->
             when (snapshot.machines.find { it.name == name }?.state) {
-                is MachineState.HostKeyUnconfirmed -> {
-                    waitingFor = null
-                    trusting = name
-                }
-                // Still on its way, or not listed in this snapshot yet.
+                // Shows the key presented now; only Trust confirms it.
+                is MachineState.HostKeyUnconfirmed -> trusting = name
+                // Still on its way, suspended in the background, or not listed in this snapshot yet.
                 null, MachineState.Connecting, MachineState.Paused -> Unit
                 // Unreachable and the like: the machine's card says why.
                 else -> show(Screen.Machines, null)

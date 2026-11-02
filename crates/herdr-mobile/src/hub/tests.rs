@@ -494,12 +494,20 @@ async fn each_backoff_step_says_when_the_next_attempt_is() {
         assert_ahead(retry_in_ms(&s, WS), secs);
     }
 
-    // The attempt that runs is not waiting out a backoff.
+    // The attempt that runs is not waiting out a backoff: the card keeps the
+    // failure and reads "retrying" until the attempt ends.
     rig.dialer.fail(WS, None);
     let mut core = rig.core().await;
     let s = rig.hub.snapshot();
-    assert_eq!(state(&s, WS), Some(&MachineState::Connecting));
-    assert_eq!(view(&s, WS).next_retry_ms, None, "absent while connecting");
+    assert!(matches!(
+        state(&s, WS),
+        Some(MachineState::Unreachable { .. })
+    ));
+    assert_eq!(
+        view(&s, WS).next_retry_ms,
+        None,
+        "absent while the retry runs"
+    );
     core.connect("0.1.15", vec![]).await;
     let s = rig.until_state(WS, connected).await;
     assert_eq!(view(&s, WS).next_retry_ms, None, "absent while connected");
@@ -511,6 +519,35 @@ async fn each_backoff_step_says_when_the_next_attempt_is() {
         .until_state(WS, |st| matches!(st, MachineState::Unreachable { .. }))
         .await;
     assert_ahead(retry_in_ms(&s, WS), 30);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_retry_keeps_the_failure_on_screen_while_it_runs() {
+    let mut rig = rig("retry-keeps-failure");
+    rig.add_trusted(WS, WS_KEY);
+
+    // The first attempt has nothing to keep: it shows as connecting.
+    rig.hub.resume();
+    let first = rig.core().await;
+    assert_eq!(
+        state(&rig.hub.snapshot(), WS),
+        Some(&MachineState::Connecting)
+    );
+    rig.hub.suspend();
+    drop(first);
+
+    // A retry does not blank the card (its "Add phone key" row) in between.
+    rig.dialer.fail(WS, Some(Fail::Rejected));
+    rig.hub.resume();
+    rig.until_state(WS, |st| *st == MachineState::KeyRejected)
+        .await;
+    rig.dialer.fail(WS, None);
+    let mut core = rig.core().await;
+    let s = rig.hub.snapshot();
+    assert_eq!(state(&s, WS), Some(&MachineState::KeyRejected));
+    assert_eq!(view(&s, WS).next_retry_ms, None, "due: \"retrying\"");
+    core.connect("0.1.15", vec![]).await;
+    rig.until_state(WS, connected).await;
 }
 
 #[tokio::test(start_paused = true)]
@@ -1163,7 +1200,8 @@ async fn a_stopped_task_cannot_write_its_state() {
         version: "0.1.15".into(),
         untested: false,
     };
-    assert!(!rig.hub.set(WS, old, late));
+    assert!(!rig.hub.attempting(WS, old));
+    assert!(!rig.hub.settle(WS, old, late, None));
     assert!(!rig.hub.observe(WS, old, &EventLines::default(), None));
     assert_eq!(state(&rig.hub.snapshot(), WS), Some(&MachineState::Paused));
 

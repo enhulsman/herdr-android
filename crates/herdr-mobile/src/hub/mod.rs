@@ -125,7 +125,8 @@ pub struct MachineView {
     /// When the next attempt starts, ms since the epoch, while the state
     /// retries by itself (unreachable, key not accepted, herdr-core missing,
     /// Network off): "retrying in 30 s". None while connecting, connected,
-    /// paused, or waiting for the person.
+    /// paused, or waiting for the person, and while a retry runs (the state
+    /// then keeps the failure: "retrying").
     #[uniffi(default = None)]
     pub next_retry_ms: Option<u64>,
 }
@@ -767,13 +768,25 @@ impl HubCore {
         })
     }
 
-    /// Sets a machine's state if `epoch` still owns it; false means the task
-    /// was replaced and should stop.
-    fn set(self: &Arc<Self>, name: &str, epoch: u64, state: MachineState) -> bool {
-        self.settle(name, epoch, state, None)
+    /// An attempt starts. A retry keeps the failure on screen ("retrying")
+    /// so the card does not blank its detail and links in between; anything
+    /// else shows as connecting. False when `epoch` no longer owns the
+    /// machine: the task was replaced and should stop.
+    fn attempting(self: &Arc<Self>, name: &str, epoch: u64) -> bool {
+        self.with(|_, st| match st.live.get_mut(name) {
+            Some(live) if live.epoch == epoch => {
+                if !live.state.retrying() {
+                    live.state = MachineState::Connecting;
+                }
+                live.next_retry_ms = None;
+                true
+            }
+            _ => false,
+        })
     }
 
-    /// [`HubCore::set`], plus when the next attempt starts if it retries.
+    /// Sets a machine's state if `epoch` still owns it, and when the next
+    /// attempt starts if it retries; false as for [`HubCore::attempting`].
     fn settle(
         self: &Arc<Self>,
         name: &str,
@@ -887,7 +900,7 @@ async fn run_machine(hub: Arc<HubCore>, name: String, epoch: u64) {
         let Some(target) = hub.target(&name) else {
             return;
         };
-        if !hub.set(&name, epoch, MachineState::Connecting) {
+        if !hub.attempting(&name, epoch) {
             return;
         }
         let outcome = attempt(&hub, &name, epoch, target).await;

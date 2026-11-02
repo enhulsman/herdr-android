@@ -157,8 +157,9 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
 
 /**
  * "retrying in 30 s" until the hub's next attempt, rounded up so it starts at
- * the full step; "retrying" once it is due (the hub then shows Connecting) or
- * when the hub gave no time.
+ * the full step; "retrying" once it is due (the hub keeps the failure while
+ * the retry runs, so the card's detail and links stay put) or when the hub
+ * gave no time.
  */
 private fun retryingSegment(nextRetryMs: Long?, nowMs: Long, res: Resources): Segment {
     val left = nextRetryMs?.let { (it - nowMs + 999).floorDiv(1_000L) } ?: 0L

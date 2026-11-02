@@ -48,7 +48,13 @@ pub struct Viewer {
     size: (u16, u16),
     /// None between a detach and the next attach's reply (or after it failed).
     stream: Option<Stream>,
+    /// Sizes the phone sent as RESIZE whose `size` event has not come back
+    /// yet, oldest first: their events are the phone's own, not the desk's.
+    pending: std::collections::VecDeque<(u16, u16)>,
 }
+
+/// More unacknowledged phone resizes than this and the oldest are forgotten.
+const PENDING_MAX: usize = 8;
 
 /// `display` for the active attach: every field null keeps the desk's.
 fn null_display() -> Value {
@@ -134,6 +140,7 @@ impl Viewer {
             mode: Mode::Watching,
             size: (attached.cols, attached.rows),
             stream: Some(stream),
+            pending: std::collections::VecDeque::new(),
         };
         Ok((viewer, attached))
     }
@@ -163,6 +170,7 @@ impl Viewer {
         self.stream = Some(stream);
         self.mode = mode;
         self.size = (attached.cols, attached.rows);
+        self.pending.clear();
         Ok(attached)
     }
 
@@ -184,6 +192,10 @@ impl Viewer {
         let payload = [cols.to_le_bytes(), rows.to_le_bytes()].concat();
         self.client.send(stream.channel(), wire::RESIZE, &payload);
         self.size = (cols, rows);
+        if self.pending.len() == PENDING_MAX {
+            self.pending.pop_front();
+        }
+        self.pending.push_back((cols, rows));
         true
     }
 
@@ -195,6 +207,12 @@ impl Viewer {
         cols: u16,
         rows: u16,
     ) -> Result<Option<Attached>, CallError> {
+        // The phone's own resize coming back (this one, or an earlier one the
+        // phone has since replaced): it and everything older are acknowledged.
+        if let Some(i) = self.pending.iter().position(|p| *p == (cols, rows)) {
+            self.pending.drain(..=i);
+            return Ok(None);
+        }
         if (cols, rows) == self.size {
             return Ok(None);
         }

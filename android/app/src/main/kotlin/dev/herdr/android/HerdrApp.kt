@@ -75,7 +75,7 @@ class HerdrApp : Application() {
             ElapsedClock.SYSTEM,
             onResume = hubHost::resume,
             onSuspend = hubHost::suspend,
-            onForeground = hubHost::ensureStarted,
+            onForeground = hubHost::foreground,
         )
         registerActivityLifecycleCallbacks(Callbacks())
     }

@@ -22,7 +22,7 @@ data class Segment(val text: String, val tone: Tone = Tone.Muted)
 enum class StatusMark { Connected, Ring }
 
 /** A button at the end of the card's head. */
-enum class CardButton { Unlock, TryAgain }
+enum class CardButton { Unlock, TryAgain, OpenSettings }
 
 /** A row under the head that leads to a flow (5d builds the flows). */
 enum class CardLink { CheckHostKey, CompareHostKeys, AddPhoneKey }
@@ -140,8 +140,10 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
             listOf(s(R.string.status_app_too_old))
         }
         MachineState.NetworkOff -> {
+            // Only Android settings change it: no countdown, tried again on the return.
             detail = res.getString(R.string.status_network_off_detail)
-            listOf(s(R.string.status_network_off), retrying)
+            button = CardButton.OpenSettings
+            listOf(s(R.string.status_network_off))
         }
     }
     return MachineCardUi(

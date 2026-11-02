@@ -127,7 +127,7 @@ class HubHostTest {
         clock,
         onResume = flaky::resume,
         onSuspend = flaky::suspend,
-        onForeground = flaky::ensureStarted,
+        onForeground = flaky::foreground,
     )
 
     @Test
@@ -144,7 +144,7 @@ class HubHostTest {
     }
 
     @Test
-    fun aHealthyHubIsNotRestartedOnReturn() {
+    fun aHealthyHubIsNotRestartedOnReturnButToldOfIt() {
         fail = false
         tracker.activityStarted()
         repeat(3) {
@@ -153,7 +153,8 @@ class HubHostTest {
             tracker.activityStarted()
         }
         assertEquals(1, attempts)
-        assertEquals(listOf("resume"), fake.calls)
+        // Each return within 60 s: machines waiting for Network try again.
+        assertEquals(listOf("resume") + List(4) { "foreground" }, fake.calls)
     }
 
     @Test
@@ -252,6 +253,7 @@ class FakeHub : HubInterface {
         refused()
         calls += "remove $name"
     }
+    override fun foreground() { calls += "foreground" }
     override fun resume() { calls += "resume" }
     override fun retry() { calls += "retry" }
     override fun snapshot(): HubSnapshot = HubSnapshot(emptyList(), emptyList(), emptyList(), null)

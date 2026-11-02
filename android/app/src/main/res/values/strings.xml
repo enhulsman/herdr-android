@@ -120,6 +120,7 @@
     <!-- What a machine card offers when it waits for the person. -->
     <string name="action_unlock">Unlock</string>
     <string name="action_try_again">Try again</string>
+    <string name="action_open_settings">Open settings</string>
     <string name="link_check_host_key">Check the host key</string>
     <string name="link_check_host_key_detail">Connects once you trust its fingerprint</string>
     <string name="link_compare_host_keys">Compare the host keys</string>

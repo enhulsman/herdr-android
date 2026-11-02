@@ -191,6 +191,12 @@ impl Hub {
         self.core.resume();
     }
 
+    /// Every return to the foreground: machines waiting for the Network
+    /// permission try again.
+    pub fn foreground(&self) {
+        self.core.foreground();
+    }
+
     /// The app has been in the background for 60 s: close every connection.
     pub fn suspend(&self) {
         self.core.suspend();

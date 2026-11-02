@@ -87,6 +87,8 @@ data class MachinesActions(
     val onConfirmRemove: () -> Unit = {},
     /** The confirm's Cancel, or a tap on the scrim. */
     val onCancelRemove: () -> Unit = {},
+    /** "Network permission is off": this app's page in Android settings (MachinesRoute). */
+    val onOpenSettings: () -> Unit = {},
 ) {
     companion object {
         /** Does nothing; for screenshots and flows not built yet. */
@@ -237,6 +239,7 @@ private fun MachineCard(machine: MachineCardUi, actions: MachinesActions) {
             when (machine.button) {
                 CardButton.Unlock -> OutlineButton(stringResource(R.string.action_unlock), actions.onUnlock, compact = true)
                 CardButton.TryAgain -> OutlineButton(stringResource(R.string.action_try_again), actions.onTryAgain, compact = true)
+                CardButton.OpenSettings -> OutlineButton(stringResource(R.string.action_open_settings), actions.onOpenSettings, compact = true)
                 null -> Unit
             }
         }

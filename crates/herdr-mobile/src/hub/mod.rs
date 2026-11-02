@@ -86,7 +86,8 @@ pub enum MachineState {
     },
     /// The core speaks a newer protocol generation: the app needs an update.
     AppTooOld,
-    /// GrapheneOS's Network permission is off; retrying.
+    /// GrapheneOS's Network permission is off. It changes only in Android
+    /// settings, so no timed retries: tried again on the return to the app.
     NetworkOff,
 }
 
@@ -106,7 +107,6 @@ impl MachineState {
             MachineState::Unreachable { .. }
                 | MachineState::KeyRejected
                 | MachineState::NotInstalled
-                | MachineState::NetworkOff
         )
     }
 }
@@ -123,9 +123,9 @@ pub struct MachineView {
     /// · last connected ...", and "as of hh:mm" on its rows while not connected.
     pub last_connected_ms: Option<u64>,
     /// When the next attempt starts, ms since the epoch, while the state
-    /// retries by itself (unreachable, key not accepted, herdr-core missing,
-    /// Network off): "retrying in 30 s". None while connecting, connected,
-    /// paused, or waiting for the person, and while a retry runs (the state
+    /// retries by itself (unreachable, key not accepted, herdr-core missing):
+    /// "retrying in 30 s". None while connecting, connected, paused, or
+    /// waiting for the person (Network off too), and while a retry runs (the state
     /// then keeps the failure: "retrying").
     #[uniffi(default = None)]
     pub next_retry_ms: Option<u64>,
@@ -594,6 +594,26 @@ impl HubCore {
         });
     }
 
+    /// The app is back in the foreground, also within its 60 s in the
+    /// background: machines waiting for Network (granted in Android settings
+    /// meanwhile) try again. Nothing while suspended; the resume connects all.
+    pub(crate) fn foreground(self: &Arc<Self>) {
+        self.with(|hub, st| {
+            if st.paused {
+                return;
+            }
+            let waiting: Vec<String> = st
+                .live
+                .iter()
+                .filter(|(_, l)| l.state == MachineState::NetworkOff)
+                .map(|(n, _)| n.clone())
+                .collect();
+            for name in waiting {
+                hub.spawn(st, &name);
+            }
+        });
+    }
+
     /// Closes every connection now (the app's 60 s in the background are up).
     pub(crate) fn suspend(self: &Arc<Self>) {
         self.with(|hub, st| {
@@ -938,7 +958,7 @@ fn dial_failure(e: DialError, target: &Target) -> Outcome {
             algorithm,
         }),
         DialError::Rejected => Outcome::retry(MachineState::KeyRejected),
-        DialError::NetworkOff => Outcome::retry(MachineState::NetworkOff),
+        DialError::NetworkOff => Outcome::wait(MachineState::NetworkOff),
         DialError::Failed(detail) => Outcome::retry(unreachable(detail)),
     }
 }

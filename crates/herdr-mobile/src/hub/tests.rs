@@ -555,12 +555,12 @@ async fn every_retrying_state_says_when_the_next_attempt_is() {
     let mut rig = rig("next-retry-kinds");
     rig.add_trusted(WS, WS_KEY);
     rig.add_trusted(SRV, SRV_KEY);
-    rig.dialer.fail(WS, Some(Fail::NetworkOff));
+    rig.dialer.fail(WS, Some(Fail::Unreachable));
     rig.dialer.fail(SRV, Some(Fail::Rejected));
     rig.hub.resume();
     let s = rig
         .until("both named", |s| {
-            state(s, WS) == Some(&MachineState::NetworkOff)
+            matches!(state(s, WS), Some(MachineState::Unreachable { .. }))
                 && state(s, SRV) == Some(&MachineState::KeyRejected)
         })
         .await;
@@ -950,29 +950,54 @@ async fn suspending_closes_every_connection_until_resume() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn network_off_and_rejected_keys_are_named_and_retried() {
+async fn a_rejected_key_is_named_and_retried() {
     let mut rig = rig("named");
-    rig.add_trusted(WS, WS_KEY);
     rig.add_trusted(SRV, SRV_KEY);
-    rig.dialer.fail(WS, Some(Fail::NetworkOff));
     rig.dialer.fail(SRV, Some(Fail::Rejected));
     rig.hub.resume();
-    rig.until("both named", |s| {
-        state(s, WS) == Some(&MachineState::NetworkOff)
-            && state(s, SRV) == Some(&MachineState::KeyRejected)
-    })
-    .await;
-    // The person grants Network, or installs the line: it connects by itself.
-    rig.dialer.fail(WS, None);
+    rig.until_state(SRV, |st| *st == MachineState::KeyRejected)
+        .await;
+    // The person installs the line: it connects by itself.
     rig.dialer.fail(SRV, None);
-    let mut c1 = rig.core().await;
-    c1.connect("0.1.15", vec![]).await;
-    let mut c2 = rig.core().await;
-    c2.connect("0.1.15", vec![]).await;
-    rig.until("both connected", |s| {
-        state(s, WS).is_some_and(connected) && state(s, SRV).is_some_and(connected)
-    })
-    .await;
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    rig.until_state(SRV, connected).await;
+}
+
+/// Network off can only change in Android settings, which puts the app in the
+/// background: no timed retries, a try on every return to the foreground.
+#[tokio::test(start_paused = true)]
+async fn network_off_waits_for_the_return_to_the_app() {
+    let mut rig = rig("network-off");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.add_machine(SRV, SRV, 22, "dev").unwrap();
+    rig.dialer.fail(WS, Some(Fail::NetworkOff));
+    rig.hub.resume();
+    let s = rig
+        .until("both waiting", |s| {
+            state(s, WS) == Some(&MachineState::NetworkOff)
+                && matches!(state(s, SRV), Some(MachineState::HostKeyUnconfirmed { .. }))
+        })
+        .await;
+    assert_eq!(view(&s, WS).next_retry_ms, None);
+    tokio::time::sleep(Duration::from_secs(120)).await;
+    assert_eq!(rig.dialer.dials(WS).len(), 1, "no retries on its own");
+
+    // Network granted; back in the app.
+    rig.dialer.fail(WS, None);
+    rig.hub.foreground();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    rig.until_state(WS, connected).await;
+    // Only Network off is tried again: the host key still waits for the person.
+    assert_eq!(rig.dialer.dials(SRV).len(), 1);
+
+    // In the background (suspended), a return to the foreground before the
+    // resume dials nothing.
+    rig.hub.suspend();
+    rig.hub.foreground();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_eq!(rig.dialer.dials(WS).len(), 2);
 }
 
 #[tokio::test(start_paused = true)]

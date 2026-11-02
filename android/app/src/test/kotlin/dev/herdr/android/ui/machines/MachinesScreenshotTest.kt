@@ -51,8 +51,8 @@ class MachinesScreenshotTest {
     @Test fun needsUnlockPaper() = capture("machines-unlock-paper", dark = false, unlock)
 
     private val networkOff = listOf(
-        machine("workstation", MachineState.NetworkOff, lastConnectedMs = NOW - 5 * MINUTE, nextRetryMs = NOW + 16_000),
-        machine("server", MachineState.NetworkOff, nextRetryMs = NOW + 4_000),
+        machine("workstation", MachineState.NetworkOff, lastConnectedMs = NOW - 5 * MINUTE),
+        machine("server", MachineState.NetworkOff),
     )
 
     @Test fun networkOffGraphite() = capture("machines-network-off-graphite", dark = true, networkOff)

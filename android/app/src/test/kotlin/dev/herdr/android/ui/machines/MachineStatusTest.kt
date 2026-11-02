@@ -100,7 +100,6 @@ class MachineStatusTest {
         val next = NOW + 4_000
         assertEquals("Phone key not accepted · retrying in 4 s", card(MachineState.KeyRejected, nextRetryMs = next).statusText)
         assertEquals("herdr-core not found on this machine · retrying in 4 s", card(MachineState.NotInstalled, nextRetryMs = next).statusText)
-        assertEquals("Network permission is off · retrying in 4 s", card(MachineState.NetworkOff, nextRetryMs = next).statusText)
     }
 
     @Test
@@ -192,8 +191,9 @@ class MachineStatusTest {
     @Test
     fun networkOffSaysSoInsteadOfConnectionFailed() {
         val c = card(MachineState.NetworkOff)
-        assertEquals("Network permission is off · retrying", c.statusText)
+        assertEquals("Network permission is off", c.statusText)
         assertEquals("Allow Network for herdr in Android settings.", c.detail)
+        assertEquals(CardButton.OpenSettings, c.button)
     }
 
     @Test

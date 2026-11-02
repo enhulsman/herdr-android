@@ -1,6 +1,9 @@
 package dev.herdr.android.ui.machines
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -28,6 +31,13 @@ fun hubActions(userAuth: UserAuthGate, hubHost: HubHost, onBack: (() -> Unit)? =
         onUnlock = { userAuth.unlock() },
         onTryAgain = hubHost::retry,
     )
+
+/**
+ * This app's App info page in Android settings, for "Network permission is
+ * off": Android has no public link to one permission's toggle.
+ */
+fun appSettingsIntent(packageName: String): Intent =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
 
 /** The "Text contrast" row switches [setting]; the theme follows it app-wide. */
 fun withTextContrast(actions: MachinesActions, setting: ContrastSetting): MachinesActions =
@@ -60,7 +70,8 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
         transfer.import(uri?.toString())
     }
     val fileName = stringResource(R.string.machines_export_file_name)
-    val actions = remember(app, flows, transfer, onBack, exportPicker, importPicker, fileName) {
+    val context = LocalContext.current
+    val actions = remember(app, flows, transfer, onBack, exportPicker, importPicker, fileName, context) {
         fun pick(launch: () -> Unit) = try {
             transfer.pickerOpened()
             launch()
@@ -70,6 +81,13 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
         withTextContrast(flows.actions(hubActions(app.userAuth, app.hubHost, onBack)), app.contrast).copy(
             onExport = { pick { exportPicker.launch(fileName) } },
             onImport = { pick { importPicker.launch(IMPORT_TYPES) } },
+            onOpenSettings = {
+                try {
+                    context.startActivity(appSettingsIntent(context.packageName))
+                } catch (_: ActivityNotFoundException) {
+                    // No settings app to open: the card's detail still says where.
+                }
+            },
         )
     }
     // Read without subscribing: the route follows [tick], not every clock change.

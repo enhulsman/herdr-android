@@ -109,6 +109,7 @@ class MachineFlowsTest {
 
     @Test
     fun theMachinesCardOpensTheConfirmForAnUnconfirmedKey() {
+        flows.openMachines()
         val s = publish(machine("workstation", unconfirmed))
         flows.actions(MachinesActions.Preview).onHostKey("workstation")
         assertEquals(Screen.Machines, flows.screen)
@@ -254,9 +255,25 @@ class MachineFlowsTest {
         assertEquals(Screen.HostKeyChanged, flows.screen)
         assertTrue(flows.back())
         assertEquals(Screen.Machines, flows.screen)
-        // Machines is the start screen: back leaves the app.
+        // Machines returns to the Agents home, the start screen; back there leaves the app.
+        assertTrue(flows.back())
+        assertEquals(Screen.Agents, flows.screen)
         assertFalse(flows.back())
         assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test
+    fun theAgentsHomeIsTheStartAndReachesMachinesAndAddMachine() {
+        assertEquals(Screen.Agents, flows.screen)
+        flows.openMachines()
+        assertEquals(Screen.Machines, flows.screen)
+        assertTrue(flows.back())
+        assertEquals(Screen.Agents, flows.screen)
+        // The empty home's "Add machine" opens the form; back from it lands on Machines.
+        flows.openAddMachine()
+        assertEquals(Screen.AddMachine, flows.screen)
+        assertTrue(flows.back())
+        assertEquals(Screen.Machines, flows.screen)
     }
 
     @Test

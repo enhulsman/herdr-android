@@ -246,7 +246,7 @@ class FakeHub : HubInterface {
         calls += "import $json"
         return importAdds
     }
-    override fun markSeen(machine: String, address: String) { calls += "seen $address" }
+    override fun markSeen(machine: String, address: String) { calls += "seen $machine $address" }
     override fun removeMachine(name: String) { calls += "remove $name" }
     override fun resume() { calls += "resume" }
     override fun retry() { calls += "retry" }

@@ -82,7 +82,7 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
             detail = st.detail.takeIf { it.isNotBlank() }
             buildList {
                 add(s(R.string.status_unreachable))
-                m.lastConnectedMs?.let { add(s(R.string.status_last_connected, ago(nowMs - it.toLong(), res))) }
+                m.lastConnectedMs?.let { add(s(R.string.status_last_connected, agoText(nowMs - it.toLong(), res))) }
                 add(retrying)
             }
         }
@@ -129,7 +129,7 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
 }
 
 /** "just now", "5m ago", "2h ago", "3d ago"; a clock that went backwards reads as just now. */
-private fun ago(elapsedMs: Long, res: Resources): String {
+fun agoText(elapsedMs: Long, res: Resources): String {
     val minutes = elapsedMs / 60_000
     return when {
         minutes < 1 -> res.getString(R.string.status_ago_now)

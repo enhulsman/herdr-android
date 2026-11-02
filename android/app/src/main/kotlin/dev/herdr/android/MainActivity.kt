@@ -13,6 +13,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import dev.herdr.android.ui.addmachine.AddMachineRoute
+import dev.herdr.android.ui.agents.AgentsHome
+import dev.herdr.android.ui.agents.AgentsRoute
 import dev.herdr.android.ui.flows.MachineFlows
 import dev.herdr.android.ui.flows.Screen
 import dev.herdr.android.ui.hostkey.HostKeyChangedActions
@@ -34,22 +36,29 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Switches screens by [MachineFlows] state; system back closes a dialog, then returns to Machines. */
+/**
+ * Switches screens by [MachineFlows] state, starting on the Agents home; system
+ * back closes a sheet or dialog first, then returns to Machines, then home.
+ */
 @Composable
 private fun Root(app: HerdrApp) {
     val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
+    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost)) { AgentsHome(app.hubHost) }
     val snapshot by app.hubHost.snapshot.collectAsState()
-    LaunchedEffect(snapshot) { flows.onSnapshot(snapshot) }
+    LaunchedEffect(snapshot) {
+        flows.onSnapshot(snapshot)
+        home.onSnapshot(snapshot)
+    }
     // The export/import notice answers the picker just closed; it does not follow the person to other screens.
     LaunchedEffect(flows.screen) { if (flows.screen != Screen.Machines) app.transfer.dismiss() }
-    BackHandler(enabled = flows.screen != Screen.Machines || flows.trusting != null || flows.confirmingForget) {
+    BackHandler(enabled = flows.screen != Screen.Agents || flows.trusting != null || flows.confirmingForget) {
         flows.back()
     }
     Box {
         when (flows.screen) {
-            // The start screen has no back arrow; once the Agents home is the start,
-            // Machines gets onBack = { screen = Screen.Agents }.
-            Screen.Machines -> MachinesRoute(app, flows, onBack = null)
+            // AgentsRoute's own BackHandler closes its sheet before this one leaves the app.
+            Screen.Agents -> AgentsRoute(app, flows, home)
+            Screen.Machines -> MachinesRoute(app, flows, onBack = { flows.back() })
             Screen.AddMachine -> AddMachineRoute(flows, snapshot)
             // onSnapshot returns to Machines once the machine no longer shows a changed key.
             Screen.HostKeyChanged -> hostKeyChange(snapshot, flows.machine)?.let { change ->

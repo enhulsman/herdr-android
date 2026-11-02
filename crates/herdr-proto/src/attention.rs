@@ -58,6 +58,13 @@ pub struct Row {
     pub since_ms: Option<u64>,
     /// The folder it works in now, as a name.
     pub folder: String,
+    /// Which program it is, for its icon: "claude", "codex", ... (see [`program_id`]).
+    pub program: Option<String>,
+    /// Needs you or error: the card's heading ("Permission", "Question",
+    /// "Needs you", "Error"); none for other rows.
+    pub request_kind: Option<String>,
+    /// Needs you or error: the program's `msg`, shown under the heading.
+    pub request: Option<String>,
 }
 
 /// A terminal that never reported status ("Other terminals").
@@ -67,6 +74,8 @@ pub struct Other {
     pub address: String,
     pub name: String,
     pub folder: String,
+    /// The command's file name ("make"), if it has one.
+    pub program: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -314,6 +323,7 @@ impl Tracker {
                             address: address.to_owned(),
                             name: name_of(t, address),
                             folder: folder_of(t),
+                            program: program_of(t),
                         })
                     })
             })
@@ -346,6 +356,14 @@ fn row(machine: &str, address: &str, t: &Value, a: &Agent) -> Row {
         Attention::Working => "Working".to_owned(),
         Attention::Idle => "Idle".to_owned(),
     };
+    let (request_kind, request) = match attention {
+        Attention::NeedsYou => (
+            Some(text("kind").map_or("Needs you".to_owned(), capitalized)),
+            text("msg").map(str::to_owned),
+        ),
+        Attention::Error => (Some("Error".to_owned()), text("msg").map(str::to_owned)),
+        _ => (None, None),
+    };
     Row {
         machine: machine.to_owned(),
         address: address.to_owned(),
@@ -359,6 +377,32 @@ fn row(machine: &str, address: &str, t: &Value, a: &Agent) -> Row {
             .map(|p| p as u8),
         since_ms: a.since_ms,
         folder: folder_of(t),
+        program: program_of(t),
+        request_kind,
+        request,
+    }
+}
+
+/// The program for the icon: the reported app, else the command's file name.
+fn program_of(t: &Value) -> Option<String> {
+    fn nonempty(v: Option<&Value>) -> Option<&str> {
+        v.and_then(Value::as_str).filter(|s| !s.is_empty())
+    }
+    if let Some(app) = nonempty(t.pointer("/status/app")) {
+        return Some(program_id(app));
+    }
+    nonempty(t.pointer("/argv/0"))
+        .map(|p| folder_name(p, None))
+        .filter(|p| !p.is_empty() && p != "~" && p != "/")
+        .map(|p| program_id(&p))
+}
+
+/// One name per program, whichever way it reported itself.
+pub fn program_id(app: &str) -> String {
+    match app {
+        "claude" | "claude-code" => "claude".into(),
+        "cursor" | "cursor-agent" => "cursor".into(),
+        other => other.to_owned(),
     }
 }
 

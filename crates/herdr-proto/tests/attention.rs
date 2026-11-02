@@ -569,3 +569,107 @@ fn a_seen_blocked_agent_that_was_answered_is_idle_after_a_restart() {
     t.observe(WSL, &[agent("t1", Some("idle"), 2)], 3);
     assert_eq!(state_of(&t, "t1"), Some(Attention::Idle));
 }
+
+// ---- what the home screen draws (task M1.4) ----
+
+/// The card shows the kind in red above the request in terminal type
+/// (design-brief "Signature element"); the one-line label stays for the rest.
+#[test]
+fn a_needs_you_row_carries_its_kind_and_request_apart() {
+    let cases = [
+        (
+            json!({"state": "blocked", "kind": "permission", "msg": "Run npm test?"}),
+            Some("Permission"),
+            Some("Run npm test?"),
+        ),
+        (json!({"state": "blocked"}), Some("Needs you"), None),
+        (
+            json!({"state": "blocked", "kind": "question"}),
+            Some("Question"),
+            None,
+        ),
+        (
+            json!({"state": "blocked", "msg": "Which branch?"}),
+            Some("Needs you"),
+            Some("Which branch?"),
+        ),
+        (
+            json!({"state": "blocked", "kind": "", "msg": ""}),
+            Some("Needs you"),
+            None,
+        ),
+        (
+            json!({"state": "error", "msg": "rate limited"}),
+            Some("Error"),
+            Some("rate limited"),
+        ),
+        (json!({"state": "error"}), Some("Error"), None),
+        // Only rows that need you carry a request.
+        (
+            json!({"state": "working", "kind": "permission", "msg": "stale"}),
+            None,
+            None,
+        ),
+        (json!({"state": "idle", "msg": "stale"}), None, None),
+    ];
+    for (st, kind, request) in cases {
+        let mut t = tracker_knowing_wsl();
+        t.observe(WSL, &[status(agent("t1", Some("idle"), 0), st.clone())], 1);
+        let row = &t.rows()[0];
+        assert_eq!(row.request_kind.as_deref(), kind, "{st}");
+        assert_eq!(row.request.as_deref(), request, "{st}");
+    }
+}
+
+/// The program decides the row's icon: the reported app first, else the
+/// command's file name, named one way for each program.
+#[test]
+fn the_program_is_named_for_its_icon() {
+    let mut t = tracker_knowing_wsl();
+    let app = |a: &str, app: &str| status(agent(a, Some("idle"), 0), json!({"state": "idle", "app": app}));
+    let claude_code = app("t1", "claude-code");
+    let claude = app("t2", "claude");
+    let codex = app("t3", "codex");
+    let cursor = app("t4", "cursor-agent");
+    let from_argv = with(
+        status(agent("t5", Some("idle"), 0), json!({"state": "idle"})),
+        "argv",
+        json!(["/usr/local/bin/codex", "--yolo"]),
+    );
+    let nothing = with(
+        status(agent("t6", Some("idle"), 0), json!({"state": "idle"})),
+        "argv",
+        json!([]),
+    );
+    t.observe(
+        WSL,
+        &[claude_code, claude, codex, cursor, from_argv, nothing],
+        1,
+    );
+    let program = |a: &str| {
+        t.rows()
+            .into_iter()
+            .find(|r| r.address == a)
+            .unwrap()
+            .program
+    };
+    assert_eq!(program("t1").as_deref(), Some("claude"));
+    assert_eq!(program("t2").as_deref(), Some("claude"));
+    assert_eq!(program("t3").as_deref(), Some("codex"));
+    assert_eq!(program("t4").as_deref(), Some("cursor"));
+    assert_eq!(program("t5").as_deref(), Some("codex"));
+    assert_eq!(program("t6"), None);
+}
+
+#[test]
+fn other_terminals_name_their_program() {
+    let mut t = tracker_knowing_wsl();
+    let build = json!({"address": "t3", "state": "live", "cwd": "/home/me/src/api", "argv": ["/usr/bin/make", "-j8"],
+                       "labels": {}, "name": null, "parent": null, "reported": false, "status": null, "turn": 0});
+    let shell = json!({"address": "t4", "state": "live", "cwd": "/home/me", "argv": [],
+                       "labels": {}, "name": null, "parent": null, "reported": false, "status": null, "turn": 0});
+    t.observe(WSL, &[build, shell], 1);
+    let others = t.others();
+    assert_eq!(others[0].program.as_deref(), Some("make"));
+    assert_eq!(others[1].program, None);
+}

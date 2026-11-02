@@ -18,7 +18,8 @@ import uniffi.herdr_mobile.MachineState
 
 /** The app's screens; switched by state, without a navigation library. */
 enum class Screen {
-    /** The start screen until the Agents home (step 6) takes over. */
+    /** The start screen: every agent, the ones that need you first (renders 1 and 2). */
+    Agents,
     Machines,
     AddMachine,
 
@@ -43,7 +44,7 @@ enum class Screen {
  * offers it as for any first connection.
  */
 class MachineFlows(private val hubHost: HubHost) {
-    var screen by mutableStateOf(Screen.Machines)
+    var screen by mutableStateOf(Screen.Agents)
         private set
 
     /** The machine [Screen.HostKeyChanged] or [Screen.PhoneKey] is about (none for the Phone key row). */
@@ -75,6 +76,12 @@ class MachineFlows(private val hubHost: HubHost) {
         onPhoneKey = { show(Screen.PhoneKey, null) },
         onAddMachine = { show(Screen.AddMachine, null) },
     )
+
+    /** The Agents home's Machines button and machine notices. */
+    fun openMachines() = show(Screen.Machines, null)
+
+    /** The empty Agents home's "Add machine"; back from the form lands on Machines. */
+    fun openAddMachine() = show(Screen.AddMachine, null)
 
     private fun show(next: Screen, about: String?) {
         screen = next
@@ -167,7 +174,7 @@ class MachineFlows(private val hubHost: HubHost) {
         if (call { it.forgetHostKey(name) }) show(Screen.Machines, null)
     }
 
-    /** System back: closes a dialog first, then returns to Machines; false on Machines itself. */
+    /** System back: closes a dialog first, then returns to Machines, then to the Agents home; false there. */
     fun back(): Boolean = when {
         trusting != null -> {
             cancelTrust()
@@ -177,7 +184,11 @@ class MachineFlows(private val hubHost: HubHost) {
             cancelForget()
             true
         }
-        screen != Screen.Machines -> {
+        screen == Screen.Machines -> {
+            show(Screen.Agents, null)
+            true
+        }
+        screen != Screen.Agents -> {
             show(Screen.Machines, null)
             true
         }

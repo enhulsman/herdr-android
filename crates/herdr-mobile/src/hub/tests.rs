@@ -606,6 +606,51 @@ async fn terminals_that_never_reported_are_other_terminals() {
     assert_eq!(s.others[0].machine, WS);
 }
 
+// Scenario "A core with an added machine" (machine-connection spec, "Each
+// terminal is listed once"), through the hub's snapshot.
+#[tokio::test(start_paused = true)]
+async fn a_core_with_an_added_machine_lists_each_terminal_once() {
+    let mut rig = rig("duplicates");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut shell = agent("other/t4", "idle", 0);
+    shell["reported"] = json!(false);
+    shell["status"] = Value::Null;
+    let mut core = rig.core().await;
+    core.connect(
+        "0.1.15",
+        vec![agent("t1", "working", 0), agent("other/t3", "blocked", 0), shell],
+    )
+    .await;
+    let s = rig.until_state(WS, connected).await;
+    assert_eq!(rows_of(&s, WS), [("t1".into(), AgentAttention::Working)]);
+    assert!(s.agents.iter().all(|r| !r.address.contains('/')));
+    assert!(s.others.is_empty());
+}
+
+// What the home screen draws from a row: icon, card kind and request.
+#[tokio::test(start_paused = true)]
+async fn rows_carry_the_program_and_the_request_apart() {
+    let mut rig = rig("request");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut blocked = agent("t1", "blocked", 0);
+    blocked["status"] = json!({"state": "blocked", "kind": "question", "msg": "Which test runner should I use?", "app": "codex"});
+    let mut build = agent("t2", "idle", 0);
+    build["reported"] = json!(false);
+    build["status"] = Value::Null;
+    build["argv"] = json!(["/usr/bin/make"]);
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![blocked, build]).await;
+    let s = rig.until_state(WS, connected).await;
+    let row = &s.agents[0];
+    assert_eq!(row.program.as_deref(), Some("codex"));
+    assert_eq!(row.request_kind.as_deref(), Some("Question"));
+    assert_eq!(row.request.as_deref(), Some("Which test runner should I use?"));
+    assert_eq!(row.label, "Question: Which test runner should I use?");
+    assert_eq!(s.others[0].program.as_deref(), Some("make"));
+}
+
 // Scenario "A second machine is off".
 #[tokio::test(start_paused = true)]
 async fn a_machine_that_drops_keeps_its_rows_as_of_its_last_connection() {

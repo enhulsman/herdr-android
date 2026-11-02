@@ -145,6 +145,12 @@ pub struct AgentRow {
     pub progress: Option<u8>,
     pub since_ms: Option<u64>,
     pub folder: String,
+    /// For the icon: "claude", "codex", ...; none when unknown.
+    pub program: Option<String>,
+    /// Needs you or error: the card's heading ("Permission", "Needs you", "Error").
+    pub request_kind: Option<String>,
+    /// Needs you or error: what the program asks, if it said.
+    pub request: Option<String>,
 }
 
 impl From<attention::Row> for AgentRow {
@@ -158,6 +164,9 @@ impl From<attention::Row> for AgentRow {
             progress: r.progress,
             since_ms: r.since_ms,
             folder: r.folder,
+            program: r.program,
+            request_kind: r.request_kind,
+            request: r.request,
         }
     }
 }
@@ -169,6 +178,7 @@ pub struct OtherTerminal {
     pub address: String,
     pub name: String,
     pub folder: String,
+    pub program: Option<String>,
 }
 
 impl From<attention::Other> for OtherTerminal {
@@ -178,6 +188,7 @@ impl From<attention::Other> for OtherTerminal {
             address: o.address,
             name: o.name,
             folder: o.folder,
+            program: o.program,
         }
     }
 }

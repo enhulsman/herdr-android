@@ -4,6 +4,43 @@
     <string name="unlock_key_title">Unlock the SSH key</string>
     <string name="unlock_key_subtitle">To connect to your machines</string>
 
+    <!-- Agents home (renders 1 and 2). -->
+    <string name="agents_title">Agents</string>
+    <!-- Section headers, in list order (components.sectionHeader). -->
+    <string name="agents_needs_you">Needs you</string>
+    <string name="agents_done">Done</string>
+    <string name="agents_working">Working</string>
+    <string name="agents_idle">Idle</string>
+    <string name="agents_other">Other terminals</string>
+    <!-- A row's second line: %1$s is the folder name, %2$s the machine. -->
+    <string name="agents_line_two">%1$s · %2$s</string>
+    <!-- How long ago the state changed, as in render 1. -->
+    <string name="age_now">&lt;1m</string>
+    <string name="age_minutes">%1$dm</string>
+    <string name="age_hours">%1$dh</string>
+    <string name="age_days">%1$dd</string>
+    <!-- On rows of a machine that is not connected: %1$s is the time it was last connected (machine-connection spec). -->
+    <string name="agents_as_of">as of %1$s</string>
+    <!-- The line above the list for an unreachable machine; the machine's name comes first, in the text colour. -->
+    <string name="notice_unreachable">unreachable</string>
+    <!-- Empty home when the connection core could not start; the reason (HubHost.startError) follows as is. -->
+    <string name="agents_start_failed_title">Could not start the connections</string>
+    <!-- Empty home, no machines yet (no signed-off render). -->
+    <string name="agents_empty_machines_title">No machines yet</string>
+    <!-- Empty home, machines but no agents (no signed-off render). -->
+    <string name="agents_empty_agents_title">No agents yet</string>
+    <string name="agents_empty_agents_body">Agents you start in herdr on your machines show up here, the ones that need you first.</string>
+
+    <!-- The read-only agent sheet (M1 pick 1b; no signed-off render). -->
+    <string name="sheet_machine">Machine</string>
+    <string name="sheet_folder">Folder</string>
+    <string name="sheet_changed">Last change</string>
+    <!-- A working agent that reports progress: %1$s is the state, %2$d the percentage. -->
+    <string name="sheet_progress">%1$s · %2$d%%</string>
+    <string name="sheet_no_status">No status reported</string>
+    <string name="sheet_later">Read only. The live terminal opens here in a later version.</string>
+    <string name="sheet_close">Close</string>
+
     <!-- Machines screen (render 7). -->
     <string name="back">Back</string>
     <string name="machines_title">Machines</string>

@@ -49,6 +49,9 @@ jobs:
       - run: scripts/test-check-release-tag.sh
       - run: scripts/test-release-sign-gate.sh
       - run: scripts/test-fetch-herdr-core.sh
+      - run: scripts/test-check-restricted-key.sh
+        env:
+          HERDR_REQUIRE_SSHD: "1"
 
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:

@@ -454,6 +454,47 @@ mod tests {
         }
     }
 
+    /// The seam with Kotlin (M2.1): each golden stream's first frame is kept
+    /// as a fixture under the app's test resources, where the Kotlin tests
+    /// parse it and check every cell against the same `.grid` golden. Run with
+    /// `HERDR_WRITE_FRAME_FIXTURES=1` to write them after a format change.
+    #[test]
+    fn frame_fixtures_for_kotlin_match_the_first_frames() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../android/app/src/test/resources/frames");
+        let write = std::env::var_os("HERDR_WRITE_FRAME_FIXTURES").is_some_and(|v| v == "1");
+        for (name, stream, golden) in GOLDENS {
+            let (cols, rows) = size(name);
+            let mut t = Terminal::new(cols, rows).unwrap();
+            t.write(stream);
+            let frame = t.frame().unwrap();
+            let path = dir.join(format!("{name}.frame"));
+            let grid_path = dir.join(format!("{name}.grid"));
+            if write {
+                std::fs::create_dir_all(&dir).unwrap();
+                std::fs::write(&path, &frame).unwrap();
+                std::fs::write(&grid_path, golden).unwrap();
+                continue;
+            }
+            let kept = std::fs::read(&path).unwrap_or_else(|e| {
+                panic!(
+                    "{}: {e}; write it with HERDR_WRITE_FRAME_FIXTURES=1",
+                    path.display()
+                )
+            });
+            assert!(
+                kept == frame,
+                "{name}: the Kotlin fixture differs from the first frame; \
+                 rewrite it with HERDR_WRITE_FRAME_FIXTURES=1"
+            );
+            let kept_grid = std::fs::read_to_string(&grid_path).unwrap();
+            assert_eq!(
+                kept_grid, golden,
+                "{name}: the Kotlin copy of the golden grid"
+            );
+        }
+    }
+
     fn word(c: Rgb) -> u32 {
         (u32::from(c.0) << 16) | (u32::from(c.1) << 8) | u32::from(c.2)
     }

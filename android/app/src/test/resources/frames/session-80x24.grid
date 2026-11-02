@@ -1,0 +1,79 @@
+grid 80x24
+default fg=ffffff bg=000000
+cursor 59,23 block
+row 0: 
+row 1: ⏺ its settings machines retry we reads parser retry a of so and of a the cannot
+  54-55 fg=d7d700
+  67-67 fg=af0000
+  69-71 italic
+row 2: list reads exhaust renders page
+row 3: ⏺ after buffer exhaust buffer its the after peer allocating renders settings ren
+  2-6 bold
+row 4: ders bad bad retry we we of of timeout peer a settings settings after reads the
+  13-17 italic
+  28-29 bold
+row 5: renders so buffer buffer a frame after page and exhaust reads allocating the par
+  0-6 italic
+  18-23 fg=875faf
+  27-31 italic
+  44-46 fg=d7d700
+  48-54 bold
+row 6: ser now page of reads
+  8-11 fg=5fafff
+row 7: ⏺ the once its allocating length reads retry allocating 日本語 now we now before
+  33-37 italic
+  56-56 wide
+  58-58 wide
+  60-60 wide
+row 8:  so length peer done peer done frame machines and allocating list each each sett
+  21-24 italic
+  37-44 fg=5f005f
+  61-64 fg=5faf87
+row 9: 
+row 10: > page settings allocating a exhaust length
+  0-0 fg=999999
+  16-25 fg=ffd7d7
+  29-35 fg=afd700
+  37-42 italic
+row 11: 
+row 12: ⏺ Read(src/settings.kt)
+  0-0 fg=4eba65
+  2-5 bold
+row 13:   ⎿  Read 325 lines
+row 14: 
+row 15: ⏺ list before and 日本語 the list and checks retry after 日本語 page its length
+  18-18 wide
+  20-20 wide
+  22-22 wide
+  51-55 fg=875faf
+  57-57 wide
+  59-59 wide
+  61-61 wide
+row 16: each the peer renders テスト machines memory retry the its cannot machines bad b
+  5-7 fg=ffd75f
+  14-20 bold
+  22-22 wide
+  24-24 wide
+  26-26 wide
+  45-49 bold
+  75-77 bold
+row 17: ad before exhaust and reads
+row 18: ⏺ retry bad machines 日本語 page memory the after now frame each checks renders
+  12-19 bold
+  21-21 wide
+  23-23 wide
+  25-25 wide
+row 19: frame renders done its buffer length 日本語 and the once settings checks buffer
+  37-37 wide
+  39-39 wide
+  41-41 wide
+  48-50 bold
+  57-64 italic
+row 20: checks page cannot its timeout each
+  0-5 fg=5f5fd7
+row 21: ╭──────────────────────────────────────────────────────────────────────────────╮
+  0-79 fg=999999
+row 22: │ >                                                                            │
+  0-79 fg=999999
+row 23: ╰──────────────────────────────────────────────────────────
+  0-58 fg=999999

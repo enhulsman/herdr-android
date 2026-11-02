@@ -7,6 +7,8 @@ mod machines;
 mod ssh;
 mod synthetic;
 #[cfg(feature = "vt")]
+mod term;
+#[cfg(feature = "vt")]
 mod vt;
 
 pub use ssh::{
@@ -252,6 +254,61 @@ impl Hub {
     pub fn import_machines(&self, json: String) -> Result<u32, HubError> {
         self.core.import_machines(&json)
     }
+
+    /// Opens a terminal to watch; `phone_cols` x `phone_rows` is the phone's
+    /// own grid, used once it types. The listener hears frames and states.
+    pub fn open_terminal(
+        &self,
+        machine: String,
+        address: String,
+        phone_cols: u16,
+        phone_rows: u16,
+        listener: Arc<dyn TerminalListener>,
+    ) -> Arc<TerminalView> {
+        #[cfg(feature = "vt")]
+        {
+            let (tx, rx) = std::sync::mpsc::channel::<SinkItem>();
+            // One thread per open terminal keeps the listener's calls in order.
+            let spawned = std::thread::Builder::new()
+                .name("herdr-term".into())
+                .spawn(move || {
+                    while let Ok(item) = rx.recv() {
+                        match item {
+                            SinkItem::Frame(f) => listener.on_frame(f),
+                            SinkItem::State(s) => listener.on_state(s),
+                            SinkItem::Interrupt(r) => listener.on_interrupt(r),
+                        }
+                    }
+                });
+            let cmds = spawned.ok().map(|_| {
+                term::spawn(
+                    &self.core,
+                    &machine,
+                    &address,
+                    (phone_cols, phone_rows),
+                    Arc::new(ListenerSink(tx)),
+                )
+            });
+            Arc::new(TerminalView {
+                cmds: Mutex::new(cmds),
+                keys: Mutex::new(keys_row::KeysRow::default()),
+            })
+        }
+        #[cfg(not(feature = "vt"))]
+        {
+            let _ = (machine, address, phone_cols, phone_rows);
+            listener.on_state(TermState {
+                phase: TermPhase::Failed {
+                    detail: VtError::Unavailable.to_string(),
+                },
+                cols: 0,
+                rows: 0,
+            });
+            Arc::new(TerminalView {
+                keys: Mutex::new(keys_row::KeysRow::default()),
+            })
+        }
+    }
 }
 
 impl Drop for Hub {
@@ -262,6 +319,236 @@ impl Drop for Hub {
             // Never block the thread that dropped the last reference.
             runtime.shutdown_background();
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum TermPhase {
+    /// The machine is not connected; the terminal reattaches when it is.
+    Waiting,
+    Attaching,
+    Watching,
+    Typing,
+    /// The terminal itself ended.
+    Ended {
+        reason: String,
+    },
+    /// The attach failed; tried again shortly.
+    Failed {
+        detail: String,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct TermState {
+    pub phase: TermPhase,
+    /// The grid the frames have; 0 before the first attach.
+    pub cols: u16,
+    pub rows: u16,
+}
+
+/// Receives an open terminal's frames, states and interrupt reports, in
+/// order, on one background thread. Implemented in Kotlin.
+#[uniffi::export(foreign)]
+pub trait TerminalListener: Send + Sync {
+    fn on_frame(&self, frame: Vec<u8>);
+    fn on_state(&self, state: TermState);
+    fn on_interrupt(&self, report: String);
+}
+
+/// A keys-row key (terminal-input spec, "A keys row for keys the phone
+/// keyboard lacks").
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum RowKeyTap {
+    Esc,
+    Tab,
+    Ctrl,
+    Alt,
+    Up,
+    Down,
+    Left,
+    Right,
+    Enter,
+    CtrlC,
+    /// A shelf symbol such as `|`; only its first character counts.
+    Symbol {
+        text: String,
+    },
+}
+
+/// The sticky modifiers waiting for the next key.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct Armed {
+    pub ctrl: bool,
+    pub alt: bool,
+}
+
+/// One open terminal (see `term.rs`). Closing it, or dropping it, detaches.
+#[derive(uniffi::Object)]
+pub struct TerminalView {
+    #[cfg(feature = "vt")]
+    cmds: Mutex<Option<tokio::sync::mpsc::UnboundedSender<term::Cmd>>>,
+    keys: Mutex<keys_row::KeysRow>,
+}
+
+#[cfg(feature = "vt")]
+struct ListenerSink(std::sync::mpsc::Sender<SinkItem>);
+
+#[cfg(feature = "vt")]
+enum SinkItem {
+    Frame(Vec<u8>),
+    State(TermState),
+    Interrupt(String),
+}
+
+#[cfg(feature = "vt")]
+impl term::TermSink for ListenerSink {
+    fn frame(&self, bytes: Vec<u8>) {
+        let _ = self.0.send(SinkItem::Frame(bytes));
+    }
+    fn state(&self, state: TermState) {
+        let _ = self.0.send(SinkItem::State(state));
+    }
+    fn interrupted(&self, report: String) {
+        let _ = self.0.send(SinkItem::Interrupt(report));
+    }
+}
+
+impl TerminalView {
+    #[cfg(feature = "vt")]
+    fn send(&self, cmd: term::Cmd) {
+        let cmds = self
+            .cmds
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(tx) = cmds.as_ref() {
+            let _ = tx.send(cmd);
+        }
+    }
+
+    #[cfg(feature = "vt")]
+    fn press(&self, key: keys_row::Key, mods: keys_row::Mods) {
+        self.send(term::Cmd::Key(key, mods));
+    }
+
+    #[cfg(not(feature = "vt"))]
+    fn press(&self, _key: keys_row::Key, _mods: keys_row::Mods) {}
+
+    fn keys(&self) -> std::sync::MutexGuard<'_, keys_row::KeysRow> {
+        self.keys
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn armed_now(&self) -> Armed {
+        let m = self.keys().armed();
+        Armed {
+            ctrl: m.ctrl,
+            alt: m.alt,
+        }
+    }
+}
+
+#[uniffi::export]
+impl TerminalView {
+    /// A keys-row tap; returns the modifiers now held (the row shows them).
+    pub fn tap(&self, key: RowKeyTap) -> Armed {
+        use keys_row::RowKey;
+        let row = match key {
+            RowKeyTap::Esc => RowKey::Esc,
+            RowKeyTap::Tab => RowKey::Tab,
+            RowKeyTap::Ctrl => RowKey::Ctrl,
+            RowKeyTap::Alt => RowKey::Alt,
+            RowKeyTap::Up => RowKey::Up,
+            RowKeyTap::Down => RowKey::Down,
+            RowKeyTap::Left => RowKey::Left,
+            RowKeyTap::Right => RowKey::Right,
+            RowKeyTap::Enter => RowKey::Enter,
+            RowKeyTap::CtrlC => RowKey::CtrlC,
+            RowKeyTap::Symbol { text } => match text.chars().next() {
+                Some(c) => RowKey::Symbol(c),
+                None => return self.armed_now(),
+            },
+        };
+        let pressed = self.keys().tap(row);
+        if let Some((k, m)) = pressed {
+            self.press(k, m);
+        }
+        self.armed_now()
+    }
+
+    /// Text from the terminal keyboard; each character takes any armed
+    /// modifier. Returns the modifiers still held.
+    pub fn type_text(&self, text: String) -> Armed {
+        for c in text.chars() {
+            let key = match c {
+                '\n' | '\r' => keys_row::RowKey::Enter,
+                c => keys_row::RowKey::Typed(c),
+            };
+            let pressed = self.keys().tap(key);
+            if let Some((k, m)) = pressed {
+                self.press(k, m);
+            }
+        }
+        self.armed_now()
+    }
+
+    pub fn backspace(&self) -> Armed {
+        let mods = {
+            let mut keys = self.keys();
+            let m = keys.armed();
+            *keys = keys_row::KeysRow::default();
+            m
+        };
+        self.press(keys_row::Key::Backspace, mods);
+        self.armed_now()
+    }
+
+    pub fn armed(&self) -> Armed {
+        self.armed_now()
+    }
+
+    /// Compose text, as a bracketed paste without Enter.
+    pub fn paste(&self, text: String) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Paste(text));
+        #[cfg(not(feature = "vt"))]
+        let _ = text;
+    }
+
+    /// Scrolls the view by rows; up is negative.
+    pub fn scroll(&self, rows: i32) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Scroll(rows));
+        #[cfg(not(feature = "vt"))]
+        let _ = rows;
+    }
+
+    pub fn live(&self) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Live);
+    }
+
+    /// The phone's own grid size: sent while typing, kept while watching.
+    pub fn phone_size(&self, cols: u16, rows: u16) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::PhoneSize(cols, rows));
+        #[cfg(not(feature = "vt"))]
+        let _ = (cols, rows);
+    }
+
+    pub fn interrupt(&self) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Interrupt);
+    }
+
+    /// Detaches; the view sends nothing after this.
+    pub fn close(&self) {
+        #[cfg(feature = "vt")]
+        self.cmds
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
     }
 }
 

@@ -323,6 +323,60 @@ pub(crate) struct HubCore {
     runtime: tokio::runtime::Handle,
     state: Mutex<State>,
     snapshots: watch::Sender<HubSnapshot>,
+    /// Each machine's live connection, for terminal views to attach through.
+    conns: Mutex<HashMap<String, watch::Sender<Option<Conn>>>>,
+}
+
+/// Every terminal's size as the event stream reports it, by address.
+pub(crate) type Sizes = Arc<HashMap<String, (u16, u16)>>;
+
+/// A machine's live connection: what an open terminal attaches through.
+#[derive(Clone)]
+#[cfg_attr(not(feature = "vt"), allow(dead_code))]
+pub(crate) struct Conn {
+    /// Which connection attempt this is; a reconnect has a new one.
+    pub epoch: u64,
+    pub client: Client,
+    pub sizes: watch::Receiver<Sizes>,
+}
+
+fn sizes_of(lines: &EventLines) -> HashMap<String, (u16, u16)> {
+    let dim = |t: &Value, k: &str| t[k].as_u64().and_then(|n| u16::try_from(n).ok());
+    lines
+        .terminals()
+        .iter()
+        .filter_map(|t| {
+            let address = t["address"].as_str()?;
+            Some((address.to_owned(), (dim(t, "cols")?, dim(t, "rows")?)))
+        })
+        .collect()
+}
+
+/// Withdraws a connection from terminal views when its attempt ends, however
+/// it ends (an aborted task included), and closes it: a view's clone of the
+/// client must not keep a suspended connection open.
+struct ConnGuard {
+    hub: Arc<HubCore>,
+    name: String,
+    epoch: u64,
+    client: Client,
+}
+
+impl Drop for ConnGuard {
+    fn drop(&mut self) {
+        self.client.close();
+        let conns = self.hub.conns.lock().unwrap();
+        if let Some(tx) = conns.get(&self.name) {
+            tx.send_if_modified(|c| {
+                if c.as_ref().is_some_and(|c| c.epoch == self.epoch) {
+                    *c = None;
+                    true
+                } else {
+                    false
+                }
+            });
+        }
+    }
 }
 
 /// How one connection attempt ended.
@@ -495,7 +549,37 @@ impl HubCore {
             runtime: tokio::runtime::Handle::current(),
             state: Mutex::new(state),
             snapshots: watch::channel(snapshot).0,
+            conns: Mutex::new(HashMap::new()),
         })
+    }
+
+    /// The machine's live connection, now and as it changes.
+    #[cfg_attr(not(feature = "vt"), allow(dead_code))]
+    pub(crate) fn connection(&self, name: &str) -> watch::Receiver<Option<Conn>> {
+        let mut conns = self.conns.lock().unwrap();
+        conns
+            .entry(name.to_owned())
+            .or_insert_with(|| watch::channel(None).0)
+            .subscribe()
+    }
+
+    fn publish_conn(&self, name: &str, conn: Conn) {
+        let mut conns = self.conns.lock().unwrap();
+        conns
+            .entry(name.to_owned())
+            .or_insert_with(|| watch::channel(None).0)
+            .send_replace(Some(conn));
+    }
+
+    /// Notes a line in the diagnostic log (`hub.log`).
+    #[cfg_attr(not(feature = "vt"), allow(dead_code))]
+    pub(crate) fn note(&self, line: &str) {
+        log(&self.dir, line);
+    }
+
+    #[cfg_attr(not(feature = "vt"), allow(dead_code))]
+    pub(crate) fn runtime(&self) -> &tokio::runtime::Handle {
+        &self.runtime
     }
 
     pub(crate) fn subscribe(&self) -> watch::Receiver<HubSnapshot> {
@@ -1022,12 +1106,36 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
     ) {
         return Outcome::wait(MachineState::Paused);
     }
+    let (sizes, sizes_rx) = watch::channel::<Sizes>(Arc::new(sizes_of(&lines)));
+    hub.publish_conn(
+        name,
+        Conn {
+            epoch,
+            client: client.clone(),
+            sizes: sizes_rx,
+        },
+    );
+    let _guard = ConnGuard {
+        hub: hub.clone(),
+        name: name.to_owned(),
+        epoch,
+        client: client.clone(),
+    };
     let why = loop {
         match events.recv().await {
             StreamItem::Data(d) => {
                 if lines.push(&d).terminals && !hub.observe(name, epoch, &lines, None) {
                     return Outcome::wait(MachineState::Paused);
                 }
+                let now = sizes_of(&lines);
+                sizes.send_if_modified(|s| {
+                    if **s == now {
+                        false
+                    } else {
+                        *s = Arc::new(now);
+                        true
+                    }
+                });
             }
             StreamItem::Closed(_) => break "herdr-core ended the event stream".to_owned(),
             StreamItem::Lost => {

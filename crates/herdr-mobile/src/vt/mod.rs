@@ -33,14 +33,12 @@
 //! | 14 | how many more codepoints the grapheme has (combining marks, ZWJ parts) |
 //! | 15 | reserved, 0 |
 
-// The terminal view (M2.2) and input (M2.3) call the grid and the key
-// encoder; until then only the tests do.
 #[cfg_attr(not(test), allow(dead_code))]
 mod ffi;
+// The cell grid in herdr-app's form, for the golden tests.
 #[cfg_attr(not(test), allow(dead_code))]
 mod grid;
-#[cfg_attr(not(test), allow(dead_code))]
-mod keys;
+pub(crate) mod keys;
 
 use std::ffi::c_void;
 use std::fmt;
@@ -51,9 +49,13 @@ pub const CELL_LEN: usize = 16;
 pub const FLAG_FULL: u8 = 1;
 pub const FLAG_CURSOR: u8 = 2;
 pub const FLAG_LIVE: u8 = 4;
+// The cursor shapes Kotlin draws; named here for the format's sake.
+#[allow(dead_code)]
 pub const SHAPE_BAR: u8 = 0;
 pub const SHAPE_BLOCK: u8 = 1;
+#[allow(dead_code)]
 pub const SHAPE_UNDERLINE: u8 = 2;
+#[allow(dead_code)]
 pub const SHAPE_BLOCK_HOLLOW: u8 = 3;
 pub const COLOR_SET: u32 = 0x0100_0000;
 pub const ATTR_BOLD: u8 = 1;
@@ -160,6 +162,7 @@ impl Terminal {
         unsafe { ffi::ghostty_terminal_vt_write(self.terminal, bytes.as_ptr(), bytes.len()) }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn size(&self) -> (u16, u16) {
         (self.cols, self.rows)
     }
@@ -370,7 +373,8 @@ impl Terminal {
             while written < self.cols && ffi::ghostty_render_state_row_cells_next(self.cells) {
                 let raw: ffi::Cell = self.cells_get("cell", ffi::CELLS_DATA_RAW)?;
                 let wide: i32 = cell_get(raw, "cell width", ffi::CELL_DATA_WIDE)?;
-                let spacer = wide == ffi::CELL_WIDE_SPACER_TAIL || wide == ffi::CELL_WIDE_SPACER_HEAD;
+                let spacer =
+                    wide == ffi::CELL_WIDE_SPACER_TAIL || wide == ffi::CELL_WIDE_SPACER_HEAD;
                 let grapheme = if spacer { Vec::new() } else { self.grapheme()? };
                 let cp = grapheme.first().copied().unwrap_or(0);
                 // At most 255 extra codepoints per cell; longer clusters are cut.
@@ -581,7 +585,11 @@ mod tests {
             let y = u16_at(b, at);
             at += 2;
             let cells: Vec<[u8; CELL_LEN]> = (0..cols)
-                .map(|c| b[at + c * CELL_LEN..at + (c + 1) * CELL_LEN].try_into().unwrap())
+                .map(|c| {
+                    b[at + c * CELL_LEN..at + (c + 1) * CELL_LEN]
+                        .try_into()
+                        .unwrap()
+                })
                 .collect();
             at += cols * CELL_LEN;
             let mut text = Vec::new();
@@ -737,7 +745,10 @@ mod tests {
             enum_value("GhosttyCellWide", "SPACER_TAIL"),
             ffi::CELL_WIDE_SPACER_TAIL
         );
-        assert_eq!(size("GhosttyTerminalScrollbar"), size_of::<ffi::Scrollbar>());
+        assert_eq!(
+            size("GhosttyTerminalScrollbar"),
+            size_of::<ffi::Scrollbar>()
+        );
         assert_eq!(
             size("GhosttyTerminalScrollViewport"),
             size_of::<ffi::ScrollViewport>()
@@ -746,11 +757,12 @@ mod tests {
             offset("GhosttyTerminalScrollViewport", "value"),
             std::mem::offset_of!(ffi::ScrollViewport, value)
         );
-        for (k, ours) in [
-            ("BOTTOM", ffi::SCROLL_BOTTOM),
-            ("DELTA", ffi::SCROLL_DELTA),
-        ] {
-            assert_eq!(enum_value("GhosttyTerminalScrollViewportTag", k), ours, "{k}");
+        for (k, ours) in [("BOTTOM", ffi::SCROLL_BOTTOM), ("DELTA", ffi::SCROLL_DELTA)] {
+            assert_eq!(
+                enum_value("GhosttyTerminalScrollViewportTag", k),
+                ours,
+                "{k}"
+            );
         }
         for (k, ours) in [
             ("SCROLLBAR", ffi::TERMINAL_DATA_SCROLLBAR),
@@ -890,10 +902,17 @@ mod tests {
         assert_eq!(text[1], "\u{1f469}\u{200d}\u{1f4bb}");
         assert_eq!(f.rows_sent[0].1[1][13], 1, "the sequence is wide");
         assert_eq!(text[2], "", "its spacer has no text");
-        let flag = text.iter().position(|c| c.starts_with('\u{1f1f3}')).unwrap();
+        let flag = text
+            .iter()
+            .position(|c| c.starts_with('\u{1f1f3}'))
+            .unwrap();
         assert_eq!(text[flag], "\u{1f1f3}\u{1f1f1}");
         assert!(text.contains(&"x".to_owned()));
-        assert_eq!(cp(&f.rows_sent[0].1[0]), u32::from('e'), "base codepoint stays first");
+        assert_eq!(
+            cp(&f.rows_sent[0].1[0]),
+            u32::from('e'),
+            "base codepoint stays first"
+        );
     }
 
     #[test]
@@ -908,7 +927,10 @@ mod tests {
     }
 
     fn numbered(n: usize) -> Vec<u8> {
-        (0..n).map(|i| format!("line {i}\r\n")).collect::<String>().into_bytes()
+        (0..n)
+            .map(|i| format!("line {i}\r\n"))
+            .collect::<String>()
+            .into_bytes()
     }
 
     #[test]
@@ -923,7 +945,11 @@ mod tests {
         t.scroll(-10);
         let f = parse(&t.frame().unwrap());
         assert_eq!(f.flags & FLAG_LIVE, 0, "scrolled up");
-        assert_eq!(f.flags & FLAG_FULL, FLAG_FULL, "a scrolled view sends every row");
+        assert_eq!(
+            f.flags & FLAG_FULL,
+            FLAG_FULL,
+            "a scrolled view sends every row"
+        );
         assert_eq!(f.offset + 15, f.total);
         let top = f.texts[0].concat();
         assert!(top.starts_with("line "), "{top}");

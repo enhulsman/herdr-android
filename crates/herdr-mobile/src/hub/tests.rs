@@ -17,6 +17,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
 
+#[cfg(feature = "vt")]
+mod term;
+
 const WS: &str = "workstation";
 const SRV: &str = "server";
 const WS_KEY: &str = "SHA256:workstation-host-key";

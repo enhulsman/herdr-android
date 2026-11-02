@@ -148,7 +148,6 @@ pub const CELLS_DATA_FG_COLOR: c_int = 6;
 pub const CELLS_DATA_HAS_STYLING: c_int = 8;
 
 // GhosttyCellData
-pub const CELL_DATA_CODEPOINT: c_int = 1;
 pub const CELL_DATA_WIDE: c_int = 3;
 
 // GhosttyCellWide

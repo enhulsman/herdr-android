@@ -2,6 +2,9 @@ package dev.herdr.android.ui.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.dp
 
 // Mirrors colors.themes and colors.semantic in design-tokens.json (the herdr-app
 // presets run through resolve()). ThemeTokensTest compares every value with the
@@ -161,3 +164,9 @@ fun herdrColors(theme: ThemeName, contrast: Contrast = Contrast.Default): HerdrC
  * come from the herdr-app presets; the renders are the contract for it.
  */
 val HerdrScrim = Color(0x80000000)
+
+/**
+ * The one shadow (shadows.chip in design-tokens.json, `0 6 20 #00000066`): the
+ * floating chip over the terminal. Same in both themes.
+ */
+val HerdrChipShadow = Shadow(radius = 20.dp, color = Color(0x66000000), offset = DpOffset(0.dp, 6.dp))

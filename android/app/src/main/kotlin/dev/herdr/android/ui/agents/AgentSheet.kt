@@ -121,7 +121,7 @@ fun BoxScope.AgentSheet(sheet: AgentSheetUi, clock: State<Long>, onClose: () -> 
 
 /** `.pill`: 22 dp, radius 6, 12.5/600 in the state's colour on 15% of it; none without a state. */
 @Composable
-private fun StatePill(text: String, tone: SheetTone) {
+fun StatePill(text: String, tone: SheetTone) {
     val c = HerdrTheme.colors
     val color: Color = when (tone) {
         SheetTone.NeedsYou -> c.blocked

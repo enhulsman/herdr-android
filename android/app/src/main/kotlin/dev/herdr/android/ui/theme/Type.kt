@@ -76,7 +76,7 @@ object HerdrType {
     val keysRow = mono(13.5f)
     val fingerprint = mono(13.5f, lineHeight = 1.6f)
 
-    /** Typing at phone size: about 56 columns on 412 dp. */
+    /** Typing at phone size: about 53 columns on 412 dp inside the terminal padding; also the readable size watching zooms up to. */
     val terminalPhone = mono(12.2f, lineHeight = 1.25f)
 
     /** Watching at desk size: size set at run time to width / (cols * 0.6). */

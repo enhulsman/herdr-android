@@ -181,4 +181,49 @@
     <string name="phone_key_clip_label">authorized_keys line</string>
     <!-- %1$s is why, from KeyManager. -->
     <string name="phone_key_unavailable">The phone key is not available: %1$s</string>
+
+    <!-- The terminal screen (renders 3, 4, 4b, 5). -->
+    <!-- The queue strip: how many other agents need you, then the next one. -->
+    <plurals name="terminal_queue_count">
+        <item quantity="one">%d more needs you</item>
+        <item quantity="other">%d more need you</item>
+    </plurals>
+    <!-- %1$s is the next agent's name, %2$s its kind of request in lower case ("question"). -->
+    <string name="terminal_queue_next">· next: %1$s, %2$s</string>
+    <string name="terminal_queue_next_plain">· next: %1$s</string>
+    <string name="terminal_queue_open">Open the next agent that needs you</string>
+    <!-- The watching chip: the first word stands out. %1$d x %2$d is the desk's size. -->
+    <string name="terminal_watching">Watching</string>
+    <string name="terminal_watching_rest">at desk size %1$d×%2$d · tap to type</string>
+    <string name="terminal_phone_size">phone size %1$d×%2$d</string>
+    <string name="terminal_live">Live</string>
+    <!-- %1$s is the machine. -->
+    <string name="terminal_waiting">Waiting for %1$s</string>
+    <string name="terminal_attaching">Opening the terminal</string>
+    <string name="terminal_ended">The terminal ended</string>
+    <!-- %1$s is the reason herdr gave. -->
+    <string name="terminal_ended_reason">The terminal ended: %1$s</string>
+    <!-- %1$s is why; the app tries again by itself. -->
+    <string name="terminal_failed">Could not open the terminal: %1$s. Trying again.</string>
+    <string name="terminal_select_title">Select text to copy</string>
+    <string name="terminal_select_done">Done</string>
+    <!-- Screen reader labels for the terminal and the keys row. -->
+    <string name="terminal_label">Terminal</string>
+    <string name="key_esc">Escape. Hold to interrupt</string>
+    <string name="key_tab">Tab</string>
+    <string name="key_ctrl">Control</string>
+    <string name="key_alt">Alt</string>
+    <string name="key_left">Left</string>
+    <string name="key_down">Down</string>
+    <string name="key_up">Up</string>
+    <string name="key_right">Right</string>
+    <string name="key_enter">Enter</string>
+    <string name="key_ctrl_c">Control C</string>
+    <string name="key_compose">Compose</string>
+    <string name="key_shelf">More keys. Swipe up on the keys row</string>
+    <!-- The compose sheet (render 5). %1$s is the agent's name. -->
+    <string name="compose_title">Compose</string>
+    <string name="compose_to">to %1$s</string>
+    <string name="compose_hint">Pasted into the terminal. Enter is yours.</string>
+    <string name="compose_paste">Paste</string>
 </resources>

@@ -18,6 +18,8 @@ import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.SignException
 import uniffi.herdr_mobile.SshSigner
+import uniffi.herdr_mobile.TerminalListener
+import uniffi.herdr_mobile.TerminalView
 import uniffi.herdr_mobile.UniffiLib
 import uniffi.herdr_mobile.uniffiCallbackInterfaceHubListener
 import uniffi.herdr_mobile.uniffiCallbackInterfaceSshSigner
@@ -258,5 +260,14 @@ class FakeHub : HubInterface {
     override fun retry() { calls += "retry" }
     override fun snapshot(): HubSnapshot = HubSnapshot(emptyList(), emptyList(), emptyList(), null)
     override fun suspend() { calls += "suspend" }
+
+    /** The terminal screen opens terminals through TerminalOpener, faked in its own tests. */
+    override fun openTerminal(
+        machine: String,
+        address: String,
+        phoneCols: UShort,
+        phoneRows: UShort,
+        listener: TerminalListener,
+    ): TerminalView = error("FakeHub does not open terminals")
     override fun updateMachine(name: String, host: String, port: UShort, user: String) { calls += "update $name" }
 }

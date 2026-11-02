@@ -266,6 +266,13 @@ class ThemeTokensTest {
         for ((key, value) in sizes) assertEquals("layout.$key", layout.getDouble(key).toFloat().dp, value)
     }
 
+    @Test
+    fun terminalPaddingMatchesTheTokens() {
+        val padding = tokens.getJSONObject("layout").getJSONObject("terminalPadding")
+        assertEquals(padding.getDouble("x").toFloat().dp, HerdrLayout.terminalPaddingX)
+        assertEquals(padding.getDouble("y").toFloat().dp, HerdrLayout.terminalPaddingTop)
+    }
+
     private fun em(value: String): TextUnit = value.removeSuffix("em").toFloat().em
 
     @Test

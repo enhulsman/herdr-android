@@ -2,7 +2,6 @@ package dev.herdr.android.ui.agents
 
 import android.provider.Settings
 import android.text.format.DateFormat
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -13,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.ui.components.rememberWallClock
 import dev.herdr.android.ui.flows.MachineFlows
+import dev.herdr.android.ui.terminal.TerminalRoute
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -20,7 +20,8 @@ import java.util.Locale
 
 /**
  * The Agents home fed by the app's hub, [flows] (Machines, Add machine) and
- * [home] (the sheet, "Other terminals"). One clock ticks each second while the
+ * [home] (the open terminal, "Other terminals"). An open agent shows its
+ * terminal screen (TerminalRoute) in place of the list. One clock ticks each second while the
  * screen is started; only the ages read it every tick, and the rows are
  * rebuilt once a minute for "last connected".
  */
@@ -38,11 +39,9 @@ fun AgentsRoute(app: HerdrApp, flows: MachineFlows, home: AgentsHome) {
     val ui = remember(snapshot, startError, minute, res, time) {
         agentsUi(snapshot, Snapshot.withoutReadObservation { clock.value }, res, time, startError)
     }
-    val sheet = home.openKey?.let { agentSheet(ui, it, res) }
     val spin = remember(context) {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
     }
-    BackHandler(enabled = sheet != null) { home.close() }
     val actions = remember(flows, home, app) {
         AgentsActions(
             onMachines = flows::openMachines,
@@ -53,7 +52,13 @@ fun AgentsRoute(app: HerdrApp, flows: MachineFlows, home: AgentsHome) {
             onRetry = app.hubHost::retry,
         )
     }
-    AgentsScreen(ui, home.othersExpanded, sheet, clock, spin, actions)
+    // Since M2 an agent opens its live terminal; the M1 read-only sheet is no longer shown.
+    val open = home.openKey
+    if (open != null) {
+        TerminalRoute(app, home, open)
+    } else {
+        AgentsScreen(ui, home.othersExpanded, null, clock, spin, actions)
+    }
 }
 
 /** "14:05", or "2:05 PM" when the phone uses a 12-hour clock. */

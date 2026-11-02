@@ -45,6 +45,7 @@ enum class Chevron(val points: List<Offset>) {
     Left(listOf(Offset(15f, 5f), Offset(8f, 12f), Offset(15f, 19f))),
     Right(listOf(Offset(9f, 5f), Offset(16f, 12f), Offset(9f, 19f))),
     Down(listOf(Offset(6f, 9f), Offset(12f, 15f), Offset(18f, 9f))),
+    Up(listOf(Offset(6f, 15f), Offset(12f, 9f), Offset(18f, 15f))),
 }
 
 @Composable

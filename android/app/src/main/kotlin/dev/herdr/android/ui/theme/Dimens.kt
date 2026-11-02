@@ -54,4 +54,8 @@ object HerdrLayout {
     val keysRowHeight = 48.dp
     val sectionHeaderHeight = 40.dp
     val rowMinHeight = 64.dp
+
+    /** The terminal grid's padding, painted in the terminal background (the Mac pane's, layout.terminalPadding). */
+    val terminalPaddingX = 10.dp
+    val terminalPaddingTop = 6.dp
 }

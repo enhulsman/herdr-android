@@ -141,8 +141,7 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
         }
         MachineState.NetworkOff -> {
             detail = res.getString(R.string.status_network_off_detail)
-            // Without a countdown the hub waits for the permission itself.
-            listOfNotNull(s(R.string.status_network_off), retrying.takeIf { m.nextRetryMs != null })
+            listOf(s(R.string.status_network_off), retrying)
         }
     }
     return MachineCardUi(

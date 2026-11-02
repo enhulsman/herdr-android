@@ -18,16 +18,10 @@ import uniffi.herdr_mobile.HubSnapshot
  * [startError], and [ensureStarted] (every return to the foreground) and
  * [retry] try again, connecting it only while the app is resumed. A hub that
  * started is never created twice.
- *
- * [networkAllowed] reads GrapheneOS's Network permission. The hub hears it
- * before every resume, on every return to the foreground and on [retry]: with
- * it off the name lookup fails before any socket is refused, so the hub
- * could not tell the cause itself.
  */
 class HubHost(
     private val createHub: (HubListener) -> HubInterface,
     private val mainExecutor: Executor,
-    private val networkAllowed: () -> Boolean = { true },
 ) : AutoCloseable {
     private val state = MutableStateFlow(EMPTY)
     val snapshot: StateFlow<HubSnapshot> = state.asStateFlow()
@@ -75,10 +69,7 @@ class HubHost(
 
     fun resume() {
         resumed = true
-        start()?.let {
-            it.setNetworkAllowed(networkAllowed())
-            it.resume()
-        }
+        start()?.resume()
     }
 
     fun suspend() {
@@ -89,23 +80,14 @@ class HubHost(
     /** Starts a hub that failed to start, connecting it if the app is resumed; a running hub is left alone. */
     @Synchronized
     fun ensureStarted() {
-        hub?.let {
-            it.setNetworkAllowed(networkAllowed())
-            return
-        }
+        if (hub != null) return
         val started = start() ?: return
-        started.setNetworkAllowed(networkAllowed())
         if (resumed) started.resume()
     }
 
     fun retry() {
         val running = hub
-        if (running == null) {
-            ensureStarted()
-        } else {
-            running.setNetworkAllowed(networkAllowed())
-            running.retry()
-        }
+        if (running == null) ensureStarted() else running.retry()
     }
 
     @Synchronized

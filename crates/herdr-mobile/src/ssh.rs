@@ -209,18 +209,35 @@ pub(crate) fn ssh_signature_from_der(der: &[u8]) -> Result<Vec<u8>, SshError> {
     signature.encode_vec().map_err(key_error)
 }
 
+const EPERM: i32 = 1;
+const EACCES: i32 = 13;
+
 /// Maps a failed connect. EPERM and EACCES mean the OS refused the socket,
-/// which on GrapheneOS is the per-app Network permission being off.
+/// which on GrapheneOS is the per-app Network permission being off. With it
+/// off, GrapheneOS usually fails the name lookup first and tells the app the
+/// permission is granted, so any other IO failure asks for a socket too.
 pub(crate) fn connect_error(e: russh::Error) -> SshError {
-    const EPERM: i32 = 1;
-    const EACCES: i32 = 13;
+    connect_error_probing(e, sockets_refused)
+}
+
+fn connect_error_probing(e: russh::Error, refused: impl FnOnce() -> bool) -> SshError {
     match &e {
         russh::Error::IO(io) if matches!(io.raw_os_error(), Some(EPERM | EACCES)) => {
             SshError::NetworkPermissionOff
         }
+        russh::Error::IO(_) if refused() => SshError::NetworkPermissionOff,
         _ => SshError::Connect {
             detail: e.to_string(),
         },
+    }
+}
+
+/// Whether the OS refuses this app a network socket: a UDP socket bound to
+/// any local port, closed at once, nothing sent.
+fn sockets_refused() -> bool {
+    match std::net::UdpSocket::bind(("0.0.0.0", 0)) {
+        Ok(_) => false,
+        Err(e) => matches!(e.raw_os_error(), Some(EPERM | EACCES)),
     }
 }
 
@@ -517,6 +534,36 @@ mod tests {
             SshError::NetworkPermissionOff.to_string(),
             "Network permission is off"
         );
+    }
+
+    // GrapheneOS answers the app's own permission check with "granted" and
+    // fails the name lookup instead, so a failed connect asks the OS for a
+    // socket: a refused one means the Network permission is off.
+    #[test]
+    fn a_failed_lookup_with_sockets_refused_means_network_permission_off() {
+        let lookup = || {
+            russh::Error::IO(std::io::Error::other(
+                "failed to lookup address information: No address associated with hostname",
+            ))
+        };
+        assert!(matches!(
+            connect_error_probing(lookup(), || true),
+            SshError::NetworkPermissionOff
+        ));
+        assert!(matches!(
+            connect_error_probing(lookup(), || false),
+            SshError::Connect { .. }
+        ));
+        // Not an IO failure: nothing to ask.
+        assert!(matches!(
+            connect_error_probing(russh::Error::Disconnect, || true),
+            SshError::Connect { .. }
+        ));
+    }
+
+    #[test]
+    fn here_sockets_are_not_refused() {
+        assert!(!sockets_refused());
     }
 
     #[test]

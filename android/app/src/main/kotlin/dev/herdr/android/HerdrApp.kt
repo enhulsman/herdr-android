@@ -1,10 +1,8 @@
 package dev.herdr.android
 
-import android.Manifest
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.Application
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import dev.herdr.android.hub.BiometricPromptHost
@@ -62,9 +60,6 @@ class HerdrApp : Application() {
                 Hub(hubDirectory().path, keyManager.publicKey(), keyManager.signer(), listener)
             },
             mainExecutor = mainExecutor,
-            networkAllowed = {
-                checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED
-            },
         )
         userAuth = UserAuthGate(retry = hubHost::retry)
         hubHost.addSnapshotListener(userAuth::onSnapshot)

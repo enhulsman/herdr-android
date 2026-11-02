@@ -196,12 +196,6 @@ impl Hub {
         self.core.suspend();
     }
 
-    /// GrapheneOS's Network permission as the app reads it, before every
-    /// `resume`: off, every machine says so and nothing dials.
-    pub fn set_network_allowed(&self, allowed: bool) {
-        self.core.set_network_allowed(allowed);
-    }
-
     /// Try again now, after a fingerprint prompt or when the person asks.
     pub fn retry(&self) {
         self.core.retry();

@@ -191,10 +191,8 @@ class MachineStatusTest {
 
     @Test
     fun networkOffSaysSoInsteadOfConnectionFailed() {
-        // The app's own permission check: the hub waits for the permission,
-        // no countdown and no "retrying".
         val c = card(MachineState.NetworkOff)
-        assertEquals("Network permission is off", c.statusText)
+        assertEquals("Network permission is off · retrying", c.statusText)
         assertEquals("Allow Network for herdr in Android settings.", c.detail)
     }
 

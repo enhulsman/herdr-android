@@ -1,0 +1,7 @@
+# Global uniffi-bindgen config for the Kotlin bindings (scripts/build-rust-android.sh).
+#
+# TerminalView.close detaches the open terminal; in Kotlin the generated class
+# also implements AutoCloseable.close (which frees the Rust object), and two
+# close() methods do not compile. Kotlin calls it detach().
+[crates.herdr_mobile.bindings.kotlin.rename]
+"TerminalView.close" = "detach"

@@ -52,10 +52,17 @@
     <string name="machines_phone_key_detail">Needs your fingerprint or screen lock, then valid 30 min</string>
     <string name="machines_export">Export machine list</string>
     <string name="machines_export_detail">Without keys</string>
+    <!-- The export row, disabled while the list is empty. -->
+    <string name="machines_export_detail_empty">No machines to export yet</string>
     <string name="machines_import">Import machine list</string>
     <string name="machines_import_detail">Adds machines you don\'t have yet</string>
     <!-- The file name the export's file picker suggests. -->
     <string name="machines_export_file_name" translatable="false">herdr-machines.json</string>
+    <!-- Remove machine: the card's last row and its confirm (drawn like render 8's dialog). %1$s is the machine's name. -->
+    <string name="machines_remove">Remove machine</string>
+    <string name="remove_title">Remove %1$s?</string>
+    <string name="remove_body">The app forgets this machine, its trusted host key and which agents you have seen there. Its phone key line stays on the machine until you delete it there.</string>
+    <string name="remove_confirm">Remove</string>
 
     <!-- The inline notice under "This phone" after an export or import (TransferNoticeTest). -->
     <string name="transfer_exported">Machine list exported, without keys or host keys.</string>

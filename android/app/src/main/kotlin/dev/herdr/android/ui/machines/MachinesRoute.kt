@@ -70,6 +70,11 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     val machines = remember(snapshot, startError, tick, res) {
         machinesUi(snapshot, startError, Snapshot.withoutReadObservation { clock.value }, res)
     }
-    val ui = machines.copy(transfer = transferResult?.let { transferNotice(it, res) })
+    val ui = machines.copy(
+        transfer = transferResult?.let { transferNotice(it, res) },
+        removing = flows.removing,
+        // A trust dialog over this screen shows its own error.
+        error = flows.error.takeIf { flows.trusting == null },
+    )
     MachinesScreen(ui, actions)
 }

@@ -215,7 +215,7 @@ class HubHostTest {
 class FakeHub : HubInterface {
     val calls = mutableListOf<String>()
 
-    /** Thrown by the next add, confirm, forget or import, as the hub would refuse it. */
+    /** Thrown by the next add, confirm, forget, remove or import, as the hub would refuse it. */
     var refuse: Exception? = null
 
     private fun refused() = refuse?.let { refuse = null; throw it }
@@ -248,7 +248,10 @@ class FakeHub : HubInterface {
         return importAdds
     }
     override fun markSeen(machine: String, address: String) { calls += "seen $machine $address" }
-    override fun removeMachine(name: String) { calls += "remove $name" }
+    override fun removeMachine(name: String) {
+        refused()
+        calls += "remove $name"
+    }
     override fun resume() { calls += "resume" }
     override fun retry() { calls += "retry" }
     override fun snapshot(): HubSnapshot = HubSnapshot(emptyList(), emptyList(), emptyList(), null)

@@ -362,6 +362,75 @@ class MachineFlowsTest {
         assertEquals(listOf("add workstation workstation.example.org 22 dev"), hub.calls)
     }
 
+    // Remove machine (owner approved, 2026-11-02): the card's action asks first;
+    // only the confirm's Remove calls the hub, Cancel, back and the scrim call nothing.
+
+    @Test
+    fun removeAsksFirstAndRemovesOnlyAfterTheConfirm() {
+        flows.openMachines()
+        publish(machine("workstation", MachineState.Connecting), machine("server", MachineState.Connecting))
+        val actions = flows.actions(MachinesActions.Preview)
+        actions.onRemove("server")
+        assertEquals("server", flows.removing)
+        assertTrue(hub.calls.isEmpty())
+
+        actions.onConfirmRemove()
+        assertEquals(listOf("remove server"), hub.calls)
+        assertNull(flows.removing)
+        assertNull(flows.error)
+        assertEquals(Screen.Machines, flows.screen)
+    }
+
+    @Test
+    fun cancellingTheRemoveConfirmCallsNothing() {
+        flows.openMachines()
+        publish(machine("workstation", MachineState.Connecting))
+        val actions = flows.actions(MachinesActions.Preview)
+        actions.onRemove("workstation")
+        actions.onCancelRemove()
+        assertNull(flows.removing)
+        // A late Remove after Cancel does nothing either.
+        flows.remove()
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test
+    fun backClosesTheRemoveConfirmWithoutRemoving() {
+        flows.openMachines()
+        publish(machine("workstation", MachineState.Connecting))
+        flows.askRemove("workstation")
+        assertTrue(flows.back())
+        assertNull(flows.removing)
+        assertEquals(Screen.Machines, flows.screen)
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test
+    fun aRefusedRemoveClosesTheConfirmAndKeepsTheHubsReason() {
+        flows.openMachines()
+        publish(machine("workstation", MachineState.Connecting))
+        flows.askRemove("workstation")
+        hub.refuse = HubException.Storage("Could not save the machine list: disk full")
+        flows.remove()
+        assertNull(flows.removing)
+        assertEquals("Could not save the machine list: disk full", flows.error)
+        assertTrue(hub.calls.isEmpty())
+        // Asking again starts clean.
+        flows.askRemove("workstation")
+        assertNull(flows.error)
+    }
+
+    @Test
+    fun theRemoveConfirmClosesWhenTheMachineIsGone() {
+        flows.openMachines()
+        publish(machine("workstation", MachineState.Connecting))
+        flows.askRemove("workstation")
+        publish()
+        assertNull(flows.removing)
+        flows.remove()
+        assertTrue(hub.calls.isEmpty())
+    }
+
     @Test
     fun anIpv6HostIsBracketedBeforeThePort() {
         val s = publish(machine("server", unconfirmed, host = "2001:db8::10", port = 2200u))

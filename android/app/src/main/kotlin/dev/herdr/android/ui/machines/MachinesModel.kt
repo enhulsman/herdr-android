@@ -48,8 +48,16 @@ data class MachinesUi(
     /** A storage problem from the hub. */
     val notice: String?,
     val phoneKeyDetail: String,
+    /** Export needs a machine to export: dim and not tappable while the list is empty. */
+    val canExport: Boolean,
+    /** The export row's second line: "Without keys", or why it is disabled. */
+    val exportDetail: String,
     /** How the last export or import went, under the "This phone" card. */
     val transfer: TransferNoticeUi? = null,
+    /** The machine whose Remove confirm is open. */
+    val removing: String? = null,
+    /** Why the hub refused the last remove, in the notice style. */
+    val error: String? = null,
 )
 
 /** [startError]: why the hub (and with it the phone key) could not start, from HubHost. */
@@ -58,6 +66,10 @@ fun machinesUi(snapshot: HubSnapshot, startError: String?, nowMs: Long, res: Res
         machines = snapshot.machines.map { machineCard(it, nowMs, res) },
         notice = snapshot.notice,
         phoneKeyDetail = startError ?: res.getString(R.string.machines_phone_key_detail),
+        canExport = snapshot.machines.isNotEmpty(),
+        exportDetail = res.getString(
+            if (snapshot.machines.isNotEmpty()) R.string.machines_export_detail else R.string.machines_export_detail_empty,
+        ),
     )
 
 private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCardUi {

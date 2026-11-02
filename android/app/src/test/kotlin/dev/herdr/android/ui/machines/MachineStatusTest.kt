@@ -3,7 +3,9 @@ package dev.herdr.android.ui.machines
 import android.content.res.Resources
 import dev.herdr.android.hub.snapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -225,6 +227,20 @@ class MachineStatusTest {
     fun aHubThatCouldNotStartShowsWhyOnThePhoneKeyRow() {
         val ui = machinesUi(snapshot(), "The phone's key store could not be opened: locked", NOW, res)
         assertEquals("The phone's key store could not be opened: locked", ui.phoneKeyDetail)
+    }
+
+    @Test
+    fun withNoMachinesTheExportRowIsDisabledAndSaysWhy() {
+        val ui = machinesUi(snapshot(), null, NOW, res)
+        assertFalse(ui.canExport)
+        assertEquals("No machines to export yet", ui.exportDetail)
+    }
+
+    @Test
+    fun withMachinesTheExportRowExportsWithoutKeys() {
+        val ui = machinesUi(snapshot("workstation" to MachineState.Connecting), null, NOW, res)
+        assertTrue(ui.canExport)
+        assertEquals("Without keys", ui.exportDetail)
     }
 
     private companion object {

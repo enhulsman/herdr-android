@@ -14,14 +14,16 @@ import uniffi.herdr_mobile.HubSnapshot
 
 // The read-only agent sheet (M1 pick 1b, decisions.md 2026-11-01): opening an
 // agent marks it seen through the hub, so "finished, unseen" clears (agent-list
-// spec: "finished, unseen -> opened on the phone -> idle on the phone"). Only
-// opening marks: a finish while the sheet is open is not. "Other terminals"
-// starts collapsed.
+// spec: "finished, unseen -> opened on the phone -> idle on the phone"). A
+// finish while the sheet is open counts as seen only while the app is in the
+// foreground, as herdr-app's "looking" (model.rs set_word); in the background
+// it stays unseen until the person is back. "Other terminals" starts collapsed.
 class AgentsHomeTest {
     private val hub = FakeHub()
     private lateinit var listener: HubListener
     private val hubHost = HubHost(createHub = { listener = it; hub }, mainExecutor = Executor { it.run() })
-    private val home = AgentsHome(hubHost)
+    private var foreground = true
+    private val home = AgentsHome(hubHost) { foreground }
 
     init {
         hubHost.start()
@@ -67,14 +69,70 @@ class AgentsHomeTest {
     }
 
     @Test
-    fun aFinishWhileTheSheetIsOpenIsNotMarkedSeen() {
-        // Only opening counts as seeing (agent-list spec): the hub stays connected for
-        // 60 s after the app leaves the foreground, so a later finish may go unwatched.
+    fun aFinishWhileTheSheetIsOpenInTheForegroundIsMarkedSeen() {
+        // The person is looking at it (herdr-app model.rs: a finish counts as seen when you look at it).
         publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING))))
         home.open(AgentKey("workstation", "t1"))
         publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
-        assertEquals(listOf("seen workstation t1"), hub.calls)
+        // One for opening, one for the finish.
+        assertEquals(listOf("seen workstation t1", "seen workstation t1"), hub.calls)
         assertEquals(AgentKey("workstation", "t1"), home.openKey)
+        // The hub may report the finish again before it turns idle: still one mark.
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        assertEquals(2, hub.calls.size)
+    }
+
+    @Test
+    fun aFinishWhileTheSheetIsOpenInTheBackgroundIsNotMarkedSeen() {
+        // The hub stays connected for 60 s after the app leaves the screen; nobody is looking.
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING))))
+        home.open(AgentKey("workstation", "t1"))
+        foreground = false
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        assertEquals(listOf("seen workstation t1"), hub.calls)
+    }
+
+    @Test
+    fun returningToTheForegroundOnAnOpenFinishedUnseenAgentMarksItSeenOnce() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING))))
+        home.open(AgentKey("workstation", "t1"))
+        foreground = false
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        foreground = true
+        home.onForeground()
+        assertEquals(listOf("seen workstation t1", "seen workstation t1"), hub.calls)
+        // Neither the next snapshot nor another return marks it again.
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        home.onForeground()
+        assertEquals(2, hub.calls.size)
+    }
+
+    @Test
+    fun returningToTheForegroundMarksNothingWhenTheOpenAgentHasNotFinished() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING))))
+        home.open(AgentKey("workstation", "t1"))
+        foreground = false
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.NEEDS_YOU))))
+        foreground = true
+        home.onForeground()
+        assertEquals(listOf("seen workstation t1"), hub.calls)
+    }
+
+    @Test
+    fun returningToTheForegroundWithNoSheetOpenMarksNothing() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        home.onForeground()
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test
+    fun aSecondFinishWhileStillOpenIsMarkedAgain() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        home.open(AgentKey("workstation", "t1"))
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING))))
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.DONE))))
+        assertEquals(listOf("seen workstation t1", "seen workstation t1"), hub.calls)
     }
 
     @Test

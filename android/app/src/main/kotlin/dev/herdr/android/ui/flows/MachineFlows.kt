@@ -42,6 +42,9 @@ enum class Screen {
  * forgetting the old key, and only after [askForget]'s second confirm. After
  * forgetting, nothing opens the trust dialog by itself: the machine's card
  * offers it as for any first connection.
+ *
+ * Removing a machine asks first ([askRemove]); only the confirm's Remove
+ * calls the hub, and a refusal is kept in [error] for the Machines screen.
  */
 class MachineFlows(private val hubHost: HubHost) {
     var screen by mutableStateOf(Screen.Agents)
@@ -68,6 +71,10 @@ class MachineFlows(private val hubHost: HubHost) {
     var confirmingForget by mutableStateOf(false)
         private set
 
+    /** The machine whose Remove confirm is open on the Machines screen. */
+    var removing by mutableStateOf<String?>(null)
+        private set
+
     /** Why the last hub call failed, shown where it was made. */
     var error by mutableStateOf<String?>(null)
         private set
@@ -80,6 +87,9 @@ class MachineFlows(private val hubHost: HubHost) {
         onAddPhoneKey = { name -> show(Screen.PhoneKey, name) },
         onPhoneKey = { show(Screen.PhoneKey, null) },
         onAddMachine = { show(Screen.AddMachine, null) },
+        onRemove = ::askRemove,
+        onConfirmRemove = ::remove,
+        onCancelRemove = ::cancelRemove,
     )
 
     /** The Agents home's Machines button and machine notices. */
@@ -93,6 +103,7 @@ class MachineFlows(private val hubHost: HubHost) {
         machine = about
         waitingFor = null
         confirmingForget = false
+        removing = null
         error = null
     }
 
@@ -134,6 +145,9 @@ class MachineFlows(private val hubHost: HubHost) {
         }
         if (screen == Screen.HostKeyChanged && hostKeyChange(snapshot, machine) == null) {
             show(Screen.Machines, null)
+        }
+        removing?.let { name ->
+            if (snapshot.machines.none { it.name == name }) removing = null
         }
     }
 
@@ -180,6 +194,28 @@ class MachineFlows(private val hubHost: HubHost) {
         if (call { it.forgetHostKey(name) }) show(Screen.Machines, null)
     }
 
+    /** The card's "Remove machine": opens the confirm; calls nothing. */
+    fun askRemove(name: String) {
+        error = null
+        removing = name
+    }
+
+    /** Cancel, the scrim or back: nothing is removed. */
+    fun cancelRemove() {
+        removing = null
+        error = null
+    }
+
+    /**
+     * The confirm's Remove: the hub forgets the machine, its trusted host key
+     * and its seen turns. The confirm closes either way; a refusal stays in [error].
+     */
+    fun remove() {
+        val name = removing ?: return
+        removing = null
+        call { it.removeMachine(name) }
+    }
+
     /** System back: closes a dialog first, then returns to Machines, then to the Agents home; false there. */
     fun back(): Boolean = when {
         trusting != null -> {
@@ -188,6 +224,10 @@ class MachineFlows(private val hubHost: HubHost) {
         }
         confirmingForget -> {
             cancelForget()
+            true
+        }
+        removing != null -> {
+            cancelRemove()
             true
         }
         screen == Screen.Machines -> {
@@ -224,7 +264,7 @@ class MachineFlows(private val hubHost: HubHost) {
     companion object {
         /** Keeps the flow across rotation and process death (the error is not kept). */
         fun saver(hubHost: HubHost): Saver<MachineFlows, Any> = listSaver(
-            save = { listOf(it.screen.name, it.machine, it.waitingFor, it.trusting, it.confirmingForget) },
+            save = { listOf(it.screen.name, it.machine, it.waitingFor, it.trusting, it.confirmingForget, it.removing) },
             restore = { saved ->
                 MachineFlows(hubHost).apply {
                     screen = Screen.valueOf(saved[0] as String)
@@ -232,6 +272,7 @@ class MachineFlows(private val hubHost: HubHost) {
                     waitingFor = saved[2] as String?
                     trusting = saved[3] as String?
                     confirmingForget = saved[4] as Boolean
+                    removing = saved[5] as String?
                 }
             },
         )

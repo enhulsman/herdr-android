@@ -105,15 +105,29 @@ class MachinesScreenshotTest {
 
     @Test fun importErrorPaper() = capture("machines-import-error-paper", dark = false, emptyList(), TransferResult.NotAList)
 
+    /** Remove machine's confirm (no signed-off render; drawn like render 8's dialog) over render 7. */
+    @Test fun removeGraphite() = capture("machines-remove-graphite", dark = true, render7, removing = "server")
+
+    @Test fun removePaper() = capture("machines-remove-paper", dark = false, render7, removing = "server")
+
+    /** A remove the hub refused: its reason in the notice style. */
+    @Test fun removeErrorGraphite() =
+        capture("machines-remove-error-graphite", dark = true, render7, error = "Could not save the machine list: disk full")
+
+    @Test fun removeErrorPaper() =
+        capture("machines-remove-error-paper", dark = false, render7, error = "Could not save the machine list: disk full")
+
     private fun capture(
         name: String,
         dark: Boolean,
         machines: List<MachineView>,
         transfer: TransferResult? = null,
         tall: Boolean = false,
+        removing: String? = null,
+        error: String? = null,
     ) {
         val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res)
-            .copy(transfer = transfer?.let { transferNotice(it, res) })
+            .copy(transfer = transfer?.let { transferNotice(it, res) }, removing = removing, error = error)
         if (tall) RuntimeEnvironment.setQualifiers("w412dp-h1400dp-xhdpi")
         captureRoboImage("src/test/snapshots/$name.png") {
             HerdrTheme(dark = dark) { MachinesScreen(ui, MachinesActions.Preview.copy(onBack = {})) }

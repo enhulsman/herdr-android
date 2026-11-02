@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -37,6 +38,10 @@ import androidx.compose.ui.unit.sp
 import dev.herdr.android.R
 import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
+import dev.herdr.android.ui.components.DialogButton
+import dev.herdr.android.ui.components.DialogButtons
+import dev.herdr.android.ui.components.DialogText
+import dev.herdr.android.ui.components.ModalDialog
 import dev.herdr.android.ui.components.OutlineButton
 import dev.herdr.android.ui.components.SubScreenTopBar
 import dev.herdr.android.ui.theme.HerdrBorder
@@ -57,7 +62,7 @@ import dev.herdr.android.ui.theme.HerdrType
 
 /**
  * What the screen can ask for. [onUnlock] and [onTryAgain] go to the hub
- * (hubActions); the host-key, phone-key and Add machine seams go to
+ * (hubActions); the host-key, phone-key, Add machine and Remove seams go to
  * MachineFlows; [onExport] and [onImport] open the system file picker
  * (MachinesRoute).
  */
@@ -74,6 +79,12 @@ data class MachinesActions(
     val onAddMachine: () -> Unit,
     val onExport: () -> Unit,
     val onImport: () -> Unit,
+    /** The card's "Remove machine", by machine name: opens the confirm. */
+    val onRemove: (String) -> Unit = {},
+    /** The confirm's Remove. */
+    val onConfirmRemove: () -> Unit = {},
+    /** The confirm's Cancel, or a tap on the scrim. */
+    val onCancelRemove: () -> Unit = {},
 ) {
     companion object {
         /** Does nothing; for screenshots and flows not built yet. */
@@ -89,15 +100,32 @@ private val caption = HerdrType.sectionHeader.copy(fontSize = 12.5.sp)
 @Composable
 fun MachinesScreen(ui: MachinesUi, actions: MachinesActions, modifier: Modifier = Modifier) {
     val c = HerdrTheme.colors
+    Box(modifier.fillMaxSize().background(c.chrome)) {
+        MachinesList(ui, actions)
+        ui.removing?.let { name ->
+            ModalDialog(stringResource(R.string.remove_title, name), onDismiss = actions.onCancelRemove) {
+                DialogText(stringResource(R.string.remove_body))
+                DialogButtons {
+                    DialogButton(stringResource(R.string.cancel), actions.onCancelRemove)
+                    DialogButton(stringResource(R.string.remove_confirm), actions.onConfirmRemove, solid = true)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MachinesList(ui: MachinesUi, actions: MachinesActions) {
+    val c = HerdrTheme.colors
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
-            .background(c.chrome)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState()),
     ) {
         SubScreenTopBar(stringResource(R.string.machines_title), stringResource(R.string.back), actions.onBack)
         ui.notice?.let { Notice(it) }
+        ui.error?.let { Notice(it, error = true, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         if (ui.machines.isEmpty()) {
             BasicText(
                 stringResource(R.string.machines_empty),
@@ -125,15 +153,15 @@ fun MachinesScreen(ui: MachinesUi, actions: MachinesActions, modifier: Modifier 
                 stringResource(R.string.machines_phone_key),
                 ui.phoneKeyDetail,
                 first = true,
-                // Render 7 draws this row without a chevron; it still opens the line.
-                chevron = false,
+                // Render 7 draws this row without a chevron; the owner asked for one (it opens the line).
                 onClick = actions.onPhoneKey,
             )
-            // Shown even with no machines: the spec makes export unconditional.
+            // Shown even with no machines (the spec makes export unconditional), but dim and inert until one exists.
             CardRow(
                 stringResource(R.string.machines_export),
-                stringResource(R.string.machines_export_detail),
-                onClick = actions.onExport,
+                ui.exportDetail,
+                onClick = actions.onExport.takeIf { ui.canExport },
+                enabled = ui.canExport,
             )
             // Always shown: it matters most on a fresh install's empty list.
             CardRow(
@@ -211,6 +239,8 @@ private fun MachineCard(machine: MachineCardUi, actions: MachinesActions) {
                 }
             }
         }
+        // Last on the card; opens a confirm, so no chevron.
+        CardRow(stringResource(R.string.machines_remove), null, chevron = false) { actions.onRemove(machine.name) }
     }
 }
 
@@ -240,7 +270,11 @@ private fun StatusLine(machine: MachineCardUi) {
     BasicText(text, style = HerdrType.secondary.copy(color = c.muted))
 }
 
-/** A row in a card: label over a dim second line, a chevron when it leads somewhere unless [chevron] says otherwise. */
+/**
+ * A row in a card: label over a dim second line, a chevron when it leads
+ * somewhere unless [chevron] says otherwise. A row not [enabled] draws its
+ * label in the dim text colour too, and screen readers hear it as disabled.
+ */
 @Composable
 private fun CardRow(
     label: String,
@@ -248,6 +282,7 @@ private fun CardRow(
     first: Boolean = false,
     /** Null: a chevron exactly when [onClick] is set. */
     chevron: Boolean? = null,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     val c = HerdrTheme.colors
@@ -257,12 +292,13 @@ private fun CardRow(
             Modifier
                 .fillMaxWidth()
                 .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+                .then(if (enabled) Modifier else Modifier.semantics(mergeDescendants = true) { disabled() })
                 .padding(horizontal = HerdrSpacing.s16, vertical = HerdrSpacing.s12),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(HerdrSpacing.s12),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(HerdrSpacing.s2)) {
-                BasicText(label, style = HerdrType.settingRow.copy(color = c.fg))
+                BasicText(label, style = HerdrType.settingRow.copy(color = if (enabled) c.fg else c.dimText))
                 detail?.let { BasicText(it, style = rowDetail.copy(color = c.dimText)) }
             }
             if (chevron ?: (onClick != null)) ChevronIcon(Chevron.Right, 14.dp, c.fg)

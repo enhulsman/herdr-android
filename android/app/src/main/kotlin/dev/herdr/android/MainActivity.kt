@@ -12,6 +12,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.herdr.android.ui.addmachine.AddMachineRoute
 import dev.herdr.android.ui.agents.AgentsHome
 import dev.herdr.android.ui.agents.AgentsRoute
@@ -43,7 +45,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Root(app: HerdrApp) {
     val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
-    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost)) { AgentsHome(app.hubHost) }
+    val isForeground = { app.foreground.isForeground }
+    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost, isForeground)) { AgentsHome(app.hubHost, isForeground) }
+    // Back in the foreground with an agent's sheet open: a finish it shows is now seen.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { home.onForeground() }
     val snapshot by app.hubHost.snapshot.collectAsState()
     LaunchedEffect(snapshot) {
         flows.onSnapshot(snapshot)
@@ -51,7 +56,7 @@ private fun Root(app: HerdrApp) {
     }
     // The export/import notice answers the picker just closed; it does not follow the person to other screens.
     LaunchedEffect(flows.screen) { if (flows.screen != Screen.Machines) app.transfer.dismiss() }
-    BackHandler(enabled = flows.screen != Screen.Agents || flows.trusting != null || flows.confirmingForget) {
+    BackHandler(enabled = flows.screen != Screen.Agents || flows.trusting != null || flows.confirmingForget || flows.removing != null) {
         flows.back()
     }
     Box {

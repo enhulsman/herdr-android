@@ -40,6 +40,8 @@ private fun Root(app: HerdrApp) {
     val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
     val snapshot by app.hubHost.snapshot.collectAsState()
     LaunchedEffect(snapshot) { flows.onSnapshot(snapshot) }
+    // The export/import notice answers the picker just closed; it does not follow the person to other screens.
+    LaunchedEffect(flows.screen) { if (flows.screen != Screen.Machines) app.transfer.dismiss() }
     BackHandler(enabled = flows.screen != Screen.Machines || flows.trusting != null || flows.confirmingForget) {
         flows.back()
     }

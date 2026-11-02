@@ -13,12 +13,18 @@ import dev.herdr.android.key.KeyManager
 import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.AlarmScheduler
 import dev.herdr.android.lifecycle.ElapsedClock
+import dev.herdr.android.ui.transfer.ContentResolverStore
+import dev.herdr.android.ui.transfer.MachineTransfer
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import uniffi.herdr_mobile.Hub
 
 /**
  * The process-wide objects: the phone key, the hub and its snapshots, the
- * fingerprint prompt on NeedsUserAuth, and the started-activity count that
+ * fingerprint prompt on NeedsUserAuth, export/import of the machine list,
+ * and the started-activity count that
  * resumes the hub in the foreground and suspends it 60 s after the last
  * activity stops. Nothing touches the Keystore or the network until the first
  * activity starts.
@@ -31,6 +37,10 @@ class HerdrApp : Application() {
     lateinit var userAuth: UserAuthGate
         private set
     lateinit var foreground: ForegroundTracker
+        private set
+
+    /** Export and import of the machine list; outlives activities so a rotation never cuts one short. */
+    lateinit var transfer: MachineTransfer
         private set
 
     private var promptActivity: Activity? = null
@@ -46,6 +56,11 @@ class HerdrApp : Application() {
         )
         userAuth = UserAuthGate(retry = hubHost::retry)
         hubHost.addSnapshotListener(userAuth::onSnapshot)
+        transfer = MachineTransfer(
+            hubHost,
+            ContentResolverStore(contentResolver),
+            CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        )
         foreground = ForegroundTracker(
             AlarmScheduler(getSystemService(AlarmManager::class.java), Handler(mainLooper)),
             ElapsedClock.SYSTEM,

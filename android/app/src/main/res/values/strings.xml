@@ -15,6 +15,27 @@
     <string name="machines_phone_key_detail">Needs your fingerprint or screen lock, then valid 30 min</string>
     <string name="machines_export">Export machine list</string>
     <string name="machines_export_detail">Without keys</string>
+    <string name="machines_import">Import machine list</string>
+    <string name="machines_import_detail">Adds machines you don\'t have yet</string>
+    <!-- The file name the export's file picker suggests. -->
+    <string name="machines_export_file_name" translatable="false">herdr-machines.json</string>
+
+    <!-- The inline notice under "This phone" after an export or import (TransferNoticeTest). -->
+    <string name="transfer_exported">Machine list exported, without keys or host keys.</string>
+    <string name="transfer_export_failed">Could not export the machine list.</string>
+    <string name="transfer_export_failed_because">Could not export the machine list: %1$s.</string>
+    <plurals name="transfer_imported">
+        <item quantity="one">Added %d machine.</item>
+        <item quantity="other">Added %d machines.</item>
+    </plurals>
+    <string name="transfer_imported_none">Nothing added: every machine in the file is already listed.</string>
+    <string name="transfer_too_large">Nothing imported: the file is over 1 MB, too large for a machine list.</string>
+    <string name="transfer_empty">Nothing imported: the file is empty.</string>
+    <string name="transfer_not_a_list">Nothing imported: this app cannot read this file as a machine list.</string>
+    <string name="transfer_import_failed">Nothing imported: %1$s.</string>
+    <string name="transfer_read_failed">Nothing imported: the file could not be read.</string>
+    <string name="transfer_read_failed_because">Nothing imported: the file could not be read (%1$s).</string>
+    <string name="transfer_no_picker">No file picker found on this phone.</string>
 
     <!-- A machine's status line: parts joined by status_separator. -->
     <string name="status_separator">" · "</string>

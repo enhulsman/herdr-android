@@ -2,6 +2,8 @@ package dev.herdr.android.ui.machines
 
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.herdr.android.ui.theme.HerdrTheme
+import dev.herdr.android.ui.transfer.TransferResult
+import dev.herdr.android.ui.transfer.transferNotice
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -78,8 +80,35 @@ class MachinesScreenshotTest {
 
     @Test fun waitingPaper() = capture("machines-waiting-paper", dark = false, waiting, tall = true)
 
-    private fun capture(name: String, dark: Boolean, machines: List<MachineView>, tall: Boolean = false) {
+    /** The inline notices after the file picker (no signed-off render), under the "This phone" card. */
+    @Test fun exportedGraphite() = capture("machines-exported-graphite", dark = true, render7, TransferResult.Exported)
+
+    @Test fun exportedPaper() = capture("machines-exported-paper", dark = false, render7, TransferResult.Exported)
+
+    /** Just imported on a fresh install: the machines wait for their host keys. */
+    private val imported = listOf(
+        machine("workstation", MachineState.HostKeyUnconfirmed("SHA256:q3Vb8m2N4sR7tK0yL9wE1aZ5cX6vB3nM8jH2gF4dS0p", "ED25519")),
+        machine("server", MachineState.Connecting),
+    )
+
+    @Test fun importedGraphite() = capture("machines-imported-graphite", dark = true, imported, TransferResult.Imported(2))
+
+    @Test fun importedPaper() = capture("machines-imported-paper", dark = false, imported, TransferResult.Imported(2))
+
+    /** The first launch, after picking a file that is not a machine list. */
+    @Test fun importErrorGraphite() = capture("machines-import-error-graphite", dark = true, emptyList(), TransferResult.NotAList)
+
+    @Test fun importErrorPaper() = capture("machines-import-error-paper", dark = false, emptyList(), TransferResult.NotAList)
+
+    private fun capture(
+        name: String,
+        dark: Boolean,
+        machines: List<MachineView>,
+        transfer: TransferResult? = null,
+        tall: Boolean = false,
+    ) {
         val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res)
+            .copy(transfer = transfer?.let { transferNotice(it, res) })
         if (tall) RuntimeEnvironment.setQualifiers("w412dp-h1400dp-xhdpi")
         captureRoboImage("src/test/snapshots/$name.png") {
             HerdrTheme(dark = dark) { MachinesScreen(ui, MachinesActions.Preview.copy(onBack = {})) }

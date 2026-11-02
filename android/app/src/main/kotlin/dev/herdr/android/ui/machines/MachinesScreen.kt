@@ -25,7 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -55,7 +58,8 @@ import dev.herdr.android.ui.theme.HerdrType
 /**
  * What the screen can ask for. [onUnlock] and [onTryAgain] go to the hub
  * (hubActions); the host-key, phone-key and Add machine seams go to
- * MachineFlows; [onExport] waits for 5e.
+ * MachineFlows; [onExport] and [onImport] open the system file picker
+ * (MachinesRoute).
  */
 data class MachinesActions(
     val onBack: (() -> Unit)?,
@@ -69,10 +73,11 @@ data class MachinesActions(
     val onPhoneKey: () -> Unit,
     val onAddMachine: () -> Unit,
     val onExport: () -> Unit,
+    val onImport: () -> Unit,
 ) {
     companion object {
         /** Does nothing; for screenshots and flows not built yet. */
-        val Preview = MachinesActions(null, {}, {}, {}, {}, {}, {}, {})
+        val Preview = MachinesActions(null, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -130,22 +135,31 @@ fun MachinesScreen(ui: MachinesUi, actions: MachinesActions, modifier: Modifier 
                 stringResource(R.string.machines_export_detail),
                 onClick = actions.onExport,
             )
+            // Always shown: it matters most on a fresh install's empty list.
+            CardRow(
+                stringResource(R.string.machines_import),
+                stringResource(R.string.machines_import_detail),
+                onClick = actions.onImport,
+            )
         }
+        // Announced by screen readers: it answers the picker the person just closed.
+        ui.transfer?.let { Notice(it.text, error = it.isError, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         Spacer(Modifier.height(HerdrSpacing.s24))
     }
 }
 
+/** A line on the hover background; [error] draws the text in the error colour (error = blocked). */
 @Composable
-private fun Notice(text: String) {
+private fun Notice(text: String, error: Boolean = false, modifier: Modifier = Modifier) {
     val c = HerdrTheme.colors
     BasicText(
         text,
-        Modifier
+        modifier
             .padding(start = HerdrLayout.screenPaddingX, end = HerdrLayout.screenPaddingX, bottom = 10.dp)
             .fillMaxWidth()
             .background(c.hover, RoundedCornerShape(HerdrRadius.notice))
             .padding(horizontal = HerdrSpacing.s12, vertical = 9.dp),
-        style = HerdrType.secondary.copy(color = c.muted),
+        style = HerdrType.secondary.copy(color = if (error) c.blocked else c.muted),
     )
 }
 

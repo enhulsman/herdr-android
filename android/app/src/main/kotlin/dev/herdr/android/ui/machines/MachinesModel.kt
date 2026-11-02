@@ -3,6 +3,7 @@ package dev.herdr.android.ui.machines
 import android.content.res.Resources
 import androidx.compose.runtime.Immutable
 import dev.herdr.android.R
+import dev.herdr.android.ui.transfer.TransferNoticeUi
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.MachineView
@@ -47,6 +48,8 @@ data class MachinesUi(
     /** A storage problem from the hub. */
     val notice: String?,
     val phoneKeyDetail: String,
+    /** How the last export or import went, under the "This phone" card. */
+    val transfer: TransferNoticeUi? = null,
 )
 
 /** [startError]: why the hub (and with it the phone key) could not start, from HubHost. */

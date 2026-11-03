@@ -30,6 +30,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -44,6 +46,7 @@ import dev.herdr.android.ui.components.DialogText
 import dev.herdr.android.ui.components.ModalDialog
 import dev.herdr.android.ui.components.OutlineButton
 import dev.herdr.android.ui.components.SubScreenTopBar
+import dev.herdr.android.ui.components.Toggle
 import dev.herdr.android.ui.theme.HerdrBorder
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrRadius
@@ -55,10 +58,8 @@ import dev.herdr.android.ui.theme.HerdrType
 // .mcard, .mhead, .mrow, .caption in design/renders/screens.html). Pure: it
 // lays out a MachinesUi and calls MachinesActions; MachinesRoute feeds it from
 // the hub.
-//
-// M3 seam: render 7's Alerts, Mute alerts and Send test alert rows belong in
-// MachineCard after the head, as further CardRows; they stay out until the
-// alerts milestone gives them data.
+// Render 7's Alerts, Mute alerts and Send test alert rows follow the head
+// (and a host-key or phone-key link, which is the more urgent).
 
 /**
  * What the screen can ask for. [onUnlock] and [onTryAgain] go to the hub
@@ -89,6 +90,12 @@ data class MachinesActions(
     val onCancelRemove: () -> Unit = {},
     /** "Network permission is off": this app's page in Android settings (MachinesRoute). */
     val onOpenSettings: () -> Unit = {},
+    /** The Alerts row's button: turn alerts on, try again, or allow notifications (MachinesRoute). */
+    val onAlerts: (AlertsButton) -> Unit = {},
+    /** "Mute alerts", by machine name, to the new state. */
+    val onMute: (String, Boolean) -> Unit = { _, _ -> },
+    /** "Send test alert"'s Send, by machine name. */
+    val onSendTest: (String) -> Unit = {},
 ) {
     companion object {
         /** Does nothing; for screenshots and flows not built yet. */
@@ -251,6 +258,33 @@ private fun MachineCard(machine: MachineCardUi, actions: MachinesActions) {
                 }
             }
         }
+        machine.alerts?.let { row ->
+            CardRow(stringResource(R.string.alerts_row), row.detail, chevron = false, trailing = {
+                row.button?.let { button ->
+                    val label = when (button) {
+                        AlertsButton.TurnOn -> R.string.alerts_turn_on
+                        AlertsButton.TryAgain -> R.string.action_try_again
+                        AlertsButton.Allow -> R.string.alerts_allow
+                    }
+                    OutlineButton(stringResource(label), { actions.onAlerts(button) }, compact = true)
+                }
+            })
+        }
+        machine.mute?.let { muted ->
+            CardRow(
+                stringResource(R.string.alerts_mute),
+                stringResource(R.string.alerts_mute_detail),
+                chevron = false,
+                toggled = muted,
+                trailing = { Toggle(muted) },
+                onClick = { actions.onMute(machine.name, !muted) },
+            )
+        }
+        machine.test?.let { test ->
+            CardRow(stringResource(R.string.alerts_test), test.detail, chevron = false, trailing = {
+                OutlineButton(stringResource(R.string.alerts_test_send), { actions.onSendTest(machine.name) }, compact = true)
+            })
+        }
         // Last on the card; opens a confirm, so no chevron.
         CardRow(stringResource(R.string.machines_remove), null, chevron = false) { actions.onRemove(machine.name) }
     }
@@ -295,6 +329,10 @@ private fun CardRow(
     /** Null: a chevron exactly when [onClick] is set. */
     chevron: Boolean? = null,
     enabled: Boolean = true,
+    /** A switch row: the whole row toggles and screen readers hear its state. */
+    toggled: Boolean? = null,
+    /** At the row's end: a button or a toggle. */
+    trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val c = HerdrTheme.colors
@@ -303,7 +341,15 @@ private fun CardRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+                .then(
+                    when {
+                        onClick == null -> Modifier
+                        toggled != null -> Modifier
+                            .clickable(role = Role.Switch, onClick = onClick)
+                            .semantics(mergeDescendants = true) { toggleableState = ToggleableState(toggled) }
+                        else -> Modifier.clickable(role = Role.Button, onClick = onClick)
+                    },
+                )
                 .then(if (enabled) Modifier else Modifier.semantics(mergeDescendants = true) { disabled() })
                 .padding(horizontal = HerdrSpacing.s16, vertical = HerdrSpacing.s12),
             verticalAlignment = Alignment.CenterVertically,
@@ -313,6 +359,7 @@ private fun CardRow(
                 BasicText(label, style = HerdrType.settingRow.copy(color = if (enabled) c.fg else c.dimText))
                 detail?.let { BasicText(it, style = rowDetail.copy(color = c.dimText)) }
             }
+            trailing?.invoke()
             if (chevron ?: (onClick != null)) ChevronIcon(Chevron.Right, 14.dp, c.fg)
         }
     }

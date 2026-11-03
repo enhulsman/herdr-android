@@ -331,4 +331,47 @@ class AgentsHomeTest {
         assertTrue(home.tab(next = true))
         assertEquals(key("d"), home.openKey)
     }
+
+    // alerts spec, "Blocked while the app is closed": tapping the alert opens
+    // the terminal, though the app has not connected yet when it starts.
+    @Test
+    fun anAlertTapOpensTheAgentOnceItIsListed() {
+        publish(snapshot(listOf(machine("workstation", uniffi.herdr_mobile.MachineState.Connecting)), emptyList()))
+        home.openWhenListed(key("t3"))
+        assertNull(home.openKey)
+        publish(snapshot(ws, listOf(row("t3", AgentAttention.NEEDS_YOU))))
+        assertEquals(key("t3"), home.openKey)
+        assertEquals(listOf("seen workstation t3"), hub.calls)
+        // Opened once: closing it does not bring it back.
+        home.close()
+        publish(snapshot(ws, listOf(row("t3", AgentAttention.NEEDS_YOU))))
+        assertNull(home.openKey)
+    }
+
+    @Test
+    fun anAlertTapOpensAtOnceWhenTheAgentIsAlreadyListed() {
+        publish(snapshot(ws, listOf(row("t3", AgentAttention.NEEDS_YOU))))
+        home.openWhenListed(key("t3"))
+        assertEquals(key("t3"), home.openKey)
+    }
+
+    @Test
+    fun anAlertTapForAGoneAgentIsDroppedOnceItsMachineListsOthers() {
+        home.openWhenListed(key("t3"))
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE))))
+        assertNull(home.openKey)
+        // Much later a new terminal takes the same address: not opened.
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE), row("t3", AgentAttention.IDLE))))
+        assertNull(home.openKey)
+    }
+
+    @Test
+    fun openingSomethingElseDropsAPendingAlertTap() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE))))
+        home.openWhenListed(key("t3"))
+        home.open(key("t1"))
+        home.close()
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE), row("t3", AgentAttention.IDLE))))
+        assertNull(home.openKey)
+    }
 }

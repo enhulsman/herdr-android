@@ -1,6 +1,8 @@
 package dev.herdr.android.ui.machines
 
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.push.AlertSetup
+import dev.herdr.android.push.MachineAlerts
 import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.transfer.TransferResult
@@ -11,13 +13,16 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import uniffi.herdr_mobile.AlertsRegistration
+import uniffi.herdr_mobile.AlertsView
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.MachineView
+import uniffi.herdr_mobile.PushStatusView
 
 // The Machines screen against render 7 (design/checkpoints/7-machines.png),
-// minus the alert rows that arrive in M3, and the states render 7 does not
-// show, designed from the tokens. Reference phone: 412 x 915 dp at density 2,
+// without alert rows (machines-*) and with them (machines-alerts-*), and the
+// states render 7 does not show, designed from the tokens. Reference phone: 412 x 915 dp at density 2,
 // the renders' size (the system bars are not drawn here).
 // Goldens: src/test/snapshots/machines-*.png (recordRoborazziDebug, verifyRoborazziDebug).
 @RunWith(RobolectricTestRunner::class)
@@ -40,6 +45,52 @@ class MachinesScreenshotTest {
     @Test fun render7Graphite() = capture("machines-graphite", dark = true, render7)
 
     @Test fun render7Paper() = capture("machines-paper", dark = false, render7)
+
+    /** Render 7 with its alert rows: accepted by ntfy 14:02, test received 13:58; server's last push 11:41. */
+    private val render7Alerts = listOf(
+        machine(
+            "workstation",
+            MachineState.Connected("0.1.16"),
+            alerts = AlertsView(AlertsRegistration.REGISTERED, PushStatusView("0.1.0", at(14, 2).toULong(), 200u, "accepted 200", emptyList())),
+        ),
+        machine(
+            "server",
+            MachineState.Unreachable("connection refused"),
+            lastConnectedMs = NOW - 2 * HOUR,
+            nextRetryMs = NOW + 30_000,
+            alerts = AlertsView(AlertsRegistration.REGISTERED, null),
+        ),
+    )
+    private val render7Phone = PhoneAlerts(
+        registered = true,
+        setup = AlertSetup.Off,
+        permitted = true,
+        machines = mapOf(
+            "workstation" to MachineAlerts(lastPushMs = at(14, 2), testAskedMs = at(13, 57), testReceivedMs = at(13, 58)),
+            "server" to MachineAlerts(lastPushMs = at(11, 41)),
+        ),
+        timeText = ::clock,
+    )
+
+    @Test fun render7AlertsGraphite() = capture("machines-alerts-graphite", dark = true, render7Alerts, alerts = render7Phone, tall = true)
+
+    @Test fun render7AlertsPaper() = capture("machines-alerts-paper", dark = false, render7Alerts, alerts = render7Phone, tall = true)
+
+    /** No signed-off render: alerts not yet on, and on but not allowed to notify (alerts spec, "Permission denied"). */
+    private val alertsOff = listOf(
+        machine("workstation", MachineState.Connected("0.1.16")),
+        machine("server", MachineState.Connected("0.1.16"), alerts = AlertsView(AlertsRegistration.REGISTERED, null)),
+    )
+
+    @Test fun alertsOffGraphite() = capture(
+        "machines-alerts-off-graphite", dark = true, alertsOff.take(1),
+        alerts = PhoneAlerts(false, AlertSetup.Off, true, emptyMap(), ::clock),
+    )
+
+    @Test fun alertsNotAllowedPaper() = capture(
+        "machines-alerts-not-allowed-paper", dark = false, alertsOff.drop(1),
+        alerts = PhoneAlerts(true, AlertSetup.Off, false, mapOf("server" to MachineAlerts(muted = true)), ::clock),
+    )
 
     private val unlock = listOf(
         machine("workstation", MachineState.NeedsUserAuth),
@@ -132,8 +183,9 @@ class MachinesScreenshotTest {
         removing: String? = null,
         error: String? = null,
         contrast: Contrast = Contrast.Default,
+        alerts: PhoneAlerts? = null,
     ) {
-        val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res, contrast)
+        val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res, contrast, alerts)
             .copy(transfer = transfer?.let { transferNotice(it, res) }, removing = removing, error = error)
         if (tall) RuntimeEnvironment.setQualifiers("w412dp-h1400dp-xhdpi")
         captureRoboImage("src/test/snapshots/$name.png") {
@@ -141,12 +193,23 @@ class MachinesScreenshotTest {
         }
     }
 
-    private fun machine(name: String, state: MachineState, lastConnectedMs: Long? = null, nextRetryMs: Long? = null) =
-        MachineView(name, "$name.example.org", 22u, "me", null, state, lastConnectedMs?.toULong(), nextRetryMs?.toULong())
+    private fun machine(
+        name: String,
+        state: MachineState,
+        lastConnectedMs: Long? = null,
+        nextRetryMs: Long? = null,
+        alerts: AlertsView? = null,
+    ) = MachineView(name, "$name.example.org", 22u, "me", null, state, lastConnectedMs?.toULong(), nextRetryMs?.toULong(), alerts)
+
+    /** A time of day on NOW's date, in UTC, as [clock] shows it. */
+    private fun at(hour: Int, minute: Int): Long = NOW - NOW % DAY + hour * HOUR + minute * MINUTE
+
+    private fun clock(ms: Long): String = "%02d:%02d".format((ms % DAY) / HOUR, (ms % HOUR) / MINUTE)
 
     private companion object {
         const val NOW = 1_800_000_000_000L
         const val MINUTE = 60_000L
         const val HOUR = 60 * MINUTE
+        const val DAY = 24 * HOUR
     }
 }

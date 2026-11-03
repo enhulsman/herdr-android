@@ -11,6 +11,10 @@
         <activity
             android:name=".MainActivity"
             tools:node="remove" />
+        <!-- One PUSH_EVENT receiver per app: the spike keeps its own. -->
+        <service
+            android:name=".push.HerdrPushService"
+            tools:node="remove" />
         <activity
             android:name=".spike.SpikeActivity"
             android:exported="true">

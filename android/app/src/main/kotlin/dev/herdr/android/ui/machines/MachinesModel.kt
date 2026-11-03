@@ -3,8 +3,11 @@ package dev.herdr.android.ui.machines
 import android.content.res.Resources
 import androidx.compose.runtime.Immutable
 import dev.herdr.android.R
+import dev.herdr.android.push.AlertSetup
+import dev.herdr.android.push.MachineAlerts
 import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.transfer.TransferNoticeUi
+import uniffi.herdr_mobile.AlertsRegistration
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.MachineView
@@ -29,6 +32,28 @@ enum class CardLink { CheckHostKey, CompareHostKeys, AddPhoneKey }
 
 data class CardLinkUi(val kind: CardLink, val label: String, val detail: String?)
 
+/** The button on a card's Alerts row. */
+enum class AlertsButton { TurnOn, TryAgain, Allow }
+
+/** Render 7's "Alerts" row: what this phone's alerts from the machine look like. */
+data class AlertsRowUi(val detail: String, val button: AlertsButton?)
+
+/** Render 7's "Send test alert" row, with its Send button. */
+data class TestRowUi(val detail: String)
+
+/**
+ * The phone's side of alerts, for the cards: whether it has a registration,
+ * how far setup got without one, whether Android lets it notify, and what it
+ * recorded per machine (PushStore). [timeText] formats a time of day.
+ */
+data class PhoneAlerts(
+    val registered: Boolean,
+    val setup: AlertSetup,
+    val permitted: Boolean,
+    val machines: Map<String, MachineAlerts>,
+    val timeText: (Long) -> String,
+)
+
 @Immutable
 data class MachineCardUi(
     val name: String,
@@ -39,6 +64,11 @@ data class MachineCardUi(
     val detail: String?,
     val button: CardButton?,
     val link: CardLinkUi?,
+    /** Null: no alert rows (alerts unknown, as in screens before M3). */
+    val alerts: AlertsRowUi? = null,
+    /** The "Mute alerts" toggle's state; null hides the row. */
+    val mute: Boolean? = null,
+    val test: TestRowUi? = null,
 ) {
     val statusText: String get() = status.joinToString(separator) { it.text }
 }
@@ -63,16 +93,23 @@ data class MachinesUi(
     val textContrastDetail: String = "",
 )
 
-/** [startError]: why the hub (and with it the phone key) could not start, from HubHost. */
+/**
+ * [startError]: why the hub (and with it the phone key) could not start, from
+ * HubHost; [alerts]: the phone's alert state, null for cards without alert rows.
+ */
 fun machinesUi(
     snapshot: HubSnapshot,
     startError: String?,
     nowMs: Long,
     res: Resources,
     contrast: Contrast = Contrast.Default,
+    alerts: PhoneAlerts? = null,
 ): MachinesUi =
     MachinesUi(
-        machines = snapshot.machines.map { machineCard(it, nowMs, res) },
+        machines = snapshot.machines.map { m ->
+            val card = machineCard(m, nowMs, res)
+            if (alerts == null) card else withAlerts(card, m, alerts, nowMs, res)
+        },
         notice = snapshot.notice,
         phoneKeyDetail = startError ?: res.getString(R.string.machines_phone_key_detail),
         canExport = snapshot.machines.isNotEmpty(),
@@ -171,11 +208,94 @@ private fun retryingSegment(nextRetryMs: Long?, nowMs: Long, res: Resources): Se
 }
 
 /**
- * What the Machines screen's text depends on from the clock: whole seconds
- * while a countdown shows, else whole minutes ("last connected").
+ * The card's alert rows (render 7). Without a registration the Alerts row says
+ * how far setup got, with a button to go on; with one but no permission to
+ * notify, alerts are off with a way to allow them (alerts spec, "Permission
+ * denied"). Otherwise it shows what the machine's herdr-push last told the
+ * phone (as of the last connection: never "delivered") and the last push that
+ * reached the phone. Mute and the test show on a connected machine; a muted
+ * one keeps its toggle while away, so it can be undone.
  */
-fun machinesTick(snapshot: HubSnapshot, nowMs: Long): Long =
-    if (snapshot.machines.any { it.nextRetryMs != null }) nowMs / 1_000 else nowMs / 60_000
+private fun withAlerts(card: MachineCardUi, m: MachineView, alerts: PhoneAlerts, nowMs: Long, res: Resources): MachineCardUi {
+    if (!alerts.registered) {
+        val row = when (val setup = alerts.setup) {
+            AlertSetup.Off -> AlertsRowUi(res.getString(R.string.alerts_off), AlertsButton.TurnOn)
+            AlertSetup.Waiting -> AlertsRowUi(res.getString(R.string.alerts_waiting), AlertsButton.TryAgain)
+            AlertSetup.NoDistributor -> AlertsRowUi(res.getString(R.string.alerts_no_distributor), AlertsButton.TryAgain)
+            is AlertSetup.Failed -> AlertsRowUi(res.getString(R.string.alerts_failed, setup.reason), AlertsButton.TryAgain)
+        }
+        return card.copy(alerts = row)
+    }
+    val mine = alerts.machines[m.name] ?: MachineAlerts()
+    val connected = m.state is MachineState.Connected
+    val mute = mine.muted.takeIf { connected || it }
+    if (!alerts.permitted) {
+        return card.copy(alerts = AlertsRowUi(res.getString(R.string.alerts_not_allowed), AlertsButton.Allow), mute = mute)
+    }
+    val parts = mutableListOf<String>()
+    val view = m.alerts
+    when (view?.registration ?: AlertsRegistration.NOT_YET) {
+        AlertsRegistration.NOT_YET -> parts += res.getString(R.string.alerts_not_yet)
+        AlertsRegistration.ENDPOINT_CHANGED -> parts += res.getString(R.string.alerts_endpoint_changed)
+        AlertsRegistration.REGISTERED -> {
+            val status = view?.status
+            val endpoint = status?.endpointStatus
+            when {
+                status == null -> if (connected) parts += res.getString(R.string.alerts_no_watcher)
+                endpoint == null -> parts += res.getString(R.string.alerts_no_push_yet)
+                endpoint.startsWith("accepted") -> status.lastPushAtMs?.let {
+                    parts += res.getString(R.string.alerts_accepted, alerts.timeText(it.toLong()))
+                }
+                else -> parts += res.getString(R.string.alerts_failing, failure(endpoint))
+            }
+        }
+    }
+    mine.lastPushMs?.let { at ->
+        val time = alerts.timeText(at)
+        parts += res.getString(if (parts.isEmpty()) R.string.alerts_last_push_first else R.string.alerts_last_push, time)
+    }
+    if (parts.isEmpty()) parts += res.getString(R.string.alerts_registered)
+    return card.copy(
+        alerts = AlertsRowUi(parts.joinToString(card.separator), null),
+        mute = mute,
+        test = if (connected) TestRowUi(testDetail(mine, nowMs, alerts.timeText, res)) else null,
+    )
+}
+
+/** herdr-push's endpoint status without its verb: "refused 403" is "403", "failed: timed out" is "timed out". */
+private fun failure(status: String): String = when {
+    status.startsWith("refused ") -> status.removePrefix("refused ")
+    ':' in status -> status.substringAfter(':').trim()
+    else -> status
+}
+
+/** How long the app waits for a test push before saying none came (alerts spec, "A test alert proves the path"). */
+const val TEST_WAIT_MS = 30_000L
+
+private fun testDetail(m: MachineAlerts, nowMs: Long, timeText: (Long) -> String, res: Resources): String {
+    val asked = m.testAskedMs ?: return res.getString(R.string.alerts_test_idle)
+    val received = m.testReceivedMs
+    return when {
+        received != null && received >= asked -> res.getString(R.string.alerts_test_received, timeText(received))
+        nowMs - asked < TEST_WAIT_MS -> res.getString(R.string.alerts_test_waiting)
+        else -> res.getString(R.string.alerts_test_missed)
+    }
+}
+
+/** A test sent within the last 30 s with no answer yet: the screen counts seconds. */
+private fun testWaiting(alerts: PhoneAlerts?, nowMs: Long): Boolean =
+    alerts?.machines?.values.orEmpty().any { m ->
+        val asked = m.testAskedMs ?: return@any false
+        (m.testReceivedMs ?: Long.MIN_VALUE) < asked && nowMs - asked < TEST_WAIT_MS
+    }
+
+/**
+ * What the Machines screen's text depends on from the clock: whole seconds
+ * while a countdown shows or a test alert is awaited, else whole minutes
+ * ("last connected").
+ */
+fun machinesTick(snapshot: HubSnapshot, nowMs: Long, alerts: PhoneAlerts? = null): Long =
+    if (snapshot.machines.any { it.nextRetryMs != null } || testWaiting(alerts, nowMs)) nowMs / 1_000 else nowMs / 60_000
 
 /** "just now", "5m ago", "2h ago", "3d ago"; a clock that went backwards reads as just now. */
 fun agoText(elapsedMs: Long, res: Resources): String {

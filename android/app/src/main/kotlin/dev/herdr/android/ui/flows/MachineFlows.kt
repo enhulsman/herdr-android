@@ -95,6 +95,12 @@ class MachineFlows(private val hubHost: HubHost) {
     /** The Agents home's Machines button and machine notices. */
     fun openMachines() = show(Screen.Machines, null)
 
+    /** A tapped alert: the Agents home, where its terminal opens; closes any dialog. */
+    fun openAgents() {
+        trusting = null
+        show(Screen.Agents, null)
+    }
+
     /** The empty Agents home's "Add machine"; back from the form lands on Machines. */
     fun openAddMachine() = show(Screen.AddMachine, null)
 

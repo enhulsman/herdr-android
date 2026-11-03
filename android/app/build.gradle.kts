@@ -142,8 +142,8 @@ dependencies {
     implementation(libs.jna) {
         artifact { type = "aar" }
     }
-    // The push spike (task M0.7, src/spike/) only; the app takes it on in M3.
-    add("spikeImplementation", libs.unifiedpush.connector)
+    // Alerts (M3): UnifiedPush registration and web-push decryption.
+    implementation(libs.unifiedpush.connector)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)

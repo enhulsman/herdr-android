@@ -15,6 +15,12 @@ import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.AlarmScheduler
 import dev.herdr.android.lifecycle.ElapsedClock
 import dev.herdr.android.lifecycle.HandlerScheduler
+import dev.herdr.android.push.AlertSetup
+import dev.herdr.android.push.Alerts
+import dev.herdr.android.push.AndroidAlertSink
+import dev.herdr.android.push.PushStore
+import dev.herdr.android.push.SilenceCheckService
+import dev.herdr.android.push.timeOfDay
 import dev.herdr.android.ui.terminal.TerminalCache
 import dev.herdr.android.ui.terminal.ZoomMemory
 import dev.herdr.android.ui.theme.ContrastSetting
@@ -26,7 +32,10 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import org.unifiedpush.android.connector.UnifiedPush
+import uniffi.herdr_mobile.AlertsRegistration
 import uniffi.herdr_mobile.Hub
+import uniffi.herdr_mobile.PushRegistration
 
 /**
  * The process-wide objects: the phone key, the hub and its snapshots, the
@@ -64,15 +73,30 @@ class HerdrApp : Application() {
     /** The zoom each terminal was left at while watching, for this run of the app. */
     val terminalZoom = ZoomMemory()
 
+    /** The phone's alert state; the push service and the silence check use it with the app closed. */
+    lateinit var pushStore: PushStore
+        private set
+
+    /** Pushes to notifications, silence to "Alert health". */
+    lateinit var alerts: Alerts
+        private set
+
     private var promptActivity: Activity? = null
 
     override fun onCreate() {
         super.onCreate()
         contrast = ContrastSetting.open(this)
+        pushStore = PushStore.open(this)
+        val sink = AndroidAlertSink(this).apply { createChannels() }
+        alerts = Alerts(pushStore, sink, resources) { ms -> timeOfDay(this)(ms) }
+        if (pushStore.registration != null) SilenceCheckService.schedule(this)
         keyManager = KeyManager(AndroidKeystoreBackend())
         hubHost = HubHost(
             createHub = { listener ->
+                // The registration goes in before the hub connects: a hub
+                // without it would take this phone's entries back.
                 Hub(hubDirectory().path, keyManager.publicKey(), keyManager.signer(), listener)
+                    .apply { setPush(pushStore.registration) }
             },
             mainExecutor = mainExecutor,
         )
@@ -102,8 +126,48 @@ class HerdrApp : Application() {
             if (names != machines) {
                 machines = names
                 terminalCacheExecutor.execute { terminalCache.keepMachines(names) }
+                pushStore.keepMachines(names)
             }
+            // Silence counts from a machine's registration on (a dead topic never speaks at all).
+            val now = System.currentTimeMillis()
+            snapshot.machines
+                .filter { it.alerts?.registration == AlertsRegistration.REGISTERED }
+                .forEach { pushStore.enroll(it.name, now) }
         }
+    }
+
+    /**
+     * "Turn on" or "Try again" on a card's Alerts row: the distributor the
+     * person uses (asking which when there are several), then a registration;
+     * its endpoint arrives in HerdrPushService.
+     */
+    fun turnOnAlerts(activity: Activity) {
+        pushStore.setup = AlertSetup.Waiting
+        UnifiedPush.tryUseCurrentOrDefaultDistributor(activity) { ok ->
+            if (ok) UnifiedPush.register(this, PUSH_INSTANCE) else pushStore.setup = AlertSetup.NoDistributor
+        }
+    }
+
+    /** A new endpoint from the distributor: kept, and given to the hub for the machines. */
+    fun alertsOn(registration: PushRegistration) {
+        pushStore.registration = registration
+        pushStore.setup = AlertSetup.Off
+        // HubHost.start is synchronized on it: a hub being created now reads the store after this write.
+        synchronized(hubHost) { hubHost.hub?.setPush(registration) }
+        SilenceCheckService.schedule(this)
+    }
+
+    /** The distributor took the registration back: alerts are off, and machines lose this phone's entry. */
+    fun alertsOff() {
+        pushStore.registration = null
+        pushStore.setup = AlertSetup.Off
+        synchronized(hubHost) { hubHost.hub?.setPush(null) }
+        SilenceCheckService.cancel(this)
+    }
+
+    companion object {
+        /** The one UnifiedPush registration this app makes. */
+        const val PUSH_INSTANCE = "alerts"
     }
 
     /** The machine list and seen turns: app-private and outside every backup. */

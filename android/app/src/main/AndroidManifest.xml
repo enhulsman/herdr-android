@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- BiometricPrompt throws SecurityException without it. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Alerts (M3): asked for when alerts are turned on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keeps the hourly "Alert health" check scheduled across reboots. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".HerdrApp"
@@ -23,6 +27,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Started by the UnifiedPush distributor (ntfy), also with the app closed. -->
+        <service
+            android:name=".push.HerdrPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".push.SilenceCheckService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 
 </manifest>

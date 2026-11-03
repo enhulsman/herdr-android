@@ -226,4 +226,51 @@
     <string name="compose_to">to %1$s</string>
     <string name="compose_hint">Pasted into the terminal. Enter is yours.</string>
     <string name="compose_paste">Paste</string>
+    <!-- Alerts (M3): notification channels, as Android settings lists them. -->
+    <string name="channel_needs_you">Needs you</string>
+    <string name="channel_finished">Finished</string>
+    <string name="channel_alert_health">Alert health</string>
+    <!-- Notifications (render 6, design-tokens.json notification): the agent's name, the kind and the machine only. -->
+    <string name="alert_needs_you_title">%1$s needs you</string>
+    <!-- %1$s the agent, %2$s the machine. -->
+    <string name="alert_finished_title">%1$s finished · %2$s</string>
+    <!-- %1$s the kind ("Permission"), %2$s the machine. -->
+    <string name="alert_body">%1$s · %2$s</string>
+    <string name="alert_kind_error">Error</string>
+    <string name="alert_test_title">Test alert from %1$s</string>
+    <string name="alert_test_text">Alerts reach this phone.</string>
+    <!-- After 13 hours without a push from the machine (alerts spec): %1$s the machine, %2$s the time of its last push. -->
+    <string name="alert_health_title">No word from %1$s since %2$s</string>
+    <string name="alert_health_text">The machine is off or alerts are broken.</string>
+
+    <!-- Machine card alert rows (render 7). -->
+    <string name="alerts_row">Alerts</string>
+    <string name="alerts_off">Off on this phone</string>
+    <string name="alerts_turn_on">Turn on</string>
+    <string name="alerts_waiting">Waiting for the UnifiedPush app</string>
+    <string name="alerts_no_distributor">Needs a UnifiedPush app, such as ntfy</string>
+    <!-- %1$s is the reason the UnifiedPush connector gave. -->
+    <string name="alerts_failed">Could not register: %1$s</string>
+    <string name="alerts_not_allowed">Off: notifications are not allowed</string>
+    <string name="alerts_allow">Allow</string>
+    <!-- Never "delivered": ntfy accepting a push is all the watcher knows (alerts spec). -->
+    <string name="alerts_accepted">Last accepted by ntfy %1$s</string>
+    <!-- %1$s the HTTP status or the error herdr-push reported ("403", "timed out"). -->
+    <string name="alerts_failing">Alerts failing: %1$s</string>
+    <string name="alerts_no_push_yet">Registered, no push yet</string>
+    <string name="alerts_no_watcher">No answer from herdr-push</string>
+    <string name="alerts_registered">Registered</string>
+    <string name="alerts_not_yet">Registers at the next connection</string>
+    <string name="alerts_endpoint_changed">Not registered since endpoint change</string>
+    <!-- After another part, and on its own (render 7). -->
+    <string name="alerts_last_push">last push here %1$s</string>
+    <string name="alerts_last_push_first">Last push here %1$s</string>
+    <string name="alerts_mute">Mute alerts</string>
+    <string name="alerts_mute_detail">Agents still go to the top of the list</string>
+    <string name="alerts_test">Send test alert</string>
+    <string name="alerts_test_send">Send</string>
+    <string name="alerts_test_idle">Checks the whole path to this phone</string>
+    <string name="alerts_test_waiting">Waiting for the test alert</string>
+    <string name="alerts_test_received">Test received %1$s</string>
+    <string name="alerts_test_missed">No test alert within 30 s</string>
 </resources>

@@ -60,7 +60,34 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
     private val behind = ArrayDeque<AgentKey>()
     private val ahead = ArrayDeque<AgentKey>()
 
+    /** An alert's agent, opened once the hub lists it ([openWhenListed]). */
+    private var pending: AgentKey? = null
+
+    /**
+     * A tapped alert (alerts spec, "Blocked while the app is closed"): opens
+     * the agent's terminal now if the hub lists it, else once it does. Dropped
+     * when the person opens something else, or when its machine lists agents
+     * without it (answered and gone meanwhile), so a later terminal at the same
+     * address never pops open.
+     */
+    fun openWhenListed(key: AgentKey) {
+        pending = key
+        openPending(hubHost.snapshot.value)
+    }
+
+    private fun openPending(snapshot: HubSnapshot) {
+        val key = pending ?: return
+        when {
+            listed(snapshot, key) -> {
+                pending = null
+                open(key)
+            }
+            snapshot.agents.any { it.machine == key.machine } -> pending = null
+        }
+    }
+
     fun open(key: AgentKey) {
+        pending = null
         // Taken before marking seen re-sorts the list.
         walk = hubHost.snapshot.value.agents.map { AgentKey(it.machine, it.address) }
         behind.clear()
@@ -119,6 +146,7 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
     }
 
     fun close() {
+        pending = null
         openKey = null
         finishMarked = false
         walk = emptyList()
@@ -126,12 +154,14 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
         ahead.clear()
     }
 
-    /** Follows the hub: a terminal that went away closes its sheet; a finish in view is seen. */
+    /**
+     * Follows the hub: a terminal that went away closes its sheet; a finish in
+     * view is seen; a tapped alert's agent opens once listed.
+     */
     fun onSnapshot(snapshot: HubSnapshot) {
+        openPending(snapshot)
         val key = openKey ?: return
-        val listed = row(snapshot, key) != null ||
-            snapshot.others.any { it.machine == key.machine && it.address == key.address }
-        if (!listed) {
+        if (!listed(snapshot, key)) {
             close()
             return
         }
@@ -151,6 +181,9 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
         finishMarked = true
         markSeen(key)
     }
+
+    private fun listed(snapshot: HubSnapshot, key: AgentKey): Boolean = row(snapshot, key) != null ||
+        snapshot.others.any { it.machine == key.machine && it.address == key.address }
 
     private fun row(snapshot: HubSnapshot, key: AgentKey): AgentRow? =
         snapshot.agents.find { it.machine == key.machine && it.address == key.address }

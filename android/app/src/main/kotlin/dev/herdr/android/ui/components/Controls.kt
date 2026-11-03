@@ -1,6 +1,7 @@
 package dev.herdr.android.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -133,5 +135,26 @@ fun OutlineButton(
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * The toggle (components.toggle, render 7's .toggle): 44x26, the input colour
+ * with a muted knob at the start when off; the solid colour with a solidFg
+ * knob at the end when on. Laid out by its row, which takes the tap (the whole
+ * row toggles, as a switch preference does); screen readers hear the row.
+ */
+@Composable
+fun Toggle(on: Boolean, modifier: Modifier = Modifier) {
+    val c = HerdrTheme.colors
+    Box(
+        modifier
+            .size(44.dp, 26.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(if (on) c.solid else c.input)
+            .padding(3.dp),
+        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(20.dp).clip(CircleShape).background(if (on) c.solidFg else c.muted))
     }
 }

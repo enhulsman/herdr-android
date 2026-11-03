@@ -76,11 +76,17 @@ From an open terminal, a swipe up on the title bar SHALL open the next agent
 that needs you or is finished-unseen, in list order; a swipe down SHALL go back
 through the agents that walk opened (also once they are seen or answered), then
 to earlier agents that need you; a swipe up after going back SHALL retrace them.
+A sideways swipe on the title bar SHALL open the next (finger to the left) or
+previous agent in list order, whatever its state, like tabs.
 A light haptic per step, a stronger one when none is left.
 
 #### Scenario: Clearing a backlog
 - **WHEN** three agents need Ezra and he swipes up on the title bar twice
 - **THEN** the second and third open in turn, and a third swipe gives the end-of-queue haptic
+
+#### Scenario: Tabs
+- **WHEN** Ezra swipes left on the title bar of an idle agent's terminal
+- **THEN** the next agent in the list opens, whatever its state
 
 #### Scenario: Going back
 - **WHEN** Ezra has swiped up through three finished agents and swipes down twice

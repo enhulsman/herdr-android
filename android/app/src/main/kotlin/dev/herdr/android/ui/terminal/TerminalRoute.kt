@@ -128,6 +128,7 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             onBack = home::close,
             onOpen = home::open,
             onSwipe = home::step,
+            onTab = home::tab,
             onPhoneGrid = { phone = it },
             onWatchView = { app.terminalZoom[key] = it.zoom },
         )

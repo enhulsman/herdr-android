@@ -52,6 +52,8 @@ class TerminalTouchTest {
     }
 
     private val keyboard = Keyboard()
+    private val swipes = mutableListOf<String>()
+    private val tabs = mutableListOf<String>()
 
     private fun open(phase: TermPhase, cols: Int, rows: Int, typing: Boolean): Triple<FakeTerminalView, TerminalScreenState, TerminalSession> {
         val view = FakeTerminalView()
@@ -62,7 +64,13 @@ class TerminalTouchTest {
         val screen = TerminalScreenState().apply {
             this.typing = typing
         }
-        val actions = TerminalActions(onBack = {}, onOpen = {}, onSwipe = { false }, onPhoneGrid = {})
+        val actions = TerminalActions(
+            onBack = {},
+            onOpen = {},
+            onSwipe = { swipes += if (it) "up" else "down"; true },
+            onPhoneGrid = {},
+            onTab = { tabs += if (it) "next" else "previous"; true },
+        )
         activity.setContent {
             HerdrTheme(dark = true) {
                 TerminalScreen(terminalUi(hub, key, activity.resources), session, screen, actions, keyboard, composeFocus = false)
@@ -220,5 +228,36 @@ class TerminalTouchTest {
         val (_, screen, _) = open(TermPhase.Watching, 160, 44, typing = false)
         pinch(midX, midY, 200f, 600f)
         assertTrue("zoom: ${screen.watch.zoom}", screen.watch.zoom > 1f)
+    }
+
+    /** One finger along the title bar's middle, from ([x0], [y0]) to ([x1], [y1]). */
+    private fun dragOnTitle(x0: Float, x1: Float, dy: Float = 0f) {
+        val d = activity.resources.displayMetrics.density
+        val bar = activity.window.decorView.rootWindowInsets?.getInsets(android.view.WindowInsets.Type.systemBars())?.top ?: 0
+        val y = bar + HerdrLayout.terminalTitleHeight.value * d / 2
+        val down = SystemClock.uptimeMillis()
+        send(MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, x0, y, 0))
+        for (i in 1..10) {
+            send(MotionEvent.obtain(down, down + i * 10L, MotionEvent.ACTION_MOVE, x0 + (x1 - x0) * i / 10, y + dy * i / 10, 0))
+        }
+        send(MotionEvent.obtain(down, down + 120, MotionEvent.ACTION_UP, x1, y + dy, 0))
+    }
+
+    @Test
+    fun aSidewaysSwipeOnTheTitleBarMovesBetweenTabs() {
+        open(TermPhase.Typing, 53, 40, typing = true)
+        dragOnTitle(midX + 200f, midX - 200f)
+        assertEquals("finger to the left: the next tab", listOf("next"), tabs)
+        dragOnTitle(midX - 200f, midX + 200f)
+        assertEquals(listOf("next", "previous"), tabs)
+        assertEquals("no queue step", emptyList<String>(), swipes)
+    }
+
+    @Test
+    fun anUpwardSwipeOnTheTitleBarStillStepsTheQueue() {
+        open(TermPhase.Typing, 53, 40, typing = true)
+        dragOnTitle(midX, midX + 20f, dy = -300f)
+        assertEquals(listOf("up"), swipes)
+        assertEquals(emptyList<String>(), tabs)
     }
 }

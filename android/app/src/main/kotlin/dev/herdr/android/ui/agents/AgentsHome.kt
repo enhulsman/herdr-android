@@ -91,6 +91,26 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
         return true
     }
 
+    /**
+     * A sideways swipe on the title bar: the next ([next]) or previous agent in
+     * list order, whatever its state, like tabs (phone check round 2). The order
+     * is the walk's, so agents keep their places while the hub re-sorts; agents
+     * gone are skipped, agents listed since follow. False at either end.
+     */
+    fun tab(next: Boolean): Boolean {
+        val current = openKey ?: return false
+        val listed = hubHost.snapshot.value.agents.map { AgentKey(it.machine, it.address) }
+        val present = listed.toSet()
+        val order = LinkedHashSet(walk).apply { addAll(listed) }.filter { it in present || it == current }
+        val at = order.indexOf(current)
+        val target = order.getOrNull(if (next) at + 1 else if (at < 0) -1 else at - 1) ?: return false
+        // A new starting point for the queue's swipe down.
+        behind.clear()
+        ahead.clear()
+        show(target)
+        return true
+    }
+
     private fun show(key: AgentKey) {
         openKey = key
         val row = row(hubHost.snapshot.value, key)

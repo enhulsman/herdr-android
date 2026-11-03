@@ -212,6 +212,54 @@ pub struct Scrollbar {
 // GhosttyTerminalData
 pub const TERMINAL_DATA_SCROLLBAR: c_int = 9;
 pub const TERMINAL_DATA_VIEWPORT_ACTIVE: c_int = 32;
+pub const TERMINAL_DATA_ACTIVE_SCREEN: c_int = 6;
+pub const TERMINAL_DATA_MOUSE_TRACKING: c_int = 11;
+
+// GhosttyTerminalScreen
+pub const SCREEN_PRIMARY: c_int = 0;
+pub const SCREEN_ALTERNATE: c_int = 1;
+
+#[repr(C)]
+pub struct MouseEncoderImpl {
+    _private: [u8; 0],
+}
+#[repr(C)]
+pub struct MouseEventImpl {
+    _private: [u8; 0],
+}
+pub type MouseEncoder = *mut MouseEncoderImpl;
+pub type MouseEvent = *mut MouseEventImpl;
+
+/// `GhosttyMouseEncoderSize`, in pixels.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct MouseEncoderSize {
+    pub size: usize,
+    pub screen_width: u32,
+    pub screen_height: u32,
+    pub cell_width: u32,
+    pub cell_height: u32,
+    pub padding_top: u32,
+    pub padding_bottom: u32,
+    pub padding_right: u32,
+    pub padding_left: u32,
+}
+
+/// `GhosttyMousePosition`, in pixels.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct MousePosition {
+    pub x: f32,
+    pub y: f32,
+}
+
+// GhosttyMouseEncoderOption, GhosttyMouseAction, GhosttyMouseButton
+pub const MOUSE_ENCODER_OPT_SIZE: c_int = 2;
+pub const MOUSE_ACTION_PRESS: c_int = 0;
+pub const MOUSE_ACTION_RELEASE: c_int = 1;
+pub const MOUSE_BUTTON_LEFT: c_int = 1;
+pub const MOUSE_BUTTON_FOUR: c_int = 4;
+pub const MOUSE_BUTTON_FIVE: c_int = 5;
 
 unsafe extern "C" {
     pub fn ghostty_terminal_new(
@@ -293,6 +341,30 @@ unsafe extern "C" {
     pub fn ghostty_key_event_set_consumed_mods(event: KeyEvent, mods: u16);
     pub fn ghostty_key_event_set_utf8(event: KeyEvent, utf8: *const c_char, len: usize);
     pub fn ghostty_key_event_set_unshifted_codepoint(event: KeyEvent, codepoint: u32);
+
+    pub fn ghostty_mouse_encoder_new(
+        allocator: *const c_void,
+        encoder: *mut MouseEncoder,
+    ) -> GhosttyResult;
+    pub fn ghostty_mouse_encoder_free(encoder: MouseEncoder);
+    pub fn ghostty_mouse_encoder_setopt(encoder: MouseEncoder, option: c_int, value: *const c_void);
+    pub fn ghostty_mouse_encoder_setopt_from_terminal(encoder: MouseEncoder, terminal: Terminal);
+    pub fn ghostty_mouse_encoder_encode(
+        encoder: MouseEncoder,
+        event: MouseEvent,
+        out: *mut c_char,
+        out_size: usize,
+        out_len: *mut usize,
+    ) -> GhosttyResult;
+    pub fn ghostty_mouse_event_new(
+        allocator: *const c_void,
+        event: *mut MouseEvent,
+    ) -> GhosttyResult;
+    pub fn ghostty_mouse_event_free(event: MouseEvent);
+    pub fn ghostty_mouse_event_set_action(event: MouseEvent, action: c_int);
+    pub fn ghostty_mouse_event_set_button(event: MouseEvent, button: c_int);
+    pub fn ghostty_mouse_event_set_mods(event: MouseEvent, mods: u16);
+    pub fn ghostty_mouse_event_set_position(event: MouseEvent, position: MousePosition);
 
     #[allow(dead_code, reason = "used by the layout test")]
     pub fn ghostty_type_json() -> *const c_char;

@@ -564,3 +564,87 @@ async fn a_resize_during_the_attach_is_not_lost() {
     let s = o.screen.until_state(|s| s.cols == 120).await;
     assert_eq!((s.phase, s.rows), (TermPhase::Watching, 40));
 }
+
+// "Scrolling a full-screen agent": the program keeps its own history, so the
+// flick goes to it as wheel events; while watching it first takes over at
+// the phone's size, as the first key does.
+#[tokio::test(start_paused = true)]
+async fn scrolling_a_full_screen_program_sends_it_the_wheel_from_the_phone() {
+    let (_rig, mut core, mut o) = watching("term-scroll-full").await;
+    core.send(
+        5,
+        wire::DATA,
+        b"\x1b[?1049h\x1b[?1000h\x1b[?1006hfull screen",
+    )
+    .await;
+    o.screen.until_text("full screen").await;
+    o.cmds.send(Cmd::Scroll(-2)).unwrap();
+    let close = core.frame().await;
+    assert_eq!((close.channel, close.kind), (5, wire::CLOSE));
+    let params = core.attach(6, PHONE).await;
+    assert_eq!(params["observe"], false);
+    let wheel = core.frame().await;
+    assert_eq!(
+        (wheel.channel, wheel.kind, wheel.payload.as_slice()),
+        (6, wire::DATA, b"\x1b[<64;1;1M\x1b[<64;1;1M".as_slice())
+    );
+    let s = o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
+    assert_eq!((s.cols, s.rows), PHONE);
+
+    // The next flick goes straight to the program, with the modes of the new paint.
+    core.send(
+        6,
+        wire::DATA,
+        b"\x1b[?1049h\x1b[?1000h\x1b[?1006hphone paint",
+    )
+    .await;
+    o.screen.until_text("phone paint").await;
+    o.cmds.send(Cmd::Scroll(1)).unwrap();
+    let wheel = core.frame().await;
+    assert_eq!(
+        (wheel.channel, wheel.payload.as_slice()),
+        (6, b"\x1b[<65;1;1M".as_slice())
+    );
+}
+
+// A tap on a program that takes mouse clicks, as on the desk: only while the
+// phone types at its own size (the cell watched at desk size would move).
+#[tokio::test(start_paused = true)]
+async fn a_tap_clicks_a_mouse_program_only_while_typing() {
+    let (_rig, mut core, mut o) = watching("term-click").await;
+    core.send(
+        5,
+        wire::DATA,
+        b"\x1b[?1049h\x1b[?1000h\x1b[?1006hfull screen",
+    )
+    .await;
+    o.screen.until_text("full screen").await;
+    o.cmds.send(Cmd::Click(3, 4)).unwrap();
+    key(&o, 'y');
+    let close = core.frame().await;
+    assert_eq!(
+        (close.channel, close.kind),
+        (5, wire::CLOSE),
+        "the click sent nothing"
+    );
+    core.attach(6, PHONE).await;
+    let typed = core.frame().await;
+    assert_eq!(
+        (typed.channel, typed.payload.as_slice()),
+        (6, b"y".as_slice())
+    );
+    o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
+    core.send(
+        6,
+        wire::DATA,
+        b"\x1b[?1049h\x1b[?1000h\x1b[?1006hphone paint",
+    )
+    .await;
+    o.screen.until_text("phone paint").await;
+    o.cmds.send(Cmd::Click(3, 4)).unwrap();
+    let click = core.frame().await;
+    assert_eq!(
+        (click.channel, click.payload.as_slice()),
+        (6, b"\x1b[<0;4;5M\x1b[<0;4;5m".as_slice())
+    );
+}

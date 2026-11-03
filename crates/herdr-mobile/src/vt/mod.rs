@@ -39,6 +39,7 @@ mod ffi;
 #[cfg_attr(not(test), allow(dead_code))]
 mod grid;
 pub(crate) mod keys;
+mod mouse;
 
 use std::ffi::c_void;
 use std::fmt;
@@ -677,6 +678,40 @@ mod tests {
             ffi::CELLS_DATA_HAS_STYLING
         );
         assert_eq!(enum_value("GhosttyCellData", "WIDE"), ffi::CELL_DATA_WIDE);
+        // Scrolling a full-screen program (mouse.rs).
+        assert_eq!(
+            size("GhosttyMouseEncoderSize"),
+            size_of::<ffi::MouseEncoderSize>()
+        );
+        assert_eq!(
+            size("GhosttyMousePosition"),
+            size_of::<ffi::MousePosition>()
+        );
+        for (t, k, ours) in [
+            (
+                "GhosttyTerminalData",
+                "ACTIVE_SCREEN",
+                ffi::TERMINAL_DATA_ACTIVE_SCREEN,
+            ),
+            (
+                "GhosttyTerminalData",
+                "MOUSE_TRACKING",
+                ffi::TERMINAL_DATA_MOUSE_TRACKING,
+            ),
+            ("GhosttyTerminalScreen", "ALTERNATE", ffi::SCREEN_ALTERNATE),
+            (
+                "GhosttyMouseEncoderOption",
+                "SIZE",
+                ffi::MOUSE_ENCODER_OPT_SIZE,
+            ),
+            ("GhosttyMouseAction", "PRESS", ffi::MOUSE_ACTION_PRESS),
+            ("GhosttyMouseAction", "RELEASE", ffi::MOUSE_ACTION_RELEASE),
+            ("GhosttyMouseButton", "LEFT", ffi::MOUSE_BUTTON_LEFT),
+            ("GhosttyMouseButton", "FOUR", ffi::MOUSE_BUTTON_FOUR),
+            ("GhosttyMouseButton", "FIVE", ffi::MOUSE_BUTTON_FIVE),
+        ] {
+            assert_eq!(enum_value(t, k), ours, "{t}.{k}");
+        }
         assert_eq!(enum_value("GhosttyCellWide", "WIDE"), ffi::CELL_WIDE_WIDE);
         assert_eq!(
             enum_value("GhosttyCellWide", "SPACER_HEAD"),

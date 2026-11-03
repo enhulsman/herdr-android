@@ -529,6 +529,15 @@ impl TerminalView {
         self.send(term::Cmd::Live);
     }
 
+    /// A tap on cell (col, row) of the phone's grid: a click for a program
+    /// that tracks the mouse, while the phone types (else nothing).
+    pub fn click(&self, col: u16, row: u16) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Click(col, row));
+        #[cfg(not(feature = "vt"))]
+        let _ = (col, row);
+    }
+
     /// The phone's own grid size: sent while typing, kept while watching.
     pub fn phone_size(&self, cols: u16, rows: u16) {
         #[cfg(feature = "vt")]

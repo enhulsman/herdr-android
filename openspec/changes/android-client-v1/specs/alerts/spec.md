@@ -13,14 +13,15 @@ setup.
 - **THEN** every machine shows alerts as off, with a way to grant it
 
 ### Requirement: The phone registers itself in a core document
-The app SHALL write its endpoint and keys into the `hdroid-push` document on each
-connected machine and SHALL update them when the endpoint changes. Client document
+The app SHALL write its endpoint, keys and its own name for the machine into the
+`hdroid-push` document on each connected machine and SHALL update them when the
+endpoint changes. The watcher SHALL echo that name as `machine` in each push. Client document
 names SHALL satisfy herdr-core's name rule (1-32 of `a-z 0-9 - _ .`, starting with
 a letter or digit).
 
 #### Scenario: First registration
 - **WHEN** the app registers while connected to WSL
-- **THEN** WSL's `hdroid-push` holds the current endpoint and keys
+- **THEN** WSL's `hdroid-push` holds the current endpoint, keys and the phone's name for WSL
 
 #### Scenario: Names pass the core's rule
 - **WHEN** the tests write `hdroid-push` and `hdroid-push-status` to a scratch core
@@ -44,7 +45,8 @@ or "core has zero terminals" in its log and status document.
 `herdr-proto::attention`, SHALL suppress sub-agents and terminals not placed in a
 pane, and SHALL alert for unplaceable terminals when the layout cannot be read.
 A grace delay (default 30 s, configurable) SHALL precede each alert and SHALL
-cancel it when the state moves on.
+cancel it when the state moves on. With no `herdr-app` document every agent
+SHALL be treated as placed.
 
 #### Scenario: Answered at the desk within the delay
 - **WHEN** an agent becomes blocked and Ezra answers at the desk 10 s later

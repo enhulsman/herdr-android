@@ -118,8 +118,11 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
 ## 5. Alerts
 
 - **`herdr-push`** runs on WSL as a systemd user service. It connects only to an
-  existing core (session and socket from its config file, never autostart) and
-  reports "no core" or "zero terminals" instead of idling silently.
+  existing core (the socket path from its config file `~/.config/herdr-push/config`,
+  `key = value` lines; never `herdr-core connect`, which autostarts) and
+  reports "no core" or "zero terminals" instead of idling silently. The alert
+  record, answered test requests and the last canary live in
+  `~/.local/state/herdr-push/state.json`. Install notes: `docs/herdr-push.md`.
 - **Rules** come from `herdr-proto::attention`, shared with the app: blocked
   includes `error`; done is busy (working/blocked/error) to non-busy; records with
   a `parent` are suppressed; terminals not placed in a pane are suppressed unless
@@ -129,7 +132,9 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
   persisted; on start the watcher alerts for blocked terminals never alerted,
   and after `missed` it diffs a fresh snapshot against that record.
 - **Registration:** the phone writes `hdroid-push` on each machine:
-  `{phones: [{endpoint, p256dh, auth, test?}]}`. Doc names satisfy herdr-core's
+  `{phones: [{endpoint, p256dh, auth, machine, test?}]}`. `machine` is the
+  phone's own name for that machine, echoed in each push as `machine`, so the
+  phone knows which of its machines spoke without the watcher knowing its names. Doc names satisfy herdr-core's
   name rule (`addr.rs:6-14`: 1-32 of `a-z 0-9 - _ .`, no `/`).
 - **Delivery:** the watcher POSTs only to endpoints whose scheme and host match
   its allowlist (`https://ntfy.example.org`), https only, no redirects, 10 s timeout,
@@ -140,10 +145,12 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
   `{v, type: alert|cleared|canary|test, machine, terminal?, name?, state?, kind?, at}`.
   Never screen text or `msg`. `ece` pads the plaintext to a multiple of 128 bytes, so
   a payload of up to 3967 bytes fits one record and the 4 KiB cap (body 4070 bytes).
-- **Health:** a canary push every 6 hours; the phone records the last push of
+- **Health:** a canary push every 6 hours (the first at once on a fresh install); the phone records the last push of
   any kind per machine and a local periodic check posts a quiet "Alert health"
   notice after 13 hours of silence. The watcher writes `hdroid-push-status`
-  (`{version, last_accepted_at, last_accept_status, per-endpoint status, notes}`)
+  (`{version, last_push_at, last_push_status, endpoints: {endpoint: {status, at}}, notes}`;
+  `last_push_*` is the last answer from ntfy, accepted or refused; an endpoint's
+  status is `accepted 200`, `refused 403`, `failed: ...` or `ignored: host not allowed`)
   on change or every 30 minutes; the app shows "accepted by ntfy" status, never
   "delivered".
 

@@ -20,7 +20,7 @@ import java.util.Locale
  * you" at high importance (sound and the lock screen, as Android settings
  * allow), "Finished" and "Alert health" at low importance, silent. Sound,
  * vibration and Do Not Disturb are left to Android. Tapping an agent's
- * notification opens its terminal through [MainActivity]; others open the app.
+ * notification opens its terminal through [AlertTapActivity]; others open the app.
  */
 class AndroidAlertSink(private val context: Context) : AlertSink {
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -38,12 +38,10 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
     }
 
     override fun post(note: AlertNote) {
-        val intent = Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        note.open?.let {
-            intent.action = MainActivity.ACTION_OPEN_AGENT
-            intent.putExtra(MainActivity.EXTRA_MACHINE, it.machine).putExtra(MainActivity.EXTRA_TERMINAL, it.address)
-        }
+        // An agent's tap goes through AlertTapActivity, which only the app can start.
+        val intent = note.open?.let { AlertTapActivity.intent(context, it) }
+            ?: Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val tap = PendingIntent.getActivity(
             context,
             note.tag.hashCode(),

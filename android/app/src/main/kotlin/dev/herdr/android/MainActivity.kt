@@ -1,6 +1,5 @@
 package dev.herdr.android
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -11,14 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.herdr.android.ui.addmachine.AddMachineRoute
-import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.AgentsHome
 import dev.herdr.android.ui.agents.AgentsRoute
 import dev.herdr.android.ui.flows.MachineFlows
@@ -33,39 +29,18 @@ import dev.herdr.android.ui.theme.HerdrTheme
 import org.unifiedpush.android.connector.UnifiedPush
 
 class MainActivity : ComponentActivity() {
-    /** The agent of a tapped alert, until the Agents home takes it. */
-    private val alertOpen = mutableStateOf<AgentKey?>(null)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val transparent = android.graphics.Color.TRANSPARENT
         // Light or dark bar icons follow the system, as the theme does.
         enableEdgeToEdge(SystemBarStyle.auto(transparent, transparent), SystemBarStyle.auto(transparent, transparent))
         val app = application as HerdrApp
-        // A rotation recreates the activity with the same intent: the alert was taken already.
-        if (savedInstanceState == null) takeAlert(intent)
         // The UnifiedPush way to keep a registration current: ask again on each start; a
         // changed endpoint arrives in HerdrPushService.
         if (app.pushStore.registration != null) UnifiedPush.register(this, HerdrApp.PUSH_INSTANCE)
-        setContent { HerdrTheme(app.contrast) { Root(app, alertOpen) } }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        takeAlert(intent)
-    }
-
-    private fun takeAlert(intent: Intent?) {
-        if (intent?.action != ACTION_OPEN_AGENT) return
-        val machine = intent.getStringExtra(EXTRA_MACHINE) ?: return
-        val terminal = intent.getStringExtra(EXTRA_TERMINAL) ?: return
-        alertOpen.value = AgentKey(machine, terminal)
-    }
-
-    companion object {
-        const val ACTION_OPEN_AGENT = "dev.herdr.android.OPEN_AGENT"
-        const val EXTRA_MACHINE = "machine"
-        const val EXTRA_TERMINAL = "terminal"
+        // Exported as the launcher, so it takes nothing from its intent: a tapped
+        // alert's agent comes through AlertTapActivity and app.alertTap.
+        setContent { HerdrTheme(app.contrast) { Root(app) } }
     }
 }
 
@@ -74,7 +49,7 @@ class MainActivity : ComponentActivity() {
  * back closes a sheet or dialog first, then returns to Machines, then home.
  */
 @Composable
-private fun Root(app: HerdrApp, alertOpen: MutableState<AgentKey?>) {
+private fun Root(app: HerdrApp) {
     val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
     val isForeground = { app.foreground.isForeground }
     val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost, isForeground)) { AgentsHome(app.hubHost, isForeground) }
@@ -86,12 +61,12 @@ private fun Root(app: HerdrApp, alertOpen: MutableState<AgentKey?>) {
         home.onSnapshot(snapshot)
     }
     // A tapped alert: its terminal, once the hub lists the agent.
-    val alert = alertOpen.value
+    val alert by app.alertTap.collectAsState()
     LaunchedEffect(alert) {
-        alert ?: return@LaunchedEffect
-        alertOpen.value = null
+        val key = alert ?: return@LaunchedEffect
+        app.alertTap.value = null
         flows.openAgents()
-        home.openWhenListed(alert)
+        home.openWhenListed(key)
     }
     // The export/import notice answers the picker just closed; it does not follow the person to other screens.
     LaunchedEffect(flows.screen) { if (flows.screen != Screen.Machines) app.transfer.dismiss() }

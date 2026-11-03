@@ -27,6 +27,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- An agent notification's tap: only the app's own notifications can start it. -->
+        <activity
+            android:name=".push.AlertTapActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
         <!-- Started by the UnifiedPush distributor (ntfy), also with the app closed. -->
         <service
             android:name=".push.HerdrPushService"

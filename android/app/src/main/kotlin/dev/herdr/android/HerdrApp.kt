@@ -21,6 +21,7 @@ import dev.herdr.android.push.AndroidAlertSink
 import dev.herdr.android.push.PushStore
 import dev.herdr.android.push.SilenceCheckService
 import dev.herdr.android.push.timeOfDay
+import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.terminal.TerminalCache
 import dev.herdr.android.ui.terminal.ZoomMemory
 import dev.herdr.android.ui.theme.ContrastSetting
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.unifiedpush.android.connector.UnifiedPush
 import uniffi.herdr_mobile.AlertsRegistration
 import uniffi.herdr_mobile.Hub
@@ -80,6 +82,9 @@ class HerdrApp : Application() {
     /** Pushes to notifications, silence to "Alert health". */
     lateinit var alerts: Alerts
         private set
+
+    /** The agent of a tapped alert (AlertTapActivity), until the Agents home takes it. */
+    val alertTap = MutableStateFlow<AgentKey?>(null)
 
     private var promptActivity: Activity? = null
 

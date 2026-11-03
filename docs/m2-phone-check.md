@@ -46,7 +46,7 @@ Result:
 - [ ] In a shell: type `lsx`, backspace, enter: it runs `ls`.
 - [ ] The keyboard shows no suggestions and does not autocorrect.
 
-Result:
+Result: Typing works, also into a Claude Code session from the phone (first round, 2026-11-02).
 
 ## 4. Keyboard hidden while typing (render 4b)
 
@@ -56,7 +56,7 @@ Result:
 - [ ] Scroll up in Claude Code afterwards: is there duplicated history from
   the redraws? How much does it bother you?
 
-Result:
+Result: Resizes cleanly every time. FAIL: the terminal reacts to no touch at all (cannot scroll).
 
 ## 5. Keys row and shelf
 
@@ -69,7 +69,7 @@ Result:
 - [ ] Hold esc on a working agent: it stops and the phone shows a short
   report ("Stopped", "Still working", ...).
 
-Result:
+Result: Permission prompt answered with down, down, enter. Opinion: the shelf was not found without being told; enter belongs in the main row.
 
 ## 6. Compose (render 5)
 
@@ -79,7 +79,7 @@ Result:
   and is NOT sent; enter is yours.
 - [ ] Cancel sends nothing.
 
-Result:
+Result: Dictated text lands in the input box, not sent. Pass.
 
 ## 7. Back at the desk
 
@@ -87,7 +87,7 @@ Result:
   and the phone goes back to watching at desk size without garbled lines.
 - [ ] Resize the desk window while output streams: the phone follows cleanly.
 
-Result:
+Result: The desk takes its size back at once. Opinion: watching a wide desk terminal leaves a large empty area below it; handle differently (proposal: fill it with older output above the desk screen).
 
 ## 8. Scrollback, Live and copy
 
@@ -128,7 +128,7 @@ Result:
   Claude Code answer) while watching: does it stay smooth, and does the phone
   get warm? (The measured p95 frame time comes later.)
 
-Result:
+Result: Smooth and fast; responsiveness as expected over SSH. Text size and margins fine.
 
 ## 12. Choices made while you were away (keep or change)
 

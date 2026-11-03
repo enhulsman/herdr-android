@@ -20,7 +20,7 @@ fun snapshot(
 fun machine(name: String, state: MachineState, lastConnected: Long? = null) =
     MachineView(name, "$name.example.org", 22u, "dev", "SHA256:example", state, lastConnected?.toULong())
 
-fun connected(name: String) = machine(name, MachineState.Connected("0.1.15", untested = false), lastConnected = 0L)
+fun connected(name: String) = machine(name, MachineState.Connected("0.1.15"), lastConnected = 0L)
 
 fun unreachable(name: String, lastConnected: Long) = machine(name, MachineState.Unreachable("connection refused"), lastConnected)
 

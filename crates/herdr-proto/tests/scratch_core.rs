@@ -224,7 +224,7 @@ fn hello_names_the_cores_version_and_passes_the_compat_check() {
         assert_eq!(c.hello["generation"], compat::GENERATION);
         assert_eq!(c.hello["framed"], true);
         // Tested against itself it is fine; it is at least the oldest supported.
-        assert_eq!(compat::check(&c.hello, &have), Compat::Ok);
+        assert_eq!(compat::check(&c.hello), Compat::Ok);
         for method in compat::USES {
             assert!(
                 c.hello["methods"]

@@ -77,8 +77,9 @@ only after confirmation; later it SHALL refuse a different host key and say so.
 
 ### Requirement: The protocol version is checked before use
 After `hello` the app SHALL refuse a core older than it supports, naming both
-versions, and SHALL show "untested herdr-core version" for a core newer than the
-newest version its tests ran against.
+versions. A newer core SHALL connect with no notice: CI runs the protocol suite
+against the latest herdr-core release, and bugs in a newer one become issues
+(phone check round 2).
 
 #### Scenario: Older core
 - **WHEN** a machine runs a herdr-core lacking a method the app needs
@@ -86,7 +87,7 @@ newest version its tests ran against.
 
 #### Scenario: Newer core
 - **WHEN** a machine runs a newer herdr-core than tested
-- **THEN** the app connects and shows the untested-version notice on that machine
+- **THEN** the app connects and shows only that core's version on that machine
 
 ### Requirement: Calls time out honestly
 Every call SHALL have a timeout (10 s; `terminal.interrupt` 15 s). When a call that

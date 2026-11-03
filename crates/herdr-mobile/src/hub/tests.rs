@@ -704,7 +704,7 @@ async fn a_newer_protocol_generation_asks_for_an_app_update() {
 
 // Scenario "Newer core".
 #[tokio::test(start_paused = true)]
-async fn a_newer_core_connects_with_the_untested_notice() {
+async fn a_newer_core_connects_without_a_notice() {
     let mut rig = rig("newer");
     rig.add_trusted(WS, WS_KEY);
     rig.hub.resume();
@@ -715,7 +715,6 @@ async fn a_newer_core_connects_with_the_untested_notice() {
         state(&s, WS),
         Some(&MachineState::Connected {
             version: "9.0.0".into(),
-            untested: true,
         })
     );
 }
@@ -1226,7 +1225,6 @@ async fn a_stopped_task_cannot_write_its_state() {
     rig.hub.suspend();
     let late = MachineState::Connected {
         version: "0.1.15".into(),
-        untested: false,
     };
     assert!(!rig.hub.attempting(WS, old));
     assert!(!rig.hub.settle(WS, old, late, None));

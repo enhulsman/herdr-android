@@ -40,7 +40,7 @@ class MachineStatusTest {
 
     @Test
     fun connectedShowsTheCoreVersionWithADot() {
-        val c = card(MachineState.Connected("0.1.16", untested = false))
+        val c = card(MachineState.Connected("0.1.16"))
         assertEquals("Connected · herdr-core 0.1.16", c.statusText)
         assertEquals(StatusMark.Connected, c.mark)
         assertEquals(listOf(Tone.Muted, Tone.Muted), c.status.map { it.tone })
@@ -50,10 +50,9 @@ class MachineStatusTest {
     }
 
     @Test
-    fun anUntestedCoreAddsTheNoticeInTheWarningColour() {
-        val c = card(MachineState.Connected("0.1.16", untested = true))
-        assertEquals("Connected · herdr-core 0.1.16 · untested version", c.statusText)
-        assertEquals(Segment("untested version", Tone.Warning), c.status.last())
+    fun aNewerCoreShowsJustItsVersion() {
+        val c = card(MachineState.Connected("0.9.0"))
+        assertEquals("Connected · herdr-core 0.9.0", c.statusText)
     }
 
     @Test
@@ -105,7 +104,7 @@ class MachineStatusTest {
     @Test
     fun theScreenTicksEachSecondOnlyWhileACountdownShows() {
         val waiting = MachineView("server", "server.example.org", 22u, "me", null, MachineState.Unreachable("x"), null, (NOW + 9_000).toULong())
-        val idle = waiting.copy(state = MachineState.Connected("0.1.16", untested = false), nextRetryMs = null)
+        val idle = waiting.copy(state = MachineState.Connected("0.1.16"), nextRetryMs = null)
         val counting = HubSnapshot(listOf(waiting), emptyList(), emptyList(), null)
         val quiet = HubSnapshot(listOf(idle), emptyList(), emptyList(), null)
         assertEquals(NOW / 1_000, machinesTick(counting, NOW + 999))

@@ -3,7 +3,7 @@
 //! would start a core. Each connection subscribes to events, reads the layout
 //! and phone documents, and turns what [`Rules`] decides into pushes.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -98,6 +98,9 @@ pub struct Watcher {
     status: Status,
     /// Per endpoint, the last `test` value answered.
     tests: BTreeMap<String, Value>,
+    /// Endpoints seen in `hdroid-push` before: a new one is sent the alerts
+    /// still open, which went out before it registered.
+    known: BTreeSet<String>,
     canary_at: Option<u64>,
     phones: Vec<Phone>,
     doc_notes: Vec<String>,
@@ -113,7 +116,14 @@ impl Watcher {
             .as_object()
             .map(|t| t.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
+        // Missing in a state from before it was kept: the phones then present
+        // count as new once, and get what is open again.
+        let known = state["known"]
+            .as_array()
+            .map(|k| k.iter().filter_map(|e| e.as_str().map(str::to_owned)).collect())
+            .unwrap_or_default();
         Watcher {
+            known,
             rules: Rules::new(settings.grace_ms, &state["rules"]),
             canary_at: state["canary_at"].as_u64(),
             settings,
@@ -143,6 +153,7 @@ impl Watcher {
         let state = json!({
             "rules": self.rules.record(),
             "tests": self.tests,
+            "known": self.known,
             "canary_at": self.canary_at,
         });
         if let Err(e) = save_state(&self.settings.state_file, &state) {
@@ -260,21 +271,7 @@ impl Watcher {
             return;
         }
         for action in actions {
-            let push = match action {
-                Action::Alert {
-                    terminal,
-                    name,
-                    state,
-                    kind,
-                } => Push::Alert {
-                    terminal,
-                    name,
-                    state,
-                    kind,
-                },
-                Action::Cleared { terminal } => Push::Cleared { terminal },
-            };
-            self.push(&push, None);
+            self.push(&push_of(action), None);
         }
         self.save();
     }
@@ -338,6 +335,28 @@ impl Watcher {
             .keep_endpoints(self.phones.iter().map(|p| p.subscription.endpoint.as_str()));
         self.refresh_notes();
 
+        // A phone new here missed the alerts that are still open: it gets them now.
+        let fresh: Vec<String> = self
+            .phones
+            .iter()
+            .map(|p| p.subscription.endpoint.clone())
+            .filter(|e| !self.known.contains(e))
+            .collect();
+        let current: BTreeSet<String> = self
+            .phones
+            .iter()
+            .map(|p| p.subscription.endpoint.clone())
+            .collect();
+        if !fresh.is_empty() || self.known != current {
+            for endpoint in &fresh {
+                for action in self.rules.open_alerts() {
+                    self.push(&push_of(action), Some(endpoint));
+                }
+            }
+            self.known = current;
+            self.save();
+        }
+
         // "Send test alert": each new value asks for one test push to that phone.
         let asked: Vec<(String, Value)> = self
             .phones
@@ -379,6 +398,23 @@ impl Watcher {
                 self.status_written_at = Some(now.saturating_sub(status::REFRESH_MS) + 60_000);
             }
         }
+    }
+}
+
+fn push_of(action: Action) -> Push {
+    match action {
+        Action::Alert {
+            terminal,
+            name,
+            state,
+            kind,
+        } => Push::Alert {
+            terminal,
+            name,
+            state,
+            kind,
+        },
+        Action::Cleared { terminal } => Push::Cleared { terminal },
     }
 }
 

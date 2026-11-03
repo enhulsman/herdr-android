@@ -352,3 +352,55 @@ fn a_blocked_agent_alerts_clears_and_reports_its_status() {
         watching.abort();
     });
 }
+
+/// Codex review, M3: an agent that blocked before any phone registered still
+/// alerts the phone that registers later, once; a restart repeats nothing.
+#[test]
+fn a_phone_registering_after_the_block_still_gets_the_alert_once() {
+    runtime().block_on(async {
+        let Some(core) = Core::start("late").await else {
+            return;
+        };
+        let c = core.client().await;
+        let home = core.dir.join("home");
+        let script = format!(
+            "{blocked}; sleep 60",
+            blocked = report("state=blocked:kind=permission:app=claude"),
+        );
+        c.call("terminal.run", json!({"argv": ["sh", "-c", script]}))
+            .await
+            .unwrap();
+
+        let rec = Recorder::default();
+        let w = Watcher::new(settings(core.socket(), &home), Box::new(rec.clone()));
+        let watching = tokio::spawn(async move {
+            let mut w = w;
+            w.connection().await
+        });
+        // Past the 300 ms delay with nobody to tell.
+        tokio::time::sleep(Duration::from_millis(1_500)).await;
+        assert!(rec.types().is_empty(), "{:?}", rec.types());
+
+        let phone = json!({"endpoint": ENDPOINT, "p256dh": UA_PUBLIC, "auth": AUTH,
+                           "machine": "workstation"});
+        watch::write_doc(&c, "hdroid-push", json!({"phones": [phone]}))
+            .await
+            .unwrap();
+        let alert = rec.until("alert blocked").await;
+        assert_eq!(alert["kind"], "permission");
+        watching.abort();
+        let _ = watching.await;
+
+        // A restart: the phone already has it.
+        let again = Recorder::default();
+        let w = Watcher::new(settings(core.socket(), &home), Box::new(again.clone()));
+        let watching = tokio::spawn(async move {
+            let mut w = w;
+            w.connection().await
+        });
+        tokio::time::sleep(Duration::from_millis(1_500)).await;
+        let types = again.types();
+        assert!(!types.contains(&"alert blocked".to_owned()), "{types:?}");
+        watching.abort();
+    });
+}

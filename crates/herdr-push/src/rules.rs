@@ -190,13 +190,7 @@ impl Rules {
             let Some(name) = rows.get(&address) else {
                 continue;
             };
-            let kind = (p.word == Word::Blocked)
-                .then(|| self.terminal(&address))
-                .flatten()
-                .and_then(|t| t.pointer("/status/kind"))
-                .and_then(Value::as_str)
-                .filter(|k| !k.is_empty())
-                .map(str::to_owned);
+            let kind = self.kind(&address, p.word);
             self.record.insert(
                 address.clone(),
                 Alerted {
@@ -213,6 +207,40 @@ impl Rules {
             });
         }
         actions
+    }
+
+    /// The needs-you alerts sent and not cleared, as they would go out now: for
+    /// a phone that registers while they are open (it missed them).
+    pub fn open_alerts(&self) -> Vec<Action> {
+        let rows: BTreeMap<String, String> = self
+            .tracker
+            .rows()
+            .into_iter()
+            .map(|r| (r.address, r.name))
+            .collect();
+        self.record
+            .iter()
+            .filter(|(_, a)| a.word.needs_you() && !a.cleared)
+            .filter_map(|(address, a)| {
+                let name = rows.get(address)?;
+                Some(Action::Alert {
+                    terminal: address.clone(),
+                    name: name.clone(),
+                    state: a.word,
+                    kind: self.kind(address, a.word),
+                })
+            })
+            .collect()
+    }
+
+    fn kind(&self, address: &str, word: Word) -> Option<String> {
+        (word == Word::Blocked)
+            .then(|| self.terminal(address))
+            .flatten()
+            .and_then(|t| t.pointer("/status/kind"))
+            .and_then(Value::as_str)
+            .filter(|k| !k.is_empty())
+            .map(str::to_owned)
     }
 
     /// When [`Rules::due`] next has something to say.
@@ -297,6 +325,25 @@ mod tests {
         Action::Cleared {
             terminal: terminal.into(),
         }
+    }
+
+    // Codex review, M3: a phone that registers after an agent blocked gets
+    // the alerts still open, so the watcher must be able to list them.
+    #[test]
+    fn open_alerts_are_the_alerted_needs_you_ones_not_cleared() {
+        let mut r = rules();
+        assert_eq!(r.open_alerts(), vec![]);
+        r.observe(&[agent("t1", "blocked", 0), agent("t2", "working", 0)], 0);
+        assert_eq!(r.open_alerts(), vec![], "not alerted yet");
+        r.due(GRACE);
+        assert_eq!(r.open_alerts(), vec![alert("t1", Word::Blocked)]);
+        // A finish is a moment, not an open alert.
+        r.observe(&[agent("t1", "blocked", 0), agent("t2", "idle", 0)], GRACE);
+        r.due(2 * GRACE);
+        assert_eq!(r.open_alerts(), vec![alert("t1", Word::Blocked)]);
+        // Answered: nothing open.
+        r.observe(&[agent("t1", "working", 1), agent("t2", "idle", 0)], 3 * GRACE);
+        assert_eq!(r.open_alerts(), vec![]);
     }
 
     #[test]

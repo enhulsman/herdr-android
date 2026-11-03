@@ -15,7 +15,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 // The terminal screen's line icons, as in design/renders/screens.html (`ico`):
-// the compose key's square pen (lucide square-pen, design/renders/icons/) and
+// the compose key's square pen (lucide square-pen, design/renders/icons/), the
+// keyboard key's keyboard (lucide keyboard) and
 // the watching chip's eye. Stroked in the caller's colour.
 
 enum class LineIcon(val strokeWidth: Float, val paths: List<String>) {
@@ -25,6 +26,16 @@ enum class LineIcon(val strokeWidth: Float, val paths: List<String>) {
             "M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7",
             "M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873" +
                 "a2 2 0 0 1 .506-.852z",
+        ),
+    ),
+    // lucide keyboard (ISC), the rectangle as a path.
+    Keyboard(
+        2f,
+        listOf(
+            "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+            "M6 8h.01", "M10 8h.01", "M14 8h.01", "M18 8h.01",
+            "M8 12h.01", "M12 12h.01", "M16 12h.01",
+            "M7 16h10",
         ),
     ),
     Eye(

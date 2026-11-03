@@ -69,7 +69,7 @@
     "sectionHeaderHeight": 40,
     "rowMinHeight": 64,
     "systemBars": "edge to edge; status bar 36, gesture bar 28 in the renders",
-    "terminalFit": "watching: desk grid scaled to fit the width, area below the grid in canvas colour behind a dashed top border; typing: phone grid at 12.2 sp, about 53 columns on 412 dp; keyboard hidden while typing: the phone grid grows to the full height, keys row stays; both modes draw the grid inside terminalPadding (the Mac pane's padding, painted in the terminal background)",
+    "terminalFit": "watching: desk grid scaled to fit the width, area below the grid in the terminal background (no border; 2026-11-03); typing: phone grid at 12.2 sp, about 53 columns on 412 dp; keyboard hidden while typing: the phone grid grows to the full height, keys row stays; both modes draw the grid inside terminalPadding (the Mac pane's padding, painted in the terminal background)",
     "terminalPadding": {"x": 10, "y": 6, "source": "herdr-app settings.rs terminal_padding default [10, 6]"},
     "wide": "v1.1 (M4): rail at 600 dp and wider; not specified here"
   },
@@ -397,8 +397,7 @@
       "signature": "3px"
     },
     "hairline": "1 dp border colour",
-    "signatureEdge": "3 dp blocked, left side only",
-    "deskGridEnd": "1 dp dashed border colour"
+    "signatureEdge": "3 dp blocked, left side only"
   },
   "shadows": {
     "note": "Flat app; one shadow only, for the floating chip over the terminal",
@@ -502,21 +501,16 @@
     },
     "keysRow": {
       "height": 48,
+      "lines": 2,
       "keys": [
-        "esc",
-        "tab",
-        "ctrl",
-        "alt",
-        "←",
-        "↓",
-        "↑",
-        "→",
-        "⏎",
-        "compose"
+        ["esc", "ctrl", "alt", "tab", "keyboard", "-", "/", "↑", "~"],
+        ["^C", "⇧⇥", "\\", "⏎", "compose", "|", "←", "↓", "→"]
       ],
+      "note": "two rows of nine, both always shown while typing (2026-11-03, replaces the swipe-up shelf); stop and enter keys left, away from the arrows",
       "key": "raised, radius 8",
       "latched": "solid background, solidFg text",
-      "compose": "1.25 width, outlined with input colour, pen icon"
+      "keyboard": "raised, keyboard icon; shows and hides the phone keyboard",
+      "compose": "outlined with input colour, pen icon"
     },
     "composeSheet": {
       "radius": "22 top",

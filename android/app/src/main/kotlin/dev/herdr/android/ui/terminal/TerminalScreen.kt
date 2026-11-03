@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,7 +39,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +48,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -89,7 +89,7 @@ import kotlin.math.floor
 
 // The terminal screen (renders 3, 4, 4b, 5; terminal-view and terminal-input
 // specs): the title bar, the queue strip, the grid watched at desk size or
-// typed into at phone size, the status chip, the keys row with its shelf, the
+// typed into at phone size, the status chip, the two keys rows, the
 // compose sheet and the selection layer. Sizes from design-tokens.json
 // (components.terminalTitleBar, queueStrip, watchingChip, sizeTag, keysRow,
 // composeSheet; layout.terminalPadding, terminalFit).
@@ -124,7 +124,6 @@ class TerminalScreenState(zoom: Float? = null) {
     var composeOpen by mutableStateOf(false)
     var composeText by mutableStateOf("")
     var selecting by mutableStateOf(false)
-    var shelfOpen by mutableStateOf(false)
     var watch by mutableStateOf(WatchView(zoom ?: 1f, 0f, 0f))
 
     /** The phone leads at its own size; kept through a reattach until the core says it watches again. */
@@ -139,6 +138,7 @@ class TerminalScreenState(zoom: Float? = null) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TerminalScreen(
     ui: TerminalUi,
@@ -154,6 +154,7 @@ fun TerminalScreen(
     val phase = session.state?.phase
     LaunchedEffect(phase) { screen.follow(phase) }
     val keysShown = screen.inputOpen || screen.typing
+    val keyboardUp = WindowInsets.isImeVisible
     Box(modifier.fillMaxSize().background(c.chrome)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             TitleBar(ui.header, actions)
@@ -164,14 +165,20 @@ fun TerminalScreen(
             if (keysShown) {
                 KeysRow(
                     armed = session.armed,
-                    shelfOpen = screen.shelfOpen,
                     onTap = session::tap,
                     onInterrupt = session::interrupt,
                     onCompose = {
                         input.hide()
                         screen.composeOpen = true
                     },
-                    onShelf = { screen.shelfOpen = it },
+                    onKeyboard = {
+                        if (keyboardUp) {
+                            input.hide()
+                        } else {
+                            screen.inputOpen = true
+                            input.show()
+                        }
+                    },
                 )
             }
         }
@@ -326,8 +333,8 @@ private fun TerminalArea(
         val padX = with(density) { HerdrLayout.terminalPaddingX.toPx() }
         val padTop = with(density) { HerdrLayout.terminalPaddingTop.toPx() }
         val phoneFont = with(density) { HerdrType.terminalPhone.fontSize.toPx() }
-        // The phone's grid always leaves room for the keys row, which typing shows.
-        val keysPx = if (keysShown) 0f else with(density) { HerdrLayout.keysRowHeight.toPx() }
+        // The phone's grid always leaves room for the two keys rows, which typing shows.
+        val keysPx = if (keysShown) 0f else with(density) { HerdrLayout.keysRowHeight.toPx() } * 2
         val phone = phoneGrid(widthPx, heightPx - keysPx, padX, padTop, phoneFont)
         SideEffect { actions.onPhoneGrid(phone) }
 
@@ -350,19 +357,20 @@ private fun TerminalArea(
                 .clipToBounds()
                 .semantics { contentDescription = label }
                 // Keyed by what the handlers act on: moving to another agent's terminal swaps them.
-                .pointerInput(session, screen, input, screen.typing, padX, padTop, phoneFont) {
+                .pointerInput(session, screen, screen.typing, padX, padTop, phoneFont) {
                     detectTapGestures(
+                        // A tap reads and clicks; the keyboard has its own key. At the phone's
+                        // size the cell under the finger is the program's: a program that takes
+                        // clicks gets one, as on the desk. Watching draws the desk's size, which
+                        // the takeover changes, so a tap there only takes over at phone size.
                         onTap = { at ->
-                            // At the phone's size the cell under the finger is the program's: a
-                            // program that takes clicks gets one, as on the desk. Watching draws
-                            // the desk's size, which the takeover would change, so no click.
                             if (screen.typing) {
                                 val col = floor((at.x - padX) / (phoneFont * TerminalMetrics.ADVANCE_EM)).toInt()
                                 val row = floor((at.y - padTop) / (phoneFont * TerminalMetrics.LINE_EM)).toInt()
                                 session.click(col.coerceAtLeast(0), row.coerceAtLeast(0))
+                            } else {
+                                session.lead()
                             }
-                            screen.inputOpen = true
-                            input.show()
                         },
                         onLongPress = { screen.selecting = true },
                     )
@@ -401,19 +409,7 @@ private fun TerminalArea(
                         }
                     }
                 }
-                // Below the desk's grid is not terminal: canvas colour behind a dashed top border.
-                val end = view.panY + watch.contentHeight(view.zoom)
-                if (end < size.height) {
-                    drawRect(c.canvas, topLeft = Offset(0f, end), size = size.copy(height = size.height - end))
-                    val dash = 4.dp.toPx()
-                    drawLine(
-                        c.border,
-                        Offset(0f, end),
-                        Offset(size.width, end),
-                        strokeWidth = HerdrBorder.thin.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash)),
-                    )
-                }
+                // Below the desk's grid: the terminal's own background, painted above.
             }
         }
         StatusChip(session, screen, machine, grid, input)
@@ -594,70 +590,78 @@ private fun SelectionLayer(text: String, grid: TerminalGrid, onDone: () -> Unit)
 // --- Keys row ----------------------------------------------------------------
 
 private sealed interface RowKey {
-    val label: String
-
-    data class Tap(override val label: String, val key: RowKeyTap, val description: Int? = null) : RowKey
+    data class Tap(val label: String, val key: RowKeyTap, val description: Int? = null) : RowKey
+    data object Keyboard : RowKey
+    data object Compose : RowKey
 }
 
-/** The shelf above the keys row: ctrl+c, then symbols the phone keyboard hides. */
-private val SHELF = listOf(
-    RowKey.Tap("^C", RowKeyTap.CtrlC, R.string.key_ctrl_c),
-) + listOf("|", "~", "/", "-", "_", "\\", "`", "$").map { RowKey.Tap(it, RowKeyTap.Symbol(it)) }
+/**
+ * The two keys rows (design-tokens.json `components.keysRow`, 2026-11-03),
+ * Termux-like: modifiers and the stop and enter keys on the left, away from
+ * the arrows; the keyboard key in the middle of the top row, compose under it.
+ */
+private val KEY_LINES: List<List<RowKey>> = listOf(
+    listOf(
+        RowKey.Tap("esc", RowKeyTap.Esc, R.string.key_esc),
+        RowKey.Tap("ctrl", RowKeyTap.Ctrl, R.string.key_ctrl),
+        RowKey.Tap("alt", RowKeyTap.Alt, R.string.key_alt),
+        RowKey.Tap("tab", RowKeyTap.Tab, R.string.key_tab),
+        RowKey.Keyboard,
+        RowKey.Tap("-", RowKeyTap.Symbol("-")),
+        RowKey.Tap("/", RowKeyTap.Symbol("/")),
+        RowKey.Tap("↑", RowKeyTap.Up, R.string.key_up),
+        RowKey.Tap("~", RowKeyTap.Symbol("~")),
+    ),
+    listOf(
+        RowKey.Tap("^C", RowKeyTap.CtrlC, R.string.key_ctrl_c),
+        RowKey.Tap("⇧⇥", RowKeyTap.ShiftTab, R.string.key_shift_tab),
+        RowKey.Tap("\\", RowKeyTap.Symbol("\\")),
+        RowKey.Tap("⏎", RowKeyTap.Enter, R.string.key_enter),
+        RowKey.Compose,
+        RowKey.Tap("|", RowKeyTap.Symbol("|")),
+        RowKey.Tap("←", RowKeyTap.Left, R.string.key_left),
+        RowKey.Tap("↓", RowKeyTap.Down, R.string.key_down),
+        RowKey.Tap("→", RowKeyTap.Right, R.string.key_right),
+    ),
+)
 
 /**
- * `.keys`: esc, tab, ctrl, alt, the arrows, enter and the compose key, 48 dp
- * on chrome (enter in the row since the first phone round: the shelf was not
- * found without being told). Ctrl and alt latch (solid) while held for the next key; a long
- * press on esc interrupts the agent; a swipe up opens the shelf, down closes it.
+ * `.keys`: two rows of nine, 48 dp each, on chrome, always both while typing.
+ * Ctrl and alt latch (solid) while held for the next key; a long press on
+ * esc interrupts the agent; the keyboard key shows and hides the keyboard.
  */
 @Composable
 private fun KeysRow(
     armed: uniffi.herdr_mobile.Armed,
-    shelfOpen: Boolean,
     onTap: (RowKeyTap) -> Unit,
     onInterrupt: () -> Unit,
     onCompose: () -> Unit,
-    onShelf: (Boolean) -> Unit,
+    onKeyboard: () -> Unit,
 ) {
     val c = HerdrTheme.colors
     val view = LocalView.current
-    val threshold = with(LocalDensity.current) { 24.dp.toPx() }
-    // The gesture outlives a recomposition; the shelf it opens is the current terminal's.
-    val shelf by rememberUpdatedState(onShelf)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(c.chrome)
-            .pointerInput(Unit) {
-                var travelled = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { travelled = 0f },
-                    onDragEnd = { if (abs(travelled) >= threshold) shelf(travelled < 0) },
-                ) { change, dy ->
-                    change.consume()
-                    travelled += dy
-                }
-            },
-    ) {
-        if (shelfOpen) {
+    Column(Modifier.fillMaxWidth().background(c.chrome)) {
+        for (line in KEY_LINES) {
             KeyLine {
-                for (key in SHELF) Key(key.label, key.description, latched = false, onClick = { onTap(key.key) })
+                for (key in line) {
+                    when (key) {
+                        RowKey.Keyboard -> IconKey(LineIcon.Keyboard, R.string.key_keyboard, outlined = false, onClick = onKeyboard)
+                        RowKey.Compose -> IconKey(LineIcon.Pen, R.string.key_compose, outlined = true, onClick = onCompose)
+                        is RowKey.Tap -> {
+                            val latched = (key.key == RowKeyTap.Ctrl && armed.ctrl) || (key.key == RowKeyTap.Alt && armed.alt)
+                            val hold = if (key.key == RowKeyTap.Esc) {
+                                {
+                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    onInterrupt()
+                                }
+                            } else {
+                                null
+                            }
+                            Key(key.label, key.description, latched, onClick = { onTap(key.key) }, onLongClick = hold)
+                        }
+                    }
+                }
             }
-        }
-        KeyLine {
-            Key("esc", R.string.key_esc, latched = false, onClick = { onTap(RowKeyTap.Esc) }, onLongClick = {
-                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                onInterrupt()
-            })
-            Key("tab", R.string.key_tab, latched = false, onClick = { onTap(RowKeyTap.Tab) })
-            Key("ctrl", R.string.key_ctrl, latched = armed.ctrl, onClick = { onTap(RowKeyTap.Ctrl) })
-            Key("alt", R.string.key_alt, latched = armed.alt, onClick = { onTap(RowKeyTap.Alt) })
-            Key("←", R.string.key_left, latched = false, onClick = { onTap(RowKeyTap.Left) })
-            Key("↓", R.string.key_down, latched = false, onClick = { onTap(RowKeyTap.Down) })
-            Key("↑", R.string.key_up, latched = false, onClick = { onTap(RowKeyTap.Up) })
-            Key("→", R.string.key_right, latched = false, onClick = { onTap(RowKeyTap.Right) })
-            Key("⏎", R.string.key_enter, latched = false, onClick = { onTap(RowKeyTap.Enter) })
-            ComposeKey(onCompose)
         }
     }
 }
@@ -700,22 +704,23 @@ private fun androidx.compose.foundation.layout.RowScope.Key(
     }
 }
 
+/** An icon key: the keyboard key (raised, like the others) or compose (outlined with the input colour). */
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.ComposeKey(onClick: () -> Unit) {
+private fun androidx.compose.foundation.layout.RowScope.IconKey(icon: LineIcon, description: Int, outlined: Boolean, onClick: () -> Unit) {
     val c = HerdrTheme.colors
     val shape = RoundedCornerShape(HerdrRadius.key)
-    val spoken = stringResource(R.string.key_compose)
+    val spoken = stringResource(description)
     Box(
         Modifier
-            .weight(1.25f)
+            .weight(1f)
             .height(40.dp)
             .clip(shape)
-            .border(HerdrBorder.thin, c.input, shape)
+            .then(if (outlined) Modifier.border(HerdrBorder.thin, c.input, shape) else Modifier.background(c.raised))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = spoken },
         contentAlignment = Alignment.Center,
     ) {
-        LineIconImage(LineIcon.Pen, c.fg, 18.dp)
+        LineIconImage(icon, c.fg, 18.dp)
     }
 }
 

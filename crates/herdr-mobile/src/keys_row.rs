@@ -1,6 +1,6 @@
 //! The keys row above the keyboard (terminal-input spec, "A keys row for keys
 //! the phone keyboard lacks"): esc, tab, sticky ctrl and alt, arrows, enter,
-//! ctrl+c and the shelf's symbols. Each tap becomes one key press for the
+//! shift+tab, ctrl+c and symbols. Each tap becomes one key press for the
 //! terminal's key encoder (`vt::Terminal::encode_key`), the same one typing uses.
 
 /// A key the terminal's encoder understands.
@@ -8,6 +8,8 @@
 pub enum Key {
     Escape,
     Tab,
+    /// Shift+tab (Claude Code's mode switch).
+    BackTab,
     Enter,
     Backspace,
     Up,
@@ -30,6 +32,7 @@ pub struct Mods {
 pub enum RowKey {
     Esc,
     Tab,
+    ShiftTab,
     Ctrl,
     Alt,
     Up,
@@ -75,6 +78,7 @@ impl KeysRow {
             }
             RowKey::Esc => Key::Escape,
             RowKey::Tab => Key::Tab,
+            RowKey::ShiftTab => Key::BackTab,
             RowKey::Up => Key::Up,
             RowKey::Down => Key::Down,
             RowKey::Left => Key::Left,

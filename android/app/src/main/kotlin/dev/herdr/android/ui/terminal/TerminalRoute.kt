@@ -117,7 +117,6 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
                 screen.composeText = ""
             }
             screen.selecting -> screen.selecting = false
-            screen.shelfOpen -> screen.shelfOpen = false
             else -> home.close()
         }
     }

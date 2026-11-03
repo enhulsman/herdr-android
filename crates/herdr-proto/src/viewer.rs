@@ -220,6 +220,17 @@ impl Viewer {
         self.reattach(Mode::Watching).await.map(Some)
     }
 
+    /// Takes over at the phone's size without input (a tap to read and click):
+    /// while watching (or after a failed reattach) it reattaches as an active
+    /// viewer (`Some`: start a fresh VT); while typing it does nothing.
+    pub async fn lead(&mut self) -> Result<Option<Attached>, CallError> {
+        if self.mode != Mode::Watching {
+            return Ok(None);
+        }
+        self.detach_current();
+        Ok(Some(self.reattach(Mode::Typing).await?))
+    }
+
     /// Keys, a keys-row key or a compose paste, already encoded. The first
     /// input while watching (or after a failed reattach) reattaches as an
     /// active viewer at the phone's size (`Some`: start a fresh VT), then the
@@ -228,12 +239,7 @@ impl Viewer {
         if bytes.is_empty() {
             return Ok(None);
         }
-        let attached = if self.mode == Mode::Watching {
-            self.detach_current();
-            Some(self.reattach(Mode::Typing).await?)
-        } else {
-            None
-        };
+        let attached = self.lead().await?;
         if let Some(stream) = &self.stream {
             self.client.send(stream.channel(), wire::DATA, bytes);
         }

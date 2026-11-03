@@ -571,3 +571,31 @@ async fn an_acknowledged_phone_size_is_no_longer_pending() {
     let (_viewer, r) = resized.await.unwrap();
     assert!(r.unwrap().is_some(), "an acknowledged size is not pending");
 }
+
+// A tap while watching takes over at the phone's size to read and click, with
+// no keystroke: the reattach alone, no input after it.
+#[tokio::test(start_paused = true)]
+async fn leading_while_watching_reattaches_at_the_phones_size_and_types_nothing() {
+    let (client, mut core) = connect();
+    let mut viewer = watching(&client, &mut core).await;
+    let led = tokio::spawn(async move {
+        let r = viewer.lead().await;
+        (viewer, r)
+    });
+    let close = core.next().await;
+    assert_eq!((close.channel, close.kind), (7, wire::CLOSE));
+    let params = core.attach(9, PHONE).await;
+    assert_eq!(params["observe"], false);
+    let (mut viewer, attached) = led.await.unwrap();
+    assert_eq!(attached.unwrap().unwrap().mode, Mode::Typing);
+    assert_eq!(viewer.mode(), Mode::Typing);
+    let frames = marker(&client, &mut core).await;
+    assert!(
+        frames.iter().all(|f| f.kind != wire::DATA),
+        "no input: {frames:?}"
+    );
+
+    // Leading again changes nothing.
+    assert!(viewer.lead().await.unwrap().is_none());
+    assert_sends_nothing(&marker(&client, &mut core).await, "a second lead");
+}

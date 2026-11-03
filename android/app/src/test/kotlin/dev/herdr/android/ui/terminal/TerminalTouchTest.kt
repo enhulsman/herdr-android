@@ -12,6 +12,8 @@ import dev.herdr.android.ui.agents.snapshot
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.theme.HerdrType
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +39,20 @@ class TerminalTouchTest {
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
+    /** The phone keyboard as the screen asks for it. */
+    private class Keyboard : TerminalInputHandle {
+        val asked = mutableListOf<String>()
+        override fun show() {
+            asked += "show"
+        }
+
+        override fun hide() {
+            asked += "hide"
+        }
+    }
+
+    private val keyboard = Keyboard()
+
     private fun open(phase: TermPhase, cols: Int, rows: Int, typing: Boolean): Triple<FakeTerminalView, TerminalScreenState, TerminalSession> {
         val view = FakeTerminalView()
         val session = TerminalSession(key) { it.run() }
@@ -45,12 +61,11 @@ class TerminalTouchTest {
         session.listener.onFrame(SessionFixture.frame(cols, rows, wide = cols > 60, bottom = false))
         val screen = TerminalScreenState().apply {
             this.typing = typing
-            inputOpen = typing
         }
         val actions = TerminalActions(onBack = {}, onOpen = {}, onSwipe = { false }, onPhoneGrid = {})
         activity.setContent {
             HerdrTheme(dark = true) {
-                TerminalScreen(terminalUi(hub, key, activity.resources), session, screen, actions, TerminalInputHandle.None, composeFocus = false)
+                TerminalScreen(terminalUi(hub, key, activity.resources), session, screen, actions, keyboard, composeFocus = false)
             }
         }
         idle()
@@ -137,7 +152,7 @@ class TerminalTouchTest {
     }
 
     @Test
-    fun aTapWhileTypingClicksTheCellUnderTheFinger() {
+    fun aTapWhileTypingOnlyClicksTheCellUnderTheFinger() {
         val (view, screen, _) = open(TermPhase.Typing, 53, 40, typing = true)
         val d = activity.resources.displayMetrics.density
         val font = HerdrType.terminalPhone.fontSize.value * d
@@ -147,16 +162,57 @@ class TerminalTouchTest {
         val x = padX + font * TerminalMetrics.ADVANCE_EM * 7.5f
         val y = terminalTop() + padTop + font * TerminalMetrics.LINE_EM * 3.5f
         tap(x, y)
-        assertTrue("calls: ${view.calls}", "click 7 3" in view.calls)
-        assertTrue("the keyboard is asked for too", screen.inputOpen)
+        assertEquals("calls: ${view.calls}", listOf("click 7 3"), view.calls)
+        assertEquals("the keyboard stays down: reading and clicking", emptyList<String>(), keyboard.asked)
+        assertFalse(screen.inputOpen)
     }
 
     @Test
-    fun aTapWhileWatchingOnlyAsksForTheKeyboard() {
+    fun aTapWhileWatchingTakesOverAtPhoneSizeWithoutTheKeyboard() {
         val (view, screen, _) = open(TermPhase.Watching, 96, 44, typing = false)
         tap(midX, midY)
+        assertEquals("calls: ${view.calls}", listOf("lead"), view.calls)
+        assertEquals(emptyList<String>(), keyboard.asked)
+        assertFalse(screen.inputOpen)
+    }
+
+    /** The middle of a key in the two keys rows: [col] of 9, [line] 0 (top) or 1, above the system bar. */
+    private fun keyAt(col: Int, line: Int): Pair<Float, Float> {
+        val d = activity.resources.displayMetrics.density
+        val bottomBar = activity.window.decorView.rootWindowInsets?.getInsets(android.view.WindowInsets.Type.systemBars())?.bottom ?: 0
+        val bottom = activity.window.decorView.height - bottomBar
+        val rowH = HerdrLayout.keysRowHeight.value * d
+        val y = bottom - rowH * (2 - line) + rowH / 2
+        val inner = activity.window.decorView.width - 12 * d
+        val keyW = (inner - 8 * 4 * d) / 9
+        val x = 6 * d + col * (keyW + 4 * d) + keyW / 2
+        return x to y
+    }
+
+    @Test
+    fun theKeyboardKeyInTheMiddleOfTheTopRowBringsTheKeyboardUp() {
+        val (view, screen, _) = open(TermPhase.Typing, 53, 40, typing = true)
+        val (x, y) = keyAt(4, 0)
+        tap(x, y)
+        assertEquals(listOf("show"), keyboard.asked)
         assertTrue(screen.inputOpen)
-        assertTrue("calls: ${view.calls}", view.calls.none { it.startsWith("click") })
+        assertTrue("no key typed: ${view.calls}", view.calls.isEmpty())
+    }
+
+    @Test
+    fun bothKeysRowsTypeTheirKeys() {
+        val (view, _, _) = open(TermPhase.Typing, 53, 40, typing = true)
+        val keys = mapOf(
+            (0 to 0) to "tap Esc", (3 to 0) to "tap Tab", (7 to 0) to "tap Up",
+            (0 to 1) to "tap CtrlC", (1 to 1) to "tap ShiftTab", (3 to 1) to "tap Enter",
+            (6 to 1) to "tap Left", (7 to 1) to "tap Down", (8 to 1) to "tap Right",
+        )
+        for ((at, call) in keys) {
+            view.calls.clear()
+            val (x, y) = keyAt(at.first, at.second)
+            tap(x, y)
+            assertEquals("key at $at", listOf(call), view.calls)
+        }
     }
 
     @Test

@@ -590,15 +590,15 @@ private sealed interface RowKey {
     data class Tap(override val label: String, val key: RowKeyTap, val description: Int? = null) : RowKey
 }
 
-/** The shelf above the keys row: enter and ctrl+c, then symbols the phone keyboard hides. */
+/** The shelf above the keys row: ctrl+c, then symbols the phone keyboard hides. */
 private val SHELF = listOf(
     RowKey.Tap("^C", RowKeyTap.CtrlC, R.string.key_ctrl_c),
-    RowKey.Tap("⏎", RowKeyTap.Enter, R.string.key_enter),
 ) + listOf("|", "~", "/", "-", "_", "\\", "`", "$").map { RowKey.Tap(it, RowKeyTap.Symbol(it)) }
 
 /**
- * `.keys`: esc, tab, ctrl, alt, the arrows and the compose key, 48 dp on
- * chrome. Ctrl and alt latch (solid) while held for the next key; a long
+ * `.keys`: esc, tab, ctrl, alt, the arrows, enter and the compose key, 48 dp
+ * on chrome (enter in the row since the first phone round: the shelf was not
+ * found without being told). Ctrl and alt latch (solid) while held for the next key; a long
  * press on esc interrupts the agent; a swipe up opens the shelf, down closes it.
  */
 @Composable
@@ -647,6 +647,7 @@ private fun KeysRow(
             Key("↓", R.string.key_down, latched = false, onClick = { onTap(RowKeyTap.Down) })
             Key("↑", R.string.key_up, latched = false, onClick = { onTap(RowKeyTap.Up) })
             Key("→", R.string.key_right, latched = false, onClick = { onTap(RowKeyTap.Right) })
+            Key("⏎", R.string.key_enter, latched = false, onClick = { onTap(RowKeyTap.Enter) })
             ComposeKey(onCompose)
         }
     }

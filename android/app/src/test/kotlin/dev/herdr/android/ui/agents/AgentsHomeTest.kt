@@ -297,4 +297,38 @@ class AgentsHomeTest {
         home.open(key("b"))
         assertFalse("no trail from the earlier walk", home.step(forward = false))
     }
+
+    // Phone check round 2: a horizontal swipe walks every agent like tabs, in
+    // list order as it was when the walk started, whatever their state.
+    @Test
+    fun tabsWalkEveryAgentInListOrder() {
+        val working = AgentAttention.WORKING
+        val idle = AgentAttention.IDLE
+        val done = AgentAttention.DONE
+        publish(snapshot(ws, listOf(row("a", done), row("b", working), row("c", idle))))
+        home.open(key("a"))
+        // opening a re-sorts it below the others; the tabs keep their places
+        publish(snapshot(ws, listOf(row("b", working), row("a", idle), row("c", idle))))
+        assertTrue(home.tab(next = true))
+        assertEquals(key("b"), home.openKey)
+        assertTrue(home.tab(next = true))
+        assertEquals(key("c"), home.openKey)
+        assertFalse("the last tab", home.tab(next = true))
+        assertTrue(home.tab(next = false))
+        assertTrue(home.tab(next = false))
+        assertEquals(key("a"), home.openKey)
+        assertFalse("the first tab", home.tab(next = false))
+    }
+
+    @Test
+    fun tabsSkipAnAgentThatIsGoneAndIncludeOnesListedSince() {
+        val idle = AgentAttention.IDLE
+        publish(snapshot(ws, listOf(row("a", idle), row("b", idle), row("c", idle))))
+        home.open(key("a"))
+        publish(snapshot(ws, listOf(row("a", idle), row("c", idle), row("d", idle))))
+        assertTrue(home.tab(next = true))
+        assertEquals(key("c"), home.openKey)
+        assertTrue(home.tab(next = true))
+        assertEquals(key("d"), home.openKey)
+    }
 }

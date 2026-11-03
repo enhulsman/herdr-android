@@ -6,9 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -115,6 +115,8 @@ class TerminalActions(
     val onPhoneGrid: (GridSize) -> Unit,
     /** The person zoomed or panned while watching. */
     val onWatchView: (WatchView) -> Unit = {},
+    /** A sideways swipe on the title bar: the next or previous agent, like tabs; false at the end. */
+    val onTab: (next: Boolean) -> Boolean = { false },
 )
 
 /** What the screen itself remembers while it is open. */
@@ -226,21 +228,31 @@ private fun TitleBar(header: TerminalHeader, actions: TerminalActions) {
             .height(HerdrLayout.terminalTitleHeight)
             .background(c.chrome)
             .pointerInput(actions) {
-                var travelled = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { travelled = 0f },
+                // Up and down step through the agents that want you; sideways through
+                // every agent, like tabs. The longer direction of the drag decides.
+                var dx = 0f
+                var dy = 0f
+                detectDragGestures(
+                    onDragStart = {
+                        dx = 0f
+                        dy = 0f
+                    },
                     onDragEnd = {
-                        if (abs(travelled) >= threshold) {
-                            // Up is forward: the next agent comes up from below.
-                            val moved = actions.onSwipe(travelled < 0)
+                        val moved = when {
+                            abs(dx) > abs(dy) && abs(dx) >= threshold -> actions.onTab(dx < 0)
+                            abs(dy) >= abs(dx) && abs(dy) >= threshold -> actions.onSwipe(dy < 0)
+                            else -> null
+                        }
+                        if (moved != null) {
                             view.performHapticFeedback(
                                 if (moved) HapticFeedbackConstants.CLOCK_TICK else HapticFeedbackConstants.REJECT,
                             )
                         }
                     },
-                ) { change, dy ->
+                ) { change, drag ->
                     change.consume()
-                    travelled += dy
+                    dx += drag.x
+                    dy += drag.y
                 }
             }
             .padding(start = HerdrSpacing.s4, end = HerdrSpacing.s12),

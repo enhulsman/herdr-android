@@ -38,6 +38,9 @@ android {
             manifestPlaceholders["appLabel"] = "herdr debug"
             // The system's default icon, so it never passes for the release.
             manifestPlaceholders["appIcon"] = "@android:drawable/sym_def_app_icon"
+            // -Pherdr.perf: the same app, not debuggable and with optimized Rust, for
+            // frame-time and open-time checks; installs over the debug app and keeps its data.
+            if (providers.gradleProperty("herdr.perf").isPresent) isDebuggable = false
         }
         // The terminal spike (task M0.5, src/spike/): optimized Rust with
         // libghostty-vt linked in, not debuggable so frame times are realistic.
@@ -114,7 +117,7 @@ androidComponents {
         val buildRust = tasks.register<BuildRust>("buildRust${variant.name.replaceFirstChar(Char::uppercase)}") {
             group = "build"
             description = "Builds the Rust core and its Kotlin bindings for ${variant.name}."
-            release.set(variant.buildType != "debug")
+            release.set(variant.buildType != "debug" || providers.gradleProperty("herdr.perf").isPresent)
             // Every build draws terminals since M2: libghostty-vt from scripts/build-ghostty.sh.
             features.set(listOf("vt"))
             repoRoot.set(rootProject.layout.projectDirectory.dir(".."))

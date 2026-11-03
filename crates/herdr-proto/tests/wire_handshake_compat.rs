@@ -217,16 +217,13 @@ fn hello(generation: u64, version: &str, methods: &[&str]) -> Value {
 #[test]
 fn the_pinned_core_is_the_oldest_supported_and_tested() {
     assert_eq!(compat::MIN_CORE, "0.1.15");
-    assert_eq!(
-        compat::check(&hello(1, "0.1.15", compat::USES), "0.1.15"),
-        Compat::Ok
-    );
+    assert_eq!(compat::check(&hello(1, "0.1.15", compat::USES)), Compat::Ok);
 }
 
 #[test]
 fn older_core() {
     assert_eq!(
-        compat::check(&hello(1, "0.1.14", compat::USES), "0.1.16"),
+        compat::check(&hello(1, "0.1.14", compat::USES)),
         Compat::TooOld {
             have: "0.1.14".into(),
             need: "0.1.15".into()
@@ -235,7 +232,7 @@ fn older_core() {
     // Lacking a method the app calls counts as too old too, naming the version.
     let without: Vec<&str> = compat::USES.iter().skip(1).copied().collect();
     assert_eq!(
-        compat::check(&hello(1, "0.1.16", &without), "0.1.16"),
+        compat::check(&hello(1, "0.1.16", &without)),
         Compat::Missing {
             have: "0.1.16".into(),
             methods: vec![compat::USES[0].to_owned()]
@@ -243,57 +240,24 @@ fn older_core() {
     );
     // An older generation, or no version at all.
     assert!(matches!(
-        compat::check(&hello(0, "0.1.16", compat::USES), "0.1.16"),
+        compat::check(&hello(0, "0.1.16", compat::USES)),
         Compat::TooOld { .. }
     ));
     assert!(matches!(
-        compat::check(&json!({"generation": 1, "methods": compat::USES}), "0.1.16"),
+        compat::check(&json!({"generation": 1, "methods": compat::USES})),
         Compat::TooOld { .. }
     ));
 }
 
 #[test]
 fn newer_core() {
+    // A newer core connects with no notice (phone check round 2: CI tests the
+    // latest release; bugs in a newer one become issues).
+    for v in ["0.1.16", "0.2.0", "0.10.0", "0.1.16-rc1"] {
+        assert_eq!(compat::check(&hello(1, v, compat::USES)), Compat::Ok, "{v}");
+    }
     assert_eq!(
-        compat::check(&hello(1, "0.1.16", compat::USES), "0.1.16"),
-        Compat::Ok
-    );
-    assert_eq!(
-        compat::check(&hello(1, "0.2.0", compat::USES), "0.1.16"),
-        Compat::Untested {
-            have: "0.2.0".into(),
-            tested: "0.1.16".into()
-        }
-    );
-    // Numbers, not text: 0.10.0 is newer than 0.9.3.
-    assert!(matches!(
-        compat::check(&hello(1, "0.10.0", compat::USES), "0.9.3"),
-        Compat::Untested { .. }
-    ));
-    // A pre-release of the tested version is not "newer".
-    assert_eq!(
-        compat::check(&hello(1, "0.1.16-rc1", compat::USES), "0.1.16"),
-        Compat::Ok
-    );
-    assert_eq!(
-        compat::check(&hello(2, "1.0.0", compat::USES), "0.1.16"),
+        compat::check(&hello(2, "1.0.0", compat::USES)),
         Compat::NewerGeneration { generation: 2 }
     );
-}
-
-#[test]
-fn the_newest_tested_version_is_never_older_than_the_minimum() {
-    assert!(
-        compat::check(
-            &hello(1, compat::NEWEST_TESTED, compat::USES),
-            compat::NEWEST_TESTED
-        ) == Compat::Ok
-    );
-    assert!(!matches!(
-        compat::check(
-            &hello(1, compat::MIN_CORE, compat::USES),
-            compat::NEWEST_TESTED
-        ),
-        Compat::TooOld { .. }
-    ));
 }

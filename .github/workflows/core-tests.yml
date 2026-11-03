@@ -1,8 +1,7 @@
 # The protocol suite (crates/herdr-proto/tests/scratch_core.rs) and the
 # restricted-line test (crates/herdr-mobile/tests/sshd.rs) against released
 # herdr-core: the oldest supported (MIN_CORE, checksum pinned) and the latest.
-# Called by CI and by the release build, which stamps `latest` into the app as
-# the newest tested core (HERDR_TESTED_CORE).
+# Called by CI and by the release build, where a failure blocks the release.
 name: Core tests
 
 on:

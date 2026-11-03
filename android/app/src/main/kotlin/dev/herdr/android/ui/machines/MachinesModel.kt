@@ -103,7 +103,6 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
         is MachineState.Connected -> buildList {
             add(s(R.string.status_connected))
             add(s(R.string.status_core_version, st.version))
-            if (st.untested) add(Segment(res.getString(R.string.status_untested), Tone.Warning))
         }
         is MachineState.Unreachable -> {
             detail = st.detail.takeIf { it.isNotBlank() }

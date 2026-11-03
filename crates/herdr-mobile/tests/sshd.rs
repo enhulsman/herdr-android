@@ -633,7 +633,7 @@ fn a_real_core_answers_hello_through_the_line() {
         "hello says {version}"
     );
     assert_eq!(
-        herdr_proto::compat::check(&hello, version),
+        herdr_proto::compat::check(&hello),
         herdr_proto::compat::Compat::Ok
     );
 }

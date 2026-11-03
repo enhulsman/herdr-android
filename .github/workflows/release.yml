@@ -28,7 +28,7 @@ env:
 
 jobs:
   # The protocol suite against the oldest supported and the latest herdr-core:
-  # a failure blocks the release; the latest passed is stamped in below.
+  # a failure blocks the release.
   core:
     uses: ./.github/workflows/core-tests.yml
 
@@ -36,9 +36,6 @@ jobs:
     needs: core
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    env:
-      # compat::NEWEST_TESTED: above it, the app says the core is untested.
-      HERDR_TESTED_CORE: ${{ needs.core.outputs.latest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

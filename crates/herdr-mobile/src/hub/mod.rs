@@ -51,10 +51,8 @@ pub enum MachineState {
     /// The app is in the background (or not resumed yet): no connection.
     Paused,
     Connecting,
-    /// `untested`: the core is newer than the newest version the tests ran against.
     Connected {
         version: String,
-        untested: bool,
     },
     /// Not reached, or the connection dropped; retrying.
     Unreachable {
@@ -1078,9 +1076,8 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
         Err(e) => return Outcome::retry(unreachable(e.to_string())),
     };
     let version = hello.result["version"].as_str().unwrap_or("?").to_owned();
-    let untested = match compat::check(&hello.result, compat::NEWEST_TESTED) {
-        Compat::Ok => false,
-        Compat::Untested { .. } => true,
+    match compat::check(&hello.result) {
+        Compat::Ok => {}
         Compat::TooOld { have, need } => return Outcome::wait(MachineState::TooOld { have, need }),
         Compat::Missing { have, .. } => {
             return Outcome::wait(MachineState::TooOld {
@@ -1089,7 +1086,7 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
             });
         }
         Compat::NewerGeneration { .. } => return Outcome::wait(MachineState::AppTooOld),
-    };
+    }
 
     let client = Client::start(Cursor::new(hello.leftover).chain(reader), writer);
     let (snapshot, mut events) = match client.subscribe(json!({})).await {
@@ -1102,7 +1099,7 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
         name,
         epoch,
         &lines,
-        Some(MachineState::Connected { version, untested }),
+        Some(MachineState::Connected { version }),
     ) {
         return Outcome::wait(MachineState::Paused);
     }

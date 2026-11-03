@@ -80,9 +80,9 @@ Facts cited as `file:line` refer to the upstream clones read on 2026-10-31
   (`window.rs:600-692`).
 - **Lifecycle:** connections close 60 s after the app leaves the foreground;
   alerts cover the time in between.
-- **Versions:** an older core than supported is refused; a newer core than the
-  newest tested shows "untested herdr-core version". CI runs the protocol suite
-  against the pinned version and the latest release.
+- **Versions:** an older core than supported is refused; a newer core connects
+  with no notice (2026-11-03). CI runs the protocol suite against the pinned
+  version and the latest release.
 
 ## 3. The size rule
 

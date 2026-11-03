@@ -91,7 +91,6 @@
     <string name="status_connecting">Connecting</string>
     <string name="status_connected">Connected</string>
     <string name="status_core_version">herdr-core %1$s</string>
-    <string name="status_untested">untested version</string>
     <string name="status_unreachable">Unreachable</string>
     <!-- %1$s is one of the status_ago_* strings. -->
     <string name="status_last_connected">last connected %1$s</string>

@@ -26,9 +26,9 @@ import uniffi.herdr_mobile.MachineView
 class MachinesScreenshotTest {
     private val res = RuntimeEnvironment.getApplication().resources
 
-    /** Render 7: workstation connected on an untested core, server unreachable for 2 h, next try in 30 s. */
+    /** Render 7: workstation connected, server unreachable for 2 h, next try in 30 s. */
     private val render7 = listOf(
-        machine("workstation", MachineState.Connected("0.1.16", untested = true)),
+        machine("workstation", MachineState.Connected("0.1.16")),
         machine(
             "server",
             MachineState.Unreachable("connection refused"),
@@ -60,7 +60,7 @@ class MachinesScreenshotTest {
     @Test fun networkOffPaper() = capture("machines-network-off-paper", dark = false, networkOff)
 
     private val notInstalled = listOf(
-        machine("workstation", MachineState.Connected("0.1.16", untested = false)),
+        machine("workstation", MachineState.Connected("0.1.16")),
         machine("server", MachineState.NotInstalled, nextRetryMs = NOW + 8_000),
     )
 

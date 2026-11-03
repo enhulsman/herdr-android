@@ -333,6 +333,9 @@ pub(crate) struct HubCore {
     snapshots: watch::Sender<HubSnapshot>,
     /// Each machine's live connection, for terminal views to attach through.
     conns: Mutex<HashMap<String, watch::Sender<Option<Conn>>>>,
+    /// One `hdroid-push` sync at a time per machine: a later one must not be
+    /// overtaken by an earlier one still writing an older registration.
+    push_syncs: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 /// Every terminal's size as the event stream reports it, by address.
@@ -559,6 +562,7 @@ impl HubCore {
             state: Mutex::new(state),
             snapshots: watch::channel(snapshot).0,
             conns: Mutex::new(HashMap::new()),
+            push_syncs: Mutex::new(HashMap::new()),
         })
     }
 
@@ -1260,13 +1264,55 @@ async fn sync_push(
     client: Client,
     test: Option<String>,
 ) {
+    let turn = hub
+        .push_syncs
+        .lock()
+        .unwrap()
+        .entry(name.clone())
+        .or_default()
+        .clone();
+    let _turn = turn.lock().await;
+    let mut test = test;
+    // Each pass writes the registration current when it starts; one that
+    // changed meanwhile gets another pass, so the machine ends on the latest.
+    loop {
+        match write_push_entry(&hub, &name, epoch, &client, test.take()).await {
+            Written::Done(true) => {
+                read_push_status(hub, name, epoch, client).await;
+                return;
+            }
+            Written::Done(false) | Written::Stop => return,
+            Written::Again => {}
+        }
+    }
+}
+
+enum Written {
+    /// Written and current; true when alerts are on (the status is worth reading).
+    Done(bool),
+    /// The registration changed while writing: write again.
+    Again,
+    /// A failure (noted), or the connection is gone.
+    Stop,
+}
+
+/// One pass of [`sync_push`]: reads `hdroid-push` and writes this phone's entry.
+async fn write_push_entry(
+    hub: &Arc<HubCore>,
+    name: &str,
+    epoch: u64,
+    client: &Client,
+    test: Option<String>,
+) -> Written {
     let (me, previous) = {
         let st = hub.state.lock().unwrap();
-        let Some(m) = st.list.get(&name) else { return };
+        let Some(m) = st.list.get(name) else {
+            return Written::Stop;
+        };
         (st.push.clone(), m.push_endpoint.clone())
     };
     if me.is_none() && previous.is_none() {
-        return;
+        return Written::Done(false);
     }
     let mut written = false;
     for _ in 0..3 {
@@ -1274,14 +1320,14 @@ async fn sync_push(
             Ok(got) => got,
             Err(e) => {
                 hub.note(&format!("{name}: reading {}: {e}", push::DOC));
-                return;
+                return Written::Stop;
             }
         };
         let version = got["version"].as_u64().unwrap_or(0);
         let Some(value) = push::registration_doc(
             &got["value"],
             me.as_ref(),
-            &name,
+            name,
             previous.as_deref(),
             test.as_deref(),
         ) else {
@@ -1297,7 +1343,7 @@ async fn sync_push(
             Err(herdr_proto::rpc::CallError::Rpc { kind: Some(k), .. }) if k == "conflict" => {}
             Err(e) => {
                 hub.note(&format!("{name}: writing {}: {e}", push::DOC));
-                return;
+                return Written::Stop;
             }
         }
     }
@@ -1306,25 +1352,24 @@ async fn sync_push(
             "{name}: {} kept changing; tried 3 times",
             push::DOC
         ));
-        return;
+        return Written::Stop;
     }
-    let current = hub.with(|hub, st| {
-        if st.live.get(&name).is_none_or(|l| l.epoch != epoch) {
-            return false;
+    hub.with(|hub, st| {
+        if st.live.get(name).is_none_or(|l| l.epoch != epoch) {
+            return Written::Stop;
         }
-        // Alerts may have been switched since this started: that call syncs again.
-        if st.push != me {
-            return false;
-        }
-        if let Some(m) = st.list.get_mut(&name) {
+        // What the machine now holds for this phone, current or not: the next
+        // pass replaces it, and the card never calls a stale entry registered.
+        if let Some(m) = st.list.get_mut(name) {
             m.push_endpoint = me.as_ref().map(|r| r.endpoint.clone());
         }
         hub.save_list(st);
-        true
-    });
-    if current && me.is_some() {
-        read_push_status(hub, name, epoch, client).await;
-    }
+        if st.push != me {
+            Written::Again
+        } else {
+            Written::Done(me.is_some())
+        }
+    })
 }
 
 /// Reads `hdroid-push-status` for the machine card.

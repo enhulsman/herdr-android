@@ -1578,3 +1578,71 @@ async fn turning_alerts_off_takes_the_entry_back() {
         .await;
     assert_eq!(set["params"]["value"], json!({"phones": []}));
 }
+
+const UP_THIRD: &str = "https://ntfy.example.org/upTHIRD?up=1";
+
+impl Core {
+    /// Serves `hdroid-push` from `doc` (and a fixed status) until the app has
+    /// been quiet for a second; returns the document as the app left it.
+    async fn serve_push_docs(&mut self, mut doc: Value, mut version: u64) -> Value {
+        while let Ok(req) = tokio::time::timeout(Duration::from_secs(1), self.request()).await {
+            let name = req["params"]["name"].as_str().unwrap_or_default().to_owned();
+            let result = match (req["method"].as_str().unwrap(), name.as_str()) {
+                ("doc.get", "hdroid-push") => json!({"value": doc, "version": version}),
+                ("doc.set", "hdroid-push") => {
+                    assert_eq!(req["params"]["version"], version, "{req}");
+                    doc = req["params"]["value"].clone();
+                    version += 1;
+                    json!({"version": version})
+                }
+                ("doc.get", "hdroid-push-status") => json!({"value": status_doc(200), "version": 2}),
+                _ => panic!("unexpected {req}"),
+            };
+            let reply = json!({"jsonrpc": "2.0", "id": req["id"], "result": result});
+            self.send(0, wire::DATA, reply.to_string().as_bytes()).await;
+        }
+        doc
+    }
+}
+
+/// Codex review, M3: two endpoint changes in quick succession. The second
+/// arrives while the first is still writing; the machine must end up with the
+/// latest endpoint only, and the card must not call a stale entry registered.
+#[tokio::test(start_paused = true)]
+async fn a_second_endpoint_change_mid_write_leaves_only_the_latest() {
+    let mut rig = rig("push-race");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.set_push(Some(registration(UP_OLD)));
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    let old = json!({"phones": [phone_entry(UP_OLD)]});
+    core.registers(Value::Null, old.clone(), status_doc(200)).await;
+    rig.until("registered", |s| {
+        alerts(s).is_some_and(|a| a.registration == push::AlertsRegistration::Registered)
+    })
+    .await;
+
+    // The first change reads the document and sends its write ...
+    rig.hub.set_push(Some(registration(UP_NEW)));
+    core.doc_call("doc.get", "hdroid-push", json!({"value": old, "version": 5}))
+        .await;
+    let set = core.request().await;
+    assert_eq!(set["method"], "doc.set", "{set}");
+    assert_eq!(set["params"]["value"], json!({"phones": [phone_entry(UP_NEW)]}));
+    // ... and the second change comes before the core answers it.
+    rig.hub.set_push(Some(registration(UP_THIRD)));
+    let reply = json!({"jsonrpc": "2.0", "id": set["id"], "result": {"version": 6}});
+    core.send(0, wire::DATA, reply.to_string().as_bytes()).await;
+    let doc = core
+        .serve_push_docs(json!({"phones": [phone_entry(UP_NEW)]}), 6)
+        .await;
+    assert_eq!(doc, json!({"phones": [phone_entry(UP_THIRD)]}));
+    let s = rig.hub.snapshot();
+    assert_eq!(
+        alerts(&s).map(|a| a.registration),
+        Some(push::AlertsRegistration::Registered)
+    );
+    let list = std::fs::read_to_string(rig.dir.join("machines.json")).unwrap();
+    assert!(list.contains(UP_THIRD) && !list.contains(UP_NEW), "{list}");
+}

@@ -173,6 +173,9 @@ class FakeTerminalView : TerminalViewInterface, AutoCloseable {
     override fun scroll(rows: Int) {
         calls += "scroll $rows"
     }
+    override fun click(col: UShort, row: UShort) {
+        calls += "click $col $row"
+    }
     override fun tap(key: RowKeyTap): Armed {
         calls += "tap ${key::class.simpleName}"
         return armedAfterTap

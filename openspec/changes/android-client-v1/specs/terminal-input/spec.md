@@ -21,6 +21,17 @@ rule on its own next input. The phone SHALL send `display` with null fields.
 - **WHEN** the phone becomes the size leader
 - **THEN** the terminal's reported colours stay the desk's (null display fields leave them in place)
 
+### Requirement: A tap clicks a program that takes clicks
+While the phone types at its own size, a tap on the terminal SHALL also reach a
+program that tracks the mouse as a left click on the tapped cell (press and
+release, encoded by libghostty's mouse encoder), as the desk app does; the
+keyboard is asked for as on any tap. While watching, a tap SHALL NOT click: the
+desk's grid on screen is not the one the takeover gives the program.
+
+#### Scenario: Clicking in a full-screen agent
+- **WHEN** Ezra types into full-screen Claude Code and taps a line of its output
+- **THEN** Claude Code receives a click on that cell
+
 ### Requirement: The keyboard behaves like a terminal keyboard
 In the terminal the app SHALL request a keyboard without suggestions or
 autocorrect, and SHALL map Android key events, including backspace and enter, to

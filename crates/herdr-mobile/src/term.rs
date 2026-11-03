@@ -6,6 +6,9 @@
 //!   first key, keys-row key or paste reattaches at the phone's size
 //!   (`herdr_proto::viewer`). Each attach starts a fresh VT.
 //! - A `size` event that is not the phone's own reattaches as a watcher.
+//! - A flick scrolls the VT's own scrollback on the main screen; a full-screen
+//!   program gets it as input instead (`vt/mouse.rs`), so it takes over like a
+//!   key.
 //! - After an observe attach the size from `terminal.get` is compared with the
 //!   size before attaching; a change goes to the diagnostic log.
 //! - A reconnect of the machine reattaches the terminal on the new
@@ -41,6 +44,9 @@ pub(crate) enum Cmd {
     Scroll(i32),
     /// Back to the bottom.
     Live,
+    /// A tap on cell (col, row) of the phone's grid: a click for a program
+    /// tracking the mouse, only while typing (watching draws the desk's size).
+    Click(u16, u16),
     /// The phone's own grid size changed (keyboard shown or hidden).
     PhoneSize(u16, u16),
     /// `terminal.interrupt`; the report comes back through the sink.
@@ -329,14 +335,31 @@ impl Task {
                                 return over;
                             }
                         }
-                        Cmd::Scroll(rows) => {
-                            vt.scroll(rows);
-                            dirty = true;
-                        }
+                        // A full-screen program scrolls itself, as on the desk; the
+                        // main screen scrolls the phone's own scrollback.
+                        Cmd::Scroll(rows) => match vt.program_scroll(rows) {
+                            Some(bytes) => {
+                                if let Err(over) = self.input(&mut viewer, &mut vt, &mut dirty, &bytes).await {
+                                    return over;
+                                }
+                            }
+                            None => {
+                                vt.scroll(rows);
+                                dirty = true;
+                            }
+                        },
                         Cmd::Live => {
                             vt.scroll_to_live();
                             dirty = true;
                         }
+                        Cmd::Click(col, row) if viewer.mode() == Mode::Typing => {
+                            if let Some(bytes) = vt.program_click(col, row)
+                                && let Err(over) = self.input(&mut viewer, &mut vt, &mut dirty, &bytes).await
+                            {
+                                return over;
+                            }
+                        }
+                        Cmd::Click(..) => {}
                         Cmd::PhoneSize(c, r) => {
                             if c > 0 && r > 0 {
                                 self.phone = (c, r);

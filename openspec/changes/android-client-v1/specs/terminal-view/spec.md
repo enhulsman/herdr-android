@@ -40,13 +40,23 @@ level SHALL be remembered per terminal.
 - **THEN** the text grows, a drag pans, and pinching back returns to fit-to-width
 
 ### Requirement: Scrollback with a way back to live
-The attach SHALL request 2,000 lines of history. Flicking SHALL scroll locally;
-while scrolled up, new output SHALL NOT move the view and a "Live" control SHALL
-return to the bottom.
+The attach SHALL request 2,000 lines of history. On the main screen, flicking
+SHALL scroll locally; while scrolled up, new output SHALL NOT move the view and a
+"Live" control SHALL return to the bottom.
+
+A full-screen program (on the alternate screen, or tracking the mouse) keeps its
+own history and herdr sends none, so flicking SHALL scroll the program itself, as
+the desk app does: mouse wheel events while it tracks the mouse, otherwise arrow
+keys, one per row. Because a watching attach never sends input, the first such
+flick while watching SHALL take over at the phone's size, as the first key does.
 
 #### Scenario: Reading while the agent works
 - **WHEN** Ezra scrolls up while output arrives
 - **THEN** the view stays put and "Live" is shown until tapped
+
+#### Scenario: Scrolling a full-screen agent
+- **WHEN** Ezra flicks down on a full-screen Claude Code that tracks the mouse
+- **THEN** the program receives one wheel-up event per row, and the phone leads at its own size
 
 ### Requirement: Select and copy from the local screen
 A long press SHALL switch to a text selection layer built from the local VT

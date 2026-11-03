@@ -85,6 +85,7 @@ import dev.herdr.android.ui.theme.HerdrType
 import uniffi.herdr_mobile.RowKeyTap
 import uniffi.herdr_mobile.TermPhase
 import kotlin.math.abs
+import kotlin.math.floor
 
 // The terminal screen (renders 3, 4, 4b, 5; terminal-view and terminal-input
 // specs): the title bar, the queue strip, the grid watched at desk size or
@@ -349,9 +350,17 @@ private fun TerminalArea(
                 .clipToBounds()
                 .semantics { contentDescription = label }
                 // Keyed by what the handlers act on: moving to another agent's terminal swaps them.
-                .pointerInput(screen, input, screen.typing) {
+                .pointerInput(session, screen, input, screen.typing, padX, padTop, phoneFont) {
                     detectTapGestures(
-                        onTap = {
+                        onTap = { at ->
+                            // At the phone's size the cell under the finger is the program's: a
+                            // program that takes clicks gets one, as on the desk. Watching draws
+                            // the desk's size, which the takeover would change, so no click.
+                            if (screen.typing) {
+                                val col = floor((at.x - padX) / (phoneFont * TerminalMetrics.ADVANCE_EM)).toInt()
+                                val row = floor((at.y - padTop) / (phoneFont * TerminalMetrics.LINE_EM)).toInt()
+                                session.click(col.coerceAtLeast(0), row.coerceAtLeast(0))
+                            }
                             screen.inputOpen = true
                             input.show()
                         },

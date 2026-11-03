@@ -15,8 +15,13 @@ pub const GENERATION: u64 = 1;
 pub const MIN_CORE: &str = "0.1.15";
 
 /// What the app calls on a core; a core lacking one of them is too old.
-/// Grows with the milestones (attach and input arrive in M2).
-pub const USES: &[&str] = &["events.subscribe"];
+/// Grows with the milestones; a test lists every method called in `src`.
+pub const USES: &[&str] = &[
+    "events.subscribe",
+    "terminal.attach",
+    "terminal.get",
+    "terminal.interrupt",
+];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Compat {

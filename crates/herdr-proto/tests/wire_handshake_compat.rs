@@ -261,3 +261,28 @@ fn newer_core() {
         Compat::NewerGeneration { generation: 2 }
     );
 }
+
+#[test]
+fn every_method_the_app_calls_is_checked_at_connect() {
+    // A core lacking one of these would connect, then fail when an agent opens.
+    for method in [
+        "events.subscribe",
+        "terminal.attach",
+        "terminal.get",
+        "terminal.interrupt",
+    ] {
+        assert!(compat::USES.contains(&method), "{method} not in USES");
+        let without: Vec<&str> = compat::USES
+            .iter()
+            .copied()
+            .filter(|m| *m != method)
+            .collect();
+        assert_eq!(
+            compat::check(&hello(1, "0.1.15", &without)),
+            Compat::Missing {
+                have: "0.1.15".into(),
+                methods: vec![method.to_owned()]
+            }
+        );
+    }
+}

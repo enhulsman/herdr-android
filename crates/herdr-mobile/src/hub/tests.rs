@@ -69,7 +69,7 @@ impl Core {
     async fn hello(&mut self, version: &str) {
         self.hello_as(json!({
             "generation": 1, "version": version,
-            "methods": ["events.subscribe", "terminal.list"],
+            "methods": herdr_proto::compat::USES,
         }))
         .await;
     }

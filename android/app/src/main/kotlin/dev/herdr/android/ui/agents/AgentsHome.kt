@@ -51,9 +51,20 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
      */
     private var walk: List<AgentKey> = emptyList()
 
+    /**
+     * The agents this walk opened before the current one, and the ones a swipe
+     * down came back from: opening marks an agent seen, so it may no longer
+     * want the person, yet a swipe down still goes back to it, like a back
+     * button (phone check, round 2).
+     */
+    private val behind = ArrayDeque<AgentKey>()
+    private val ahead = ArrayDeque<AgentKey>()
+
     fun open(key: AgentKey) {
         // Taken before marking seen re-sorts the list.
         walk = hubHost.snapshot.value.agents.map { AgentKey(it.machine, it.address) }
+        behind.clear()
+        ahead.clear()
         show(key)
     }
 
@@ -64,7 +75,18 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
      */
     fun step(forward: Boolean): Boolean {
         val current = openKey ?: return false
-        val next = attentionStep(hubHost.snapshot.value.agents, current, forward, walk) ?: return false
+        val snapshot = hubHost.snapshot.value
+        val (retrace, other) = if (forward) ahead to behind else behind to ahead
+        while (retrace.isNotEmpty()) {
+            val key = retrace.removeLast()
+            if (row(snapshot, key) != null) {
+                other.addLast(current)
+                show(key)
+                return true
+            }
+        }
+        val next = attentionStep(snapshot.agents, current, forward, walk) ?: return false
+        if (forward) behind.addLast(current) else ahead.addLast(current)
         show(next)
         return true
     }
@@ -80,6 +102,8 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
         openKey = null
         finishMarked = false
         walk = emptyList()
+        behind.clear()
+        ahead.clear()
     }
 
     /** Follows the hub: a terminal that went away closes its sheet; a finish in view is seen. */

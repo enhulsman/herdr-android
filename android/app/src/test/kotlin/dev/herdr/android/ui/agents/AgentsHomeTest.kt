@@ -216,15 +216,17 @@ class AgentsHomeTest {
     }
 
     @Test
-    fun swipingDownWalksBackThroughTheOnesStillWaiting() {
+    fun swipingDownWalksBackThroughTheOnesOpenedEvenWhenAnswered() {
         val needs = AgentAttention.NEEDS_YOU
         val working = AgentAttention.WORKING
         publish(snapshot(ws, listOf(row("a", needs), row("b", needs), row("c", needs))))
         home.open(key("a"))
         assertTrue(home.step(forward = true))
         assertTrue(home.step(forward = true))
-        // b was answered meanwhile; a still waits.
+        // b was answered meanwhile; a back button still returns to it (round 2).
         publish(snapshot(ws, listOf(row("a", needs), row("c", needs), row("b", working))))
+        assertTrue(home.step(forward = false))
+        assertEquals(key("b"), home.openKey)
         assertTrue(home.step(forward = false))
         assertEquals(key("a"), home.openKey)
         assertFalse(home.step(forward = false))
@@ -242,5 +244,57 @@ class AgentsHomeTest {
         assertTrue(home.step(forward = true))
         assertEquals(key("b"), home.openKey)
         assertFalse(home.step(forward = true))
+    }
+
+    // Phone check round 2: after swiping forward through finishes (each turns
+    // idle once opened), swiping down found nothing to go back to. Down
+    // retraces the agents this walk opened; up after that goes forward again.
+    @Test
+    fun swipingDownRetracesTheAgentsOpenedEvenOnceTheyNoLongerWantYou() {
+        val done = AgentAttention.DONE
+        val idle = AgentAttention.IDLE
+        publish(snapshot(ws, listOf(row("a", done), row("b", done), row("c", done))))
+        home.open(key("a"))
+        assertTrue(home.step(forward = true))
+        assertTrue(home.step(forward = true))
+        assertEquals(key("c"), home.openKey)
+        publish(snapshot(ws, listOf(row("a", idle), row("b", idle), row("c", idle))))
+        assertFalse("the end of the queue", home.step(forward = true))
+
+        assertTrue(home.step(forward = false))
+        assertEquals(key("b"), home.openKey)
+        assertTrue(home.step(forward = false))
+        assertEquals(key("a"), home.openKey)
+        assertFalse("back at the first: nothing before it", home.step(forward = false))
+
+        assertTrue("forward again through the same ones", home.step(forward = true))
+        assertEquals(key("b"), home.openKey)
+        assertTrue(home.step(forward = true))
+        assertEquals(key("c"), home.openKey)
+        assertFalse(home.step(forward = true))
+    }
+
+    @Test
+    fun goingBackSkipsAnAgentThatIsGone() {
+        val needs = AgentAttention.NEEDS_YOU
+        publish(snapshot(ws, listOf(row("a", needs), row("b", needs), row("c", needs))))
+        home.open(key("a"))
+        home.step(forward = true)
+        home.step(forward = true)
+        publish(snapshot(ws, listOf(row("a", needs), row("c", needs))))
+        assertTrue(home.step(forward = false))
+        assertEquals(key("a"), home.openKey)
+    }
+
+    @Test
+    fun openingFromTheListStartsAFreshWalk() {
+        val done = AgentAttention.DONE
+        publish(snapshot(ws, listOf(row("a", done), row("b", done))))
+        home.open(key("a"))
+        home.step(forward = true)
+        home.close()
+        publish(snapshot(ws, listOf(row("a", AgentAttention.IDLE), row("b", done))))
+        home.open(key("b"))
+        assertFalse("no trail from the earlier walk", home.step(forward = false))
     }
 }

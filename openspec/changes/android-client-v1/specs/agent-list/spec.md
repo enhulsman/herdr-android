@@ -72,10 +72,16 @@ A working row SHALL show a spinner, and a progress bar when the record carries
 - **THEN** the row shows a 40% bar
 
 ### Requirement: Jump to the next agent that needs you
-From an open terminal, a vertical swipe on the title bar SHALL open the next or
-previous agent that needs you or is finished-unseen, in list order, with a light
-haptic per step and a stronger one when none is left.
+From an open terminal, a swipe up on the title bar SHALL open the next agent
+that needs you or is finished-unseen, in list order; a swipe down SHALL go back
+through the agents that walk opened (also once they are seen or answered), then
+to earlier agents that need you; a swipe up after going back SHALL retrace them.
+A light haptic per step, a stronger one when none is left.
 
 #### Scenario: Clearing a backlog
 - **WHEN** three agents need Ezra and he swipes up on the title bar twice
 - **THEN** the second and third open in turn, and a third swipe gives the end-of-queue haptic
+
+#### Scenario: Going back
+- **WHEN** Ezra has swiped up through three finished agents and swipes down twice
+- **THEN** the second and then the first open again, though opening them marked them seen

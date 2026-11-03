@@ -44,7 +44,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [x] M3.3 ntfy write-only `up*` token on the VPS (done in Spike C, 2026-11-01; in the homelab docs)
 - [x] M3.4 App: UnifiedPush registration, `hdroid-push` writes, three channels, cleared handling, silence check, status display, mute, permission flow
 - [ ] M3.5 Phone check: app closed, agent blocks on WSL, alert opens it; answered at the desk clears it; test alert; WSL off overnight gives one quiet notice
-- [ ] M3.6 `/docs-update` for the ntfy token and the WSL watcher
+- [x] M3.6 `/docs-update` for the ntfy token and the WSL watcher
 
 ## Version 1.1
 

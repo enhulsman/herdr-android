@@ -25,6 +25,16 @@ the time. Never screen text or the agent's message. ntfy only sees ciphertext.
   logs "no core" and tries again every 30 s.
 - After a restart it alerts only what it has not alerted before
   (`~/.local/state/herdr-push/state.json`).
+- A phone that turns alerts on while an agent is already waiting gets that
+  alert once, so turning alerts on late misses nothing that still needs you.
+
+## On the phone
+
+The app posts alerts on three notification channels, which you can tune in
+Android's settings: "Needs you" (with sound), "Finished" (silent) and "Alert
+health" (silent). Tapping an agent's alert opens its terminal. Each machine card
+has an Alerts row, "Mute alerts" (agents still go to the top of the list) and
+"Send test alert", which checks the whole path from the machine to the phone.
 
 ## Install
 
@@ -66,7 +76,13 @@ the time. Never screen text or the agent's message. ntfy only sees ciphertext.
    ```
 
    On WSL, systemd must be on (`[boot] systemd=true` in `/etc/wsl.conf`).
-6. In the app, turn on alerts for the machine and tap "Send test alert".
+6. On the phone, install the ntfy app and point it at your ntfy server. If the
+   server denies anonymous access, sign in with a user that may read `up*`
+   topics.
+7. In the app, tap "Turn on" on a machine card's Alerts row. It asks to allow
+   notifications, then which UnifiedPush app to use if you have more than one.
+   Then tap "Send" on "Send test alert"; the row says "Test received" when the
+   alert arrives.
 
 ## Checking it
 

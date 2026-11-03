@@ -648,3 +648,23 @@ async fn a_tap_clicks_a_mouse_program_only_while_typing() {
         (6, b"\x1b[<0;4;5M\x1b[<0;4;5m".as_slice())
     );
 }
+
+// A tap while watching: the phone leads at its own size without a keystroke.
+#[tokio::test(start_paused = true)]
+async fn leading_takes_over_at_the_phones_size_without_typing() {
+    let (_rig, mut core, mut o) = watching("term-lead").await;
+    o.cmds.send(Cmd::Lead).unwrap();
+    let close = core.frame().await;
+    assert_eq!((close.channel, close.kind), (5, wire::CLOSE));
+    let params = core.attach(6, PHONE).await;
+    assert_eq!(params["observe"], false);
+    let s = o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
+    assert_eq!((s.cols, s.rows), PHONE);
+    // The next frame to the core is the next key, not anything the lead typed.
+    key(&o, 'k');
+    let typed = core.frame().await;
+    assert_eq!(
+        (typed.channel, typed.kind, typed.payload.as_slice()),
+        (6, wire::DATA, b"k".as_slice())
+    );
+}

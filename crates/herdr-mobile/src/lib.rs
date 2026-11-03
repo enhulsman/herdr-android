@@ -362,6 +362,7 @@ pub trait TerminalListener: Send + Sync {
 pub enum RowKeyTap {
     Esc,
     Tab,
+    ShiftTab,
     Ctrl,
     Alt,
     Up,
@@ -370,7 +371,7 @@ pub enum RowKeyTap {
     Right,
     Enter,
     CtrlC,
-    /// A shelf symbol such as `|`; only its first character counts.
+    /// A symbol key such as `|`; only its first character counts.
     Symbol {
         text: String,
     },
@@ -457,6 +458,7 @@ impl TerminalView {
         let row = match key {
             RowKeyTap::Esc => RowKey::Esc,
             RowKeyTap::Tab => RowKey::Tab,
+            RowKeyTap::ShiftTab => RowKey::ShiftTab,
             RowKeyTap::Ctrl => RowKey::Ctrl,
             RowKeyTap::Alt => RowKey::Alt,
             RowKeyTap::Up => RowKey::Up,
@@ -527,6 +529,12 @@ impl TerminalView {
     pub fn live(&self) {
         #[cfg(feature = "vt")]
         self.send(term::Cmd::Live);
+    }
+
+    /// Takes over at the phone's size without typing (a tap while watching).
+    pub fn lead(&self) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Lead);
     }
 
     /// A tap on cell (col, row) of the phone's grid: a click for a program

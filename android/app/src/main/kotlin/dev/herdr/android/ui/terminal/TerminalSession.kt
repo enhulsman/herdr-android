@@ -95,6 +95,9 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
     fun paste(text: String) = send { paste(text) }
     fun scroll(rows: Int) = send { if (rows != 0) scroll(rows) }
 
+    /** Takes over at the phone's size without typing (a tap while watching). */
+    fun lead() = send { lead() }
+
     /** A tap on cell ([col], [row]) of the phone's grid; the core clicks a program that takes clicks. */
     fun click(col: Int, row: Int) = send { click(col.coerceIn(0, 0xFFFF).toUShort(), row.coerceIn(0, 0xFFFF).toUShort()) }
     fun live() = send { live() }

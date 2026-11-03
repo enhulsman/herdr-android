@@ -75,7 +75,7 @@ in v1.1.
 | Render | Shows |
 |---|---|
 | `1-home-dark`, `2-home-light` | Agent list in the order Needs you, Done, Working, Idle, then "Other terminals" (collapsed); an unreachable-machine line |
-| `3-terminal-watch` | Watching at desk size: the grid fitted to the width, a dashed line where it ends, and the "Watching … tap to type" chip |
+| `3-terminal-watch` | Watching at desk size: the grid fitted to the width (since 2026-11-03 the area below is terminal background, no dashed line), and the "Watching … tap to type" chip |
 | `4-terminal-type` | Typing at phone size: size tag, keys row (`esc tab ctrl alt ← ↓ ↑ →` and compose), ctrl latched |
 | `4b-terminal-type-hidden` | Typing with the keyboard hidden: the phone grid at full height, keys row kept |
 | `5-compose` | Compose sheet; Paste sends no Enter |

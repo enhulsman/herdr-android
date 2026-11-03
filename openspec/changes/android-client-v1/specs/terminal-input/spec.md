@@ -25,8 +25,9 @@ rule on its own next input. The phone SHALL send `display` with null fields.
 While the phone types at its own size, a tap on the terminal SHALL also reach a
 program that tracks the mouse as a left click on the tapped cell (press and
 release, encoded by libghostty's mouse encoder), as the desk app does; the
-keyboard is asked for as on any tap. While watching, a tap SHALL NOT click: the
-desk's grid on screen is not the one the takeover gives the program.
+keyboard stays as it is. While watching, a tap SHALL NOT click: the desk's grid
+on screen is not the one the takeover gives the program; it SHALL take over at
+the phone's size without input instead.
 
 #### Scenario: Clicking in a full-screen agent
 - **WHEN** Ezra types into full-screen Claude Code and taps a line of its output
@@ -42,9 +43,11 @@ terminal keys.
 - **THEN** the shell runs `ls`
 
 ### Requirement: A keys row for keys the phone keyboard lacks
-Above the keyboard the app SHALL show a keys row: esc, tab, ctrl and alt (sticky),
-arrows, enter, ctrl+c, and a swipe-up shelf with symbols such as `|`, `~`, `/`,
-`-`. Every key SHALL go through the same encoder as typing.
+While the phone types, the app SHALL show two keys rows, both always: esc, tab,
+shift+tab, ctrl and alt (sticky), arrows, enter, ctrl+c, symbols such as `|`,
+`~`, `/`, `-`, a keyboard key and the compose key. Every key SHALL go through the
+same encoder as typing. A tap on the terminal SHALL NOT open the phone keyboard;
+the keyboard key shows and hides it, and the watching chip opens it to type.
 
 #### Scenario: Choosing a menu option
 - **WHEN** Claude Code shows a numbered menu and Ezra taps down, down, enter
@@ -53,6 +56,10 @@ arrows, enter, ctrl+c, and a swipe-up shelf with symbols such as `|`, `~`, `/`,
 #### Scenario: Sticky ctrl
 - **WHEN** Ezra taps ctrl then c
 - **THEN** the program receives ctrl+c
+
+#### Scenario: Reading without the keyboard
+- **WHEN** Ezra taps a watched terminal, then a tool result in it
+- **THEN** the terminal takes over at the phone's size with the keys rows and no keyboard, and the second tap clicks the tool result
 
 ### Requirement: A compose key for long text
 The keys row SHALL have a compose key that opens a text field with the phone's

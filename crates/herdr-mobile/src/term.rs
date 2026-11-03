@@ -44,6 +44,8 @@ pub(crate) enum Cmd {
     Scroll(i32),
     /// Back to the bottom.
     Live,
+    /// Take over at the phone's size without typing (a tap while watching).
+    Lead,
     /// A tap on cell (col, row) of the phone's grid: a click for a program
     /// tracking the mouse, only while typing (watching draws the desk's size).
     Click(u16, u16),
@@ -360,6 +362,17 @@ impl Task {
                             }
                         }
                         Cmd::Click(..) => {}
+                        Cmd::Lead => match viewer.lead().await {
+                            Ok(Some(a)) => {
+                                let Some(t) = self.fresh_vt(&a) else {
+                                    return Over::Pause;
+                                };
+                                vt = t;
+                                dirty = false;
+                            }
+                            Ok(None) => {}
+                            Err(e) => return self.failed(e),
+                        },
                         Cmd::PhoneSize(c, r) => {
                             if c > 0 && r > 0 {
                                 self.phone = (c, r);

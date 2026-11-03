@@ -44,5 +44,10 @@ release archives (renamed only, as Android resource names must be lowercase).
 - Protocol code adapted from herdr (Apache-2.0): `crates/herdr-proto/`, licence in
   `crates/herdr-proto/LICENSE-herdr-Apache-2.0`.
 - herdr-app icons (Apache-2.0), used in the design renders: `design/renders/icons/`.
+  `square-pen`, the chevrons and `settings` among them, and the keys row's
+  `keyboard`, are Lucide icons (ISC License,
+  Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part
+  of Feather (MIT); all other copyright (c) for Lucide are held by Lucide
+  Contributors 2022), drawn in the app from their paths.
 - The app's launcher icon (`android/app/src/main/res/drawable/ic_launcher_foreground.xml`)
   is the ram from herdr's logo (Apache-2.0), via `design/renders/icons/herdr.svg`.

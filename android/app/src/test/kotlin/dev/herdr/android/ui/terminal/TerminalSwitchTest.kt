@@ -108,15 +108,16 @@ class TerminalSwitchTest {
         agents = listOf(row("t1", AgentAttention.WORKING), row("t2", AgentAttention.WORKING)),
     )
 
-    private class Open(val key: AgentKey, val session: TerminalSession, val screen: TerminalScreenState)
+    private class Open(val key: AgentKey, val session: TerminalSession, val screen: TerminalScreenState, val view: FakeTerminalView)
 
     private fun watching(key: AgentKey): Open {
         val session = TerminalSession(key) { it.run() }
-        session.attach(FakeTerminalView())
+        val view = FakeTerminalView()
+        session.attach(view)
         val frame = SessionFixture.frame(96, 44, wide = true, bottom = false)
         session.listener.onState(TermState(TermPhase.Watching, 96u, 44u))
         session.listener.onFrame(frame)
-        return Open(key, session, TerminalScreenState())
+        return Open(key, session, TerminalScreenState(), view)
     }
 
     private fun touch(action: Int, down: Long, x: Float, y: Float) {
@@ -158,15 +159,16 @@ class TerminalSwitchTest {
         }
         idle()
         // The person used the first terminal (its gesture handling starts with the first touch).
+        // A tap while watching takes over at the phone's size.
         press(holdMs = 0)
-        assertTrue(first.screen.inputOpen)
-        first.screen.inputOpen = false
+        assertEquals(listOf("lead"), first.view.calls)
+        first.view.calls.clear()
         open = second
         idle()
 
         press(holdMs = 0)
-        assertTrue(second.screen.inputOpen)
-        assertFalse(first.screen.inputOpen)
+        assertEquals(listOf("lead"), second.view.calls)
+        assertEquals(emptyList<String>(), first.view.calls)
 
         press(holdMs = 800)
         assertTrue(second.screen.selecting)

@@ -220,7 +220,8 @@
     <string name="key_enter">Enter</string>
     <string name="key_ctrl_c">Control C</string>
     <string name="key_compose">Compose</string>
-    <string name="key_shelf">More keys. Swipe up on the keys row</string>
+    <string name="key_keyboard">Keyboard</string>
+    <string name="key_shift_tab">Shift Tab</string>
     <!-- The compose sheet (render 5). %1$s is the agent's name. -->
     <string name="compose_title">Compose</string>
     <string name="compose_to">to %1$s</string>

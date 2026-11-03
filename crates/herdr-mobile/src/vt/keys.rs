@@ -78,6 +78,10 @@ impl Terminal {
         let (gkey, utf8, unshifted, consumed): (i32, &[u8], u32, u16) = match key {
             Key::Escape => (ffi::KEY_ESCAPE, &[], 0, 0),
             Key::Tab => (ffi::KEY_TAB, &[], 0, 0),
+            Key::BackTab => {
+                gmods |= ffi::MODS_SHIFT;
+                (ffi::KEY_TAB, &[], 0, 0)
+            }
             Key::Enter => (ffi::KEY_ENTER, &[], 0, 0),
             Key::Backspace => (ffi::KEY_BACKSPACE, &[], 0, 0),
             Key::Up => (ffi::KEY_ARROW_UP, &[], 0, 0),
@@ -173,6 +177,7 @@ mod tests {
         let table: &[(&[RowKey], &[u8])] = &[
             (&[Esc], b"\x1b"),
             (&[Tab], b"\t"),
+            (&[ShiftTab], b"\x1b[Z"),
             (&[Enter], b"\r"),
             (&[Up], b"\x1b[A"),
             (&[Down], b"\x1b[B"),

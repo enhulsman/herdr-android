@@ -13,14 +13,21 @@ same Ghostty pin.
 - **WHEN** a recorded synthetic Claude Code byte stream is fed to the app's VT
 - **THEN** the text and attributes of every cell equal the golden grid produced by herdr-app's `vt.rs` pipeline for the same stream
 
-### Requirement: Watching never changes the terminal's size
-While Ezra only watches, the app SHALL attach with `observe: true`, SHALL draw the
+### Requirement: Opening takes the phone's size; watching never changes it
+Opening an agent SHALL attach once, actively, at the phone's size (phone check
+round 2: the open is the person's interaction); leaving SHALL detach, so the desk
+takes its own size back. Once the desk takes the size back while the phone is
+open, the phone watches: it SHALL attach with `observe: true`, SHALL draw the
 terminal at its real columns and rows, and SHALL NOT send input, RESIZE, FOCUS or
 FACTS on that attach.
 
 #### Scenario: Opening an agent
-- **WHEN** a terminal is 180x50 at the desk and Ezra opens it on the phone without typing
-- **THEN** the terminal stays 180x50
+- **WHEN** a terminal is 180x50 at the desk and Ezra opens it on the phone
+- **THEN** it reflows to the phone's size at once, and returns to 180x50 when he goes back to the list
+
+#### Scenario: The desk takes it back
+- **WHEN** Ezra types at the desk while the phone has the terminal open
+- **THEN** the terminal returns to the desk's size and the phone watches it at that size
 
 ### Requirement: Size changes reattach cleanly
 On a `size` event for the open terminal, and on any reattach, the app SHALL discard

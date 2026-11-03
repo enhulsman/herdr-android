@@ -267,6 +267,7 @@ class FakeHub : HubInterface {
         address: String,
         phoneCols: UShort,
         phoneRows: UShort,
+        atPhoneSize: Boolean,
         listener: TerminalListener,
     ): TerminalView = error("FakeHub does not open terminals")
     override fun updateMachine(name: String, host: String, port: UShort, user: String) { calls += "update $name" }

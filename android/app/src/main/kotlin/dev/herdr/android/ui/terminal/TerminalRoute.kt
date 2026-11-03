@@ -49,7 +49,8 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     val screen = remember(key) { TerminalScreenState(app.terminalZoom[key]) }
     val opener = remember(key) {
         TerminalOpener(session) { size ->
-            app.hubHost.hub?.openTerminal(key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), session.listener)
+            // Opened at the phone's size (phone check round 2); closing lets the desk take its size back.
+            app.hubHost.hub?.openTerminal(key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), true, session.listener)
         }
     }
     var phone by remember(key) { mutableStateOf<GridSize?>(null) }

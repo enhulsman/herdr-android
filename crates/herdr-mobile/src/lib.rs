@@ -255,14 +255,16 @@ impl Hub {
         self.core.import_machines(&json)
     }
 
-    /// Opens a terminal to watch; `phone_cols` x `phone_rows` is the phone's
-    /// own grid, used once it types. The listener hears frames and states.
+    /// Opens a terminal, at the phone's size when `at_phone_size` (the app,
+    /// since phone check round 2), else to watch; `phone_cols` x `phone_rows`
+    /// is the phone's own grid. The listener hears frames and states.
     pub fn open_terminal(
         &self,
         machine: String,
         address: String,
         phone_cols: u16,
         phone_rows: u16,
+        at_phone_size: bool,
         listener: Arc<dyn TerminalListener>,
     ) -> Arc<TerminalView> {
         #[cfg(feature = "vt")]
@@ -286,6 +288,7 @@ impl Hub {
                     &machine,
                     &address,
                     (phone_cols, phone_rows),
+                    at_phone_size,
                     Arc::new(ListenerSink(tx)),
                 )
             });
@@ -296,7 +299,7 @@ impl Hub {
         }
         #[cfg(not(feature = "vt"))]
         {
-            let _ = (machine, address, phone_cols, phone_rows);
+            let _ = (machine, address, phone_cols, phone_rows, at_phone_size);
             listener.on_state(TermState {
                 phase: TermPhase::Failed {
                     detail: VtError::Unavailable.to_string(),

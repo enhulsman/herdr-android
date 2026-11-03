@@ -2,9 +2,10 @@
 //! machine's live connection, feeds the attach stream into a libghostty-vt
 //! terminal and hands frames (format in `vt/mod.rs`) to the screen.
 //!
-//! - Watching attaches with `observe: true` and draws the desk's size; the
-//!   first key, keys-row key or paste reattaches at the phone's size
-//!   (`herdr_proto::viewer`). Each attach starts a fresh VT.
+//! - The app opens at the phone's size (`lead`, phone check round 2): one
+//!   active attach. Watching attaches with `observe: true` and draws the
+//!   desk's size; the first key, keys-row key, paste or a tap reattaches at
+//!   the phone's size (`herdr_proto::viewer`). Each attach starts a fresh VT.
 //! - A `size` event that is not the phone's own reattaches as a watcher.
 //! - A flick scrolls the VT's own scrollback on the main screen; a full-screen
 //!   program gets it as input instead (`vt/mouse.rs`), so it takes over like a
@@ -69,6 +70,7 @@ pub(crate) fn spawn(
     machine: &str,
     address: &str,
     phone: (u16, u16),
+    lead: bool,
     sink: Arc<dyn TermSink>,
 ) -> mpsc::UnboundedSender<Cmd> {
     let (tx, rx) = mpsc::unbounded_channel();
@@ -77,6 +79,7 @@ pub(crate) fn spawn(
         conns: hub.connection(machine),
         address: address.to_owned(),
         phone,
+        lead,
         cmds: rx,
         sink,
         size: (0, 0),
@@ -100,6 +103,8 @@ struct Task {
     conns: watch::Receiver<Option<Conn>>,
     address: String,
     phone: (u16, u16),
+    /// Open (and reopen after a reconnect) at the phone's size, not watching.
+    lead: bool,
     cmds: mpsc::UnboundedReceiver<Cmd>,
     sink: Arc<dyn TermSink>,
     /// The size of the last frames, for states that do not change it.
@@ -125,7 +130,12 @@ impl Task {
             };
             self.state(TermPhase::Attaching, None);
             let before = conn.sizes.borrow().get(&self.address).copied();
-            let over = match Viewer::watch(&conn.client, &self.address, self.phone).await {
+            let mode = if self.lead {
+                Mode::Typing
+            } else {
+                Mode::Watching
+            };
+            let over = match Viewer::open(&conn.client, &self.address, self.phone, mode).await {
                 Ok((viewer, attached)) => {
                     self.check_observe_size(&conn, before, &attached);
                     self.attached(&conn, viewer, attached, before).await

@@ -1339,3 +1339,242 @@ async fn each_broken_list_is_kept_under_its_own_name() {
     assert_eq!(read("machines.json.broken"), "first");
     assert_eq!(read("machines.json.broken-2"), "second");
 }
+
+// ---- alerts: this phone's entry in hdroid-push (task M3.4) ----
+
+const UP_NEW: &str = "https://ntfy.example.org/upNEW?up=1";
+const UP_OLD: &str = "https://ntfy.example.org/upOLD?up=1";
+
+fn registration(endpoint: &str) -> push::PushRegistration {
+    push::PushRegistration {
+        endpoint: endpoint.into(),
+        p256dh: "BKEY".into(),
+        auth: "AUTH".into(),
+    }
+}
+
+fn phone_entry(endpoint: &str) -> Value {
+    json!({"endpoint": endpoint, "p256dh": "BKEY", "auth": "AUTH", "machine": WS})
+}
+
+fn status_doc(code: u16) -> Value {
+    json!({"version": "0.0.4", "last_push_at": 1_730_650_000_000u64, "last_push_status": code,
+           "endpoints": {UP_NEW: {"status": format!("accepted {code}"), "at": 1}}, "notes": []})
+}
+
+impl Core {
+    /// Expects a call of `method` on document `name`; answers it with `result`.
+    async fn doc_call(&mut self, method: &str, name: &str, result: Value) -> Value {
+        let req = self.request().await;
+        assert_eq!(req["method"], method, "{req}");
+        assert_eq!(req["params"]["name"], name, "{req}");
+        let reply = json!({"jsonrpc": "2.0", "id": req["id"], "result": result});
+        self.send(0, wire::DATA, reply.to_string().as_bytes()).await;
+        req
+    }
+
+    /// The phone reads its registration and writes `want` over `have`, then
+    /// reads the status.
+    async fn registers(&mut self, have: Value, want: Value, status: Value) {
+        self.doc_call(
+            "doc.get",
+            "hdroid-push",
+            json!({"value": have, "version": 4}),
+        )
+        .await;
+        let set = self
+            .doc_call("doc.set", "hdroid-push", json!({"version": 5}))
+            .await;
+        assert_eq!(set["params"]["value"], want);
+        assert_eq!(set["params"]["version"], 4);
+        self.doc_call(
+            "doc.get",
+            "hdroid-push-status",
+            json!({"value": status, "version": 2}),
+        )
+        .await;
+    }
+}
+
+fn alerts(s: &HubSnapshot) -> Option<push::AlertsView> {
+    view(s, WS).alerts.clone()
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_registered_phone_writes_its_entry_and_reads_the_status() {
+    let mut rig = rig("push-register");
+    rig.add_trusted(WS, WS_KEY);
+    assert_eq!(
+        alerts(&rig.hub.snapshot()),
+        None,
+        "alerts off: nothing to show"
+    );
+    rig.hub.set_push(Some(registration(UP_NEW)));
+    let s = rig.hub.snapshot();
+    assert_eq!(
+        alerts(&s).map(|a| a.registration),
+        Some(push::AlertsRegistration::NotYet)
+    );
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    core.registers(
+        Value::Null,
+        json!({"phones": [phone_entry(UP_NEW)]}),
+        status_doc(200),
+    )
+    .await;
+    let s = rig
+        .until("registered with a status", |s| {
+            alerts(s).is_some_and(|a| a.status.is_some())
+        })
+        .await;
+    let a = alerts(&s).unwrap();
+    assert_eq!(a.registration, push::AlertsRegistration::Registered);
+    let status = a.status.unwrap();
+    assert_eq!(status.last_push_status, Some(200));
+    assert_eq!(status.endpoint_status.as_deref(), Some("accepted 200"));
+    // Remembered across restarts of the app, with the list.
+    let list = std::fs::read_to_string(rig.dir.join("machines.json")).unwrap();
+    assert!(list.contains(UP_NEW), "{list}");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_new_endpoint_while_away_shows_until_the_next_connection_rewrites_it() {
+    let mut rig = rig("push-endpoint-change");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.set_push(Some(registration(UP_OLD)));
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    let old = json!({"phones": [phone_entry(UP_OLD)]});
+    core.registers(Value::Null, old.clone(), status_doc(200))
+        .await;
+    rig.until("registered", |s| {
+        alerts(s).is_some_and(|a| a.registration == push::AlertsRegistration::Registered)
+    })
+    .await;
+
+    drop(core);
+    rig.until_state(WS, |st| matches!(st, MachineState::Unreachable { .. }))
+        .await;
+    rig.hub.set_push(Some(registration(UP_NEW)));
+    let s = rig.hub.snapshot();
+    assert_eq!(
+        alerts(&s).map(|a| a.registration),
+        Some(push::AlertsRegistration::EndpointChanged)
+    );
+
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    core.registers(
+        old,
+        json!({"phones": [phone_entry(UP_NEW)]}),
+        status_doc(200),
+    )
+    .await;
+    rig.until("registered again", |s| {
+        alerts(s).is_some_and(|a| a.registration == push::AlertsRegistration::Registered)
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_test_request_writes_a_new_test_value() {
+    let mut rig = rig("push-test");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.set_push(Some(registration(UP_NEW)));
+    assert!(rig.hub.send_test(WS).is_err(), "not connected yet");
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    let doc = json!({"phones": [phone_entry(UP_NEW)]});
+    core.registers(Value::Null, doc.clone(), status_doc(200))
+        .await;
+    rig.until("registered", |s| {
+        alerts(s).is_some_and(|a| a.registration == push::AlertsRegistration::Registered)
+    })
+    .await;
+
+    rig.hub.send_test(WS).unwrap();
+    core.doc_call(
+        "doc.get",
+        "hdroid-push",
+        json!({"value": doc, "version": 5}),
+    )
+    .await;
+    let set = core
+        .doc_call("doc.set", "hdroid-push", json!({"version": 6}))
+        .await;
+    let test = &set["params"]["value"]["phones"][0]["test"];
+    assert!(test.as_str().is_some_and(|t| !t.is_empty()), "{set}");
+    assert!(rig.hub.send_test("nowhere").is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_document_event_refreshes_the_status() {
+    let mut rig = rig("push-status-event");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.set_push(Some(registration(UP_NEW)));
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    core.registers(
+        Value::Null,
+        json!({"phones": [phone_entry(UP_NEW)]}),
+        status_doc(200),
+    )
+    .await;
+    rig.until("a status", |s| {
+        alerts(s).is_some_and(|a| a.status.is_some())
+    })
+    .await;
+
+    core.event(
+        1,
+        "doc",
+        "",
+        json!({"name": "hdroid-push-status", "version": 3}),
+    )
+    .await;
+    core.doc_call(
+        "doc.get",
+        "hdroid-push-status",
+        json!({"value": status_doc(403), "version": 3}),
+    )
+    .await;
+    rig.until("the refused status", |s| {
+        alerts(s).is_some_and(|a| a.status.is_some_and(|st| st.last_push_status == Some(403)))
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn turning_alerts_off_takes_the_entry_back() {
+    let mut rig = rig("push-off");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.set_push(Some(registration(UP_NEW)));
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![]).await;
+    let doc = json!({"phones": [phone_entry(UP_NEW)]});
+    core.registers(Value::Null, doc.clone(), status_doc(200))
+        .await;
+    rig.until("registered", |s| {
+        alerts(s).is_some_and(|a| a.registration == push::AlertsRegistration::Registered)
+    })
+    .await;
+
+    rig.hub.set_push(None);
+    assert_eq!(alerts(&rig.hub.snapshot()), None);
+    core.doc_call(
+        "doc.get",
+        "hdroid-push",
+        json!({"value": doc, "version": 5}),
+    )
+    .await;
+    let set = core
+        .doc_call("doc.set", "hdroid-push", json!({"version": 6}))
+        .await;
+    assert_eq!(set["params"]["value"], json!({"phones": []}));
+}

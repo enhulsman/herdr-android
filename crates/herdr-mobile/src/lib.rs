@@ -16,6 +16,7 @@ pub use ssh::{
     ssh_public_key_line, ssh_run_spike,
 };
 
+pub use hub::push::{AlertsRegistration, AlertsView, PushRegistration, PushStatusView};
 pub use hub::{
     AgentAttention, AgentRow, HubError, HubSnapshot, MachineState, MachineView, OtherTerminal,
 };
@@ -239,6 +240,17 @@ impl Hub {
 
     pub fn forget_host_key(&self, name: String) -> Result<(), HubError> {
         self.core.forget_host_key(&name)
+    }
+
+    /// This phone's UnifiedPush registration, or None when alerts are off;
+    /// machines get it (or lose this phone's entry) at their next connection.
+    pub fn set_push(&self, registration: Option<PushRegistration>) {
+        self.core.set_push(registration);
+    }
+
+    /// "Send test alert": fails when the machine is not connected or alerts are off.
+    pub fn send_test(&self, machine: String) -> Result<(), HubError> {
+        self.core.send_test(&machine)
     }
 
     pub fn mark_seen(&self, machine: String, address: String) {

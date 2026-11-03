@@ -28,6 +28,10 @@ pub struct Machine {
     /// The last moment the app was connected, ms since the epoch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_connected_ms: Option<u64>,
+    /// The push endpoint this phone last wrote into the machine's
+    /// `hdroid-push` (hub/push.rs); not exported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub push_endpoint: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -200,6 +204,7 @@ impl MachineList {
             user: user.to_owned(),
             host_key: None,
             last_connected_ms: None,
+            push_endpoint: None,
         });
         Ok(())
     }
@@ -219,6 +224,8 @@ impl MachineList {
             .ok_or_else(|| ListError::NotFound(name.to_owned()))?;
         if m.host != host || m.port != port {
             m.host_key = None;
+            // The registration went to the old address's core.
+            m.push_endpoint = None;
         }
         m.host = host.to_owned();
         m.port = port;

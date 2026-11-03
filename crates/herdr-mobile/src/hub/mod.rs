@@ -33,6 +33,8 @@ use tokio::time::Instant;
 use crate::link::{DialError, Dialer, Exit, Target};
 use crate::machines::{self, ListError, MachineList};
 
+pub mod push;
+
 #[cfg(test)]
 mod tests;
 
@@ -127,6 +129,9 @@ pub struct MachineView {
     /// then keeps the failure: "retrying").
     #[uniffi(default = None)]
     pub next_retry_ms: Option<u64>,
+    /// This phone's alerts here; None while alerts are off on the phone.
+    #[uniffi(default = None)]
+    pub alerts: Option<push::AlertsView>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
@@ -281,6 +286,8 @@ struct Live {
     task: Option<AbortHandle>,
     /// When the task's backoff ends, ms since the epoch; only while waiting.
     next_retry_ms: Option<u64>,
+    /// What herdr-push wrote in `hdroid-push-status`, as of the last read.
+    push_status: Option<push::PushStatusView>,
 }
 
 impl Live {
@@ -290,6 +297,7 @@ impl Live {
             epoch: 0,
             task: None,
             next_retry_ms: None,
+            push_status: None,
         }
     }
 
@@ -313,6 +321,8 @@ struct State {
     /// Why the list file must not be written: an unreadable one could not be
     /// set aside, and writing would destroy it.
     list_frozen: Option<String>,
+    /// This phone's UnifiedPush registration; None while alerts are off.
+    push: Option<push::PushRegistration>,
 }
 
 pub(crate) struct HubCore {
@@ -539,6 +549,7 @@ impl HubCore {
             saved_memory,
             notice: None,
             list_frozen: frozen,
+            push: None,
         };
         let snapshot = build_snapshot(&state);
         Arc::new(HubCore {
@@ -827,6 +838,67 @@ impl HubCore {
     }
 
     /// The person opened this agent: a finish is no longer unseen.
+    /// This phone's push registration (None: alerts off). Connected machines
+    /// get it, or lose this phone's entry, at once; others at their next connection.
+    pub(crate) fn set_push(self: &Arc<Self>, reg: Option<push::PushRegistration>) {
+        let names: Vec<String> = self.with(|_, st| {
+            st.push = reg;
+            st.list.machines().iter().map(|m| m.name.clone()).collect()
+        });
+        for name in names {
+            if let Some(conn) = self.live_conn(&name) {
+                self.runtime
+                    .spawn(sync_push(self.clone(), name, conn.epoch, conn.client, None));
+            }
+        }
+    }
+
+    /// "Send test alert": asks herdr-push on a connected machine for one test push.
+    pub(crate) fn send_test(self: &Arc<Self>, name: &str) -> Result<(), HubError> {
+        let st = self.state.lock().unwrap();
+        if st.list.get(name).is_none() {
+            return Err(HubError::NotFound {
+                name: name.to_owned(),
+            });
+        }
+        if st.push.is_none() {
+            return Err(HubError::Invalid {
+                detail: "alerts are off on this phone".into(),
+            });
+        }
+        drop(st);
+        let Some(conn) = self.live_conn(name) else {
+            return Err(HubError::Invalid {
+                detail: format!("{name} is not connected"),
+            });
+        };
+        let test = now_ms().to_string();
+        self.runtime.spawn(sync_push(
+            self.clone(),
+            name.to_owned(),
+            conn.epoch,
+            conn.client,
+            Some(test),
+        ));
+        Ok(())
+    }
+
+    /// The machine's connection, if it is up and still the current one.
+    fn live_conn(&self, name: &str) -> Option<Conn> {
+        let conn = self.conns.lock().unwrap().get(name)?.borrow().clone()?;
+        let st = self.state.lock().unwrap();
+        st.live
+            .get(name)
+            .filter(|l| l.epoch == conn.epoch)
+            .map(|_| conn)
+    }
+
+    /// Whether this phone has anything to say in the machine's `hdroid-push`.
+    fn push_relevant(&self, name: &str) -> bool {
+        let st = self.state.lock().unwrap();
+        st.push.is_some() || st.list.get(name).is_some_and(|m| m.push_endpoint.is_some())
+    }
+
     pub(crate) fn mark_seen(self: &Arc<Self>, machine: &str, address: &str) {
         self.with(|hub, st| {
             st.tracker.mark_seen(machine, address);
@@ -963,6 +1035,14 @@ fn build_snapshot(st: &State) -> HubSnapshot {
                     next_retry_ms: live
                         .and_then(|l| l.next_retry_ms)
                         .filter(|_| state.retrying()),
+                    alerts: st.push.as_ref().map(|me| push::AlertsView {
+                        registration: match &m.push_endpoint {
+                            Some(e) if *e == me.endpoint => push::AlertsRegistration::Registered,
+                            Some(_) => push::AlertsRegistration::EndpointChanged,
+                            None => push::AlertsRegistration::NotYet,
+                        },
+                        status: live.and_then(|l| l.push_status.clone()),
+                    }),
                     state,
                     last_connected_ms: m.last_connected_ms,
                 }
@@ -1118,11 +1198,29 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
         epoch,
         client: client.clone(),
     };
+    if hub.push_relevant(name) {
+        hub.runtime.spawn(sync_push(
+            hub.clone(),
+            name.to_owned(),
+            epoch,
+            client.clone(),
+            None,
+        ));
+    }
     let why = loop {
         match events.recv().await {
             StreamItem::Data(d) => {
-                if lines.push(&d).terminals && !hub.observe(name, epoch, &lines, None) {
+                let pushed = lines.push(&d);
+                if pushed.terminals && !hub.observe(name, epoch, &lines, None) {
                     return Outcome::wait(MachineState::Paused);
+                }
+                if pushed.docs && hub.push_relevant(name) {
+                    hub.runtime.spawn(read_push_status(
+                        hub.clone(),
+                        name.to_owned(),
+                        epoch,
+                        client.clone(),
+                    ));
                 }
                 let now = sizes_of(&lines);
                 sizes.send_if_modified(|s| {
@@ -1150,4 +1248,101 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
         retry: true,
         connected_for: Some(connected_at.elapsed()),
     }
+}
+
+/// Writes this phone's entry into the machine's `hdroid-push` (or takes it
+/// back), with a test request when `test` is set, then reads the status. A
+/// failure only notes it: the next connection tries again.
+async fn sync_push(
+    hub: Arc<HubCore>,
+    name: String,
+    epoch: u64,
+    client: Client,
+    test: Option<String>,
+) {
+    let (me, previous) = {
+        let st = hub.state.lock().unwrap();
+        let Some(m) = st.list.get(&name) else { return };
+        (st.push.clone(), m.push_endpoint.clone())
+    };
+    if me.is_none() && previous.is_none() {
+        return;
+    }
+    let mut written = false;
+    for _ in 0..3 {
+        let got = match client.call("doc.get", json!({"name": push::DOC})).await {
+            Ok(got) => got,
+            Err(e) => {
+                hub.note(&format!("{name}: reading {}: {e}", push::DOC));
+                return;
+            }
+        };
+        let version = got["version"].as_u64().unwrap_or(0);
+        let Some(value) = push::registration_doc(
+            &got["value"],
+            me.as_ref(),
+            &name,
+            previous.as_deref(),
+            test.as_deref(),
+        ) else {
+            written = true;
+            break;
+        };
+        let set = json!({"name": push::DOC, "value": value, "version": version});
+        match client.call("doc.set", set).await {
+            Ok(_) => {
+                written = true;
+                break;
+            }
+            Err(herdr_proto::rpc::CallError::Rpc { kind: Some(k), .. }) if k == "conflict" => {}
+            Err(e) => {
+                hub.note(&format!("{name}: writing {}: {e}", push::DOC));
+                return;
+            }
+        }
+    }
+    if !written {
+        hub.note(&format!(
+            "{name}: {} kept changing; tried 3 times",
+            push::DOC
+        ));
+        return;
+    }
+    let current = hub.with(|hub, st| {
+        if st.live.get(&name).is_none_or(|l| l.epoch != epoch) {
+            return false;
+        }
+        // Alerts may have been switched since this started: that call syncs again.
+        if st.push != me {
+            return false;
+        }
+        if let Some(m) = st.list.get_mut(&name) {
+            m.push_endpoint = me.as_ref().map(|r| r.endpoint.clone());
+        }
+        hub.save_list(st);
+        true
+    });
+    if current && me.is_some() {
+        read_push_status(hub, name, epoch, client).await;
+    }
+}
+
+/// Reads `hdroid-push-status` for the machine card.
+async fn read_push_status(hub: Arc<HubCore>, name: String, epoch: u64, client: Client) {
+    let got = match client
+        .call("doc.get", json!({"name": push::STATUS_DOC}))
+        .await
+    {
+        Ok(got) => got,
+        Err(e) => {
+            hub.note(&format!("{name}: reading {}: {e}", push::STATUS_DOC));
+            return;
+        }
+    };
+    hub.with(|_, st| {
+        let endpoint = st.push.as_ref().map(|r| r.endpoint.clone());
+        if let Some(live) = st.live.get_mut(&name).filter(|l| l.epoch == epoch) {
+            live.push_status = push::status_view(&got["value"], endpoint.as_deref());
+        }
+    });
 }

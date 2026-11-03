@@ -15,6 +15,7 @@ import uniffi.herdr_mobile.Hub
 import uniffi.herdr_mobile.HubInterface
 import uniffi.herdr_mobile.HubListener
 import uniffi.herdr_mobile.HubSnapshot
+import uniffi.herdr_mobile.PushRegistration
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.SignException
 import uniffi.herdr_mobile.SshSigner
@@ -251,6 +252,8 @@ class FakeHub : HubInterface {
         return importAdds
     }
     override fun markSeen(machine: String, address: String) { calls += "seen $machine $address" }
+    override fun setPush(registration: PushRegistration?) { calls += "push ${registration?.endpoint}" }
+    override fun sendTest(machine: String) { calls += "test $machine" }
     override fun removeMachine(name: String) {
         refused()
         calls += "remove $name"

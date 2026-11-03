@@ -129,6 +129,7 @@ Result: Round 2 (2026-11-03): swiping up works; swiping back down stopped workin
   asks once (as before) and nothing breaks.
 
 Result: Round 2 (2026-11-03): reconnect after more than 10 s away works. Instant open shows the cached screen only briefly, then the live screen at the desk's wide layout (the phone watches on open; the desk took its size back when the phone left). Open question for Ezra. No crash or key store error in the log.
+Measured (2026-11-03, screen recording with taps shown, optimized build): tap to the terminal screen 16 ms, tap to the cached last screen 66 ms (spec: within 200 ms), then the live screen at phone size 33 ms later with no blank frame between them. Before the cached screen, 50 ms of empty terminal with "Opening the terminal". Opening now takes the phone's size, so the wide-layout question above no longer applies. Pass.
 
 ## 11. Speed
 
@@ -137,6 +138,7 @@ Result: Round 2 (2026-11-03): reconnect after more than 10 s away works. Instant
   get warm? (The measured p95 frame time comes later.)
 
 Result: Smooth and fast; responsiveness as expected over SSH. Text size and margins fine.
+Measured (2026-11-03): watching a 219x59 shell print coloured `ls` output for 20 s, 1204 frames, p50 11 ms, p95 14 ms, p99 17 ms, 3 slow frames (spec: p95 at most 16.7 ms). Pass. Measured on the debug app rebuilt with `-Pherdr.perf` (not debuggable, optimized Rust, compiled ahead of time), which installs over "herdr debug" and keeps its data. The plain debug build is far slower (p95 400 ms) and says nothing about release speed.
 
 ## 12. Choices made while you were away (keep or change)
 

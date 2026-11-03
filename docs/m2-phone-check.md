@@ -40,7 +40,9 @@ Result:
 
 ## 3. Typing at phone size (render 4)
 
-- [ ] Tap the terminal: the keyboard opens; the terminal still watches.
+- [ ] Tap the chip "Watching ... tap to type": the keyboard opens; the terminal
+  still watches. (Since round 2 a tap on the terminal itself takes over at
+  phone size without the keyboard; the keyboard key opens it.)
 - [ ] The first key: the terminal reflows to about 53 columns; the tag reads
   "phone size 53xR"; the desk's window now shows the narrower terminal.
 - [ ] In a shell: type `lsx`, backspace, enter: it runs `ls`.
@@ -57,19 +59,23 @@ Result: Typing works, also into a Claude Code session from the phone (first roun
   the redraws? How much does it bother you?
 
 Result: Resizes cleanly every time. FAIL: the terminal reacts to no touch at all (cannot scroll).
+Round 2 (2026-11-03): fixed. Full-screen Claude Code keeps its own history; a drag now scrolls it as on the desk, and a tap clicks (tool results open). Pass.
 
 ## 5. Keys row and shelf
 
-- [ ] On a Claude Code permission prompt: down, down, enter (enter is in the
-  shelf: swipe up on the keys row) picks option 3; esc backs out.
+- [ ] On a Claude Code permission prompt: down, down, enter picks option 3;
+  esc backs out.
 - [ ] ctrl stays lit after a tap and applies to the next key only; tap ctrl,
   then c in a shell: the running command stops.
 - [ ] alt behaves the same way.
-- [ ] The shelf has `^C ⏎ | ~ / - _ \ ` $` and each types what it shows.
+- [ ] Round 2: two rows `esc ctrl alt tab [keyboard] - / ↑ ~` and
+  `^C ⇧⇥ \ ⏎ [compose] | ← ↓ →`, both always shown; each types what it shows,
+  ⇧⇥ switches Claude Code's mode, the keyboard key shows and hides the keyboard.
 - [ ] Hold esc on a working agent: it stops and the phone shows a short
   report ("Stopped", "Still working", ...).
 
 Result: Permission prompt answered with down, down, enter. Opinion: the shelf was not found without being told; enter belongs in the main row.
+Round 2 (2026-11-03): two fixed rows with the keyboard key; works well, layout kept.
 
 ## 6. Compose (render 5)
 
@@ -88,11 +94,13 @@ Result: Dictated text lands in the input box, not sent. Pass.
 - [ ] Resize the desk window while output streams: the phone follows cleanly.
 
 Result: The desk takes its size back at once. Opinion: watching a wide desk terminal leaves a large empty area below it; handle differently (proposal: fill it with older output above the desk screen).
+Round 2 (2026-11-03): the area below is now terminal background (older output is not available for full-screen Claude Code).
 
 ## 8. Scrollback, Live and copy
 
-- [ ] Flick up while an agent works: the view stays put, "Live" shows; tap it
-  to return to the bottom.
+- [ ] In a shell (main screen): flick up while output arrives: the view stays
+  put, "Live" shows; tap it to return to the bottom. (Full-screen Claude Code
+  scrolls itself instead, as on the desk: checked in round 2.)
 - [ ] Long-press: a selection layer with the text on screen; select an error
   line and copy it; paste somewhere: plain text, no colour codes.
 - [ ] The desk's screen did not move while you scrolled or selected.
@@ -109,7 +117,7 @@ Result:
 - [ ] Back from the terminal returns to the list, and the desk no longer
   follows the phone's size (the phone let go).
 
-Result:
+Result: Round 2 (2026-11-03): swiping up works; swiping back down stopped working after a few steps (end buzz in both directions): the agents passed were marked seen and no longer counted. Fixed: a swipe down now retraces the agents the walk opened. The desk takes its own size back as soon as the phone leaves (the phone let go: pass).
 
 ## 10. Instant open and reconnect
 
@@ -120,7 +128,7 @@ Result:
 - [ ] After more than 30 minutes since the last unlock or fingerprint: opening
   asks once (as before) and nothing breaks.
 
-Result:
+Result: Round 2 (2026-11-03): reconnect after more than 10 s away works. Instant open shows the cached screen only briefly, then the live screen at the desk's wide layout (the phone watches on open; the desk took its size back when the phone left). Open question for Ezra. No crash or key store error in the log.
 
 ## 11. Speed
 

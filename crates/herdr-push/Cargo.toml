@@ -7,7 +7,11 @@ publish.workspace = true
 [dependencies]
 base64 = "0.22"
 ece = { version = "2.4.2", default-features = false, features = ["backend-openssl"] }
+herdr-proto = { path = "../herdr-proto" }
+serde_json = "1"
+tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no-default"] }
 
 [dev-dependencies]
 sha2 = "0.10"
+tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "process", "rt", "rt-multi-thread", "sync", "test-util", "time"] }

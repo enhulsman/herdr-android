@@ -1,4 +1,11 @@
-//! The push watcher (design.md, "herdr-push"). The watcher itself arrives in
-//! M3; task M0.7 (Spike C) brings the encryption and delivery path.
+//! The push watcher (design.md §5, "herdr-push"): watches one existing
+//! herdr-core and pushes alerts to the phones registered there.
 
+pub mod config;
+pub mod deliver;
+pub mod layout;
+pub mod phones;
+pub mod rules;
+pub mod status;
+pub mod watch;
 pub mod webpush;

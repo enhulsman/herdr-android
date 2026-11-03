@@ -182,8 +182,13 @@ struct Open {
 }
 
 fn open(rig: &Rig) -> Open {
+    open_with(rig, false)
+}
+
+/// `lead`: open at the phone's size, as the app does since round 2.
+fn open_with(rig: &Rig, lead: bool) -> Open {
     let (tx, rx) = mpsc::unbounded_channel();
-    let cmds = term::spawn(&rig.hub, WS, "t3", PHONE, Arc::new(Sink(tx)));
+    let cmds = term::spawn(&rig.hub, WS, "t3", PHONE, lead, Arc::new(Sink(tx)));
     Open {
         screen: Screen {
             seen: rx,
@@ -667,4 +672,39 @@ async fn leading_takes_over_at_the_phones_size_without_typing() {
         (typed.channel, typed.kind, typed.payload.as_slice()),
         (6, wire::DATA, b"k".as_slice())
     );
+}
+
+// Opening from the list at the phone's size (phone check round 2): the first
+// attach is active at the phone's size; the desk's own input still takes the
+// size back, and the phone then watches.
+#[tokio::test(start_paused = true)]
+async fn opening_at_the_phones_size_attaches_actively_and_the_desk_can_take_it_back() {
+    let mut rig = rig("term-open-phone");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![sized("t3", 80, 24)]).await;
+    rig.until_state(WS, connected).await;
+    let mut o = open_with(&rig, true);
+    let params = core.attach(5, PHONE).await;
+    assert_eq!(params["observe"], false);
+    assert_eq!(
+        (params["cols"].clone(), params["rows"].clone()),
+        (json!(53), json!(31))
+    );
+    let s = o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
+    assert_eq!((s.cols, s.rows), PHONE);
+    core.send(5, wire::DATA, b"phone paint").await;
+    o.screen.until_text("phone paint").await;
+
+    // The desk types: its size comes back and the phone watches.
+    core.event(1, "size", "t3", json!({"cols": 120, "rows": 40}))
+        .await;
+    let close = core.frame().await;
+    assert_eq!((close.channel, close.kind), (5, wire::CLOSE));
+    let params = core.attach(6, (120, 40)).await;
+    assert_eq!(params["observe"], true);
+    o.screen
+        .until_state(|s| s.phase == TermPhase::Watching)
+        .await;
 }

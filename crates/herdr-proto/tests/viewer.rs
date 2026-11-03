@@ -599,3 +599,27 @@ async fn leading_while_watching_reattaches_at_the_phones_size_and_types_nothing(
     assert!(viewer.lead().await.unwrap().is_none());
     assert_sends_nothing(&marker(&client, &mut core).await, "a second lead");
 }
+
+// Opening an agent from the list goes straight to the phone's size (phone
+// check round 2): one active attach, no watching first.
+#[tokio::test(start_paused = true)]
+async fn opening_at_the_phones_size_attaches_actively_once() {
+    let (client, mut core) = connect();
+    let c = client.clone();
+    let open = tokio::spawn(async move { Viewer::open(&c, "t3", PHONE, Mode::Typing).await });
+    let params = core.attach(7, PHONE).await;
+    assert_eq!(params["observe"], false);
+    assert_eq!(
+        (params["cols"].clone(), params["rows"].clone()),
+        (json!(60), json!(30))
+    );
+    assert_eq!(params["history"], HISTORY);
+    assert_eq!(
+        params["display"],
+        json!({"fg": null, "bg": null, "cursor": null, "cell": null})
+    );
+    let (viewer, attached) = open.await.unwrap().unwrap();
+    assert_eq!(attached.mode, Mode::Typing);
+    assert_eq!(viewer.mode(), Mode::Typing);
+    assert_eq!(viewer.size(), PHONE);
+}

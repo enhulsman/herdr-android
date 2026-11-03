@@ -132,12 +132,23 @@ impl Viewer {
         terminal: &str,
         phone: (u16, u16),
     ) -> Result<(Viewer, Attached), CallError> {
-        let (stream, attached) = attach(client, terminal, Mode::Watching, phone).await?;
+        Self::open(client, terminal, phone, Mode::Watching).await
+    }
+
+    /// Opens a terminal watching, or ([`Mode::Typing`]) straight at the phone's
+    /// size: one active attach, as when an agent is opened from the list.
+    pub async fn open(
+        client: &Client,
+        terminal: &str,
+        phone: (u16, u16),
+        mode: Mode,
+    ) -> Result<(Viewer, Attached), CallError> {
+        let (stream, attached) = attach(client, terminal, mode, phone).await?;
         let viewer = Viewer {
             client: client.clone(),
             terminal: terminal.to_owned(),
             phone,
-            mode: Mode::Watching,
+            mode,
             size: (attached.cols, attached.rows),
             stream: Some(stream),
             pending: std::collections::VecDeque::new(),

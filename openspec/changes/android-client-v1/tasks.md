@@ -34,7 +34,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [x] M2.1 Tests: cell-grid goldens from herdr-app's VT pipeline; observe attach sends nothing; size-event reattach; typing takes phone size; null display keeps desk colours (incl. cell size); every keys-row key encodes
 - [x] M2.2 Terminal view: frame path, fit width, zoom, pan, scrollback with Live, selection from local screen, instant-open cache
 - [x] M2.3 Input: terminal keyboard, two keys rows with a keyboard key (the shelf replaced, phone check round 2), sticky modifiers, compose key with bracketed paste, interrupt
-- [x] M2.4 Attention swipe between agents
+- [x] M2.4 Attention swipe between agents (up and down; left and right as tabs since round 2)
 - [ ] M2.5 Phone check: answer a permission prompt and a long dictated prompt from the phone; desk size returns on desk input; p95 frame time and instant open measured
 
 ## M3. Alerts

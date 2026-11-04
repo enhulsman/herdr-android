@@ -23,7 +23,8 @@ class AgentsHomeTest {
     private lateinit var listener: HubListener
     private val hubHost = HubHost(createHub = { listener = it; hub }, mainExecutor = Executor { it.run() })
     private var foreground = true
-    private val home = AgentsHome(hubHost) { foreground }
+    private var nowMs = 0L
+    private val home = AgentsHome(hubHost, now = { nowMs }) { foreground }
 
     init {
         hubHost.start()
@@ -372,6 +373,51 @@ class AgentsHomeTest {
         home.open(key("t1"))
         home.close()
         publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE), row("t3", AgentAttention.IDLE))))
+        assertNull(home.openKey)
+    }
+
+    // start-agents spec, "Started and open": a terminal started from the "New"
+    // sheet opens at once, though the hub lists it only on its next snapshot,
+    // and a fresh shell is listed under "Other terminals".
+    @Test
+    fun aStartedTerminalOpensOnceListedUnderOtherTerminals() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE))))
+        home.openWhenStarted(key("t9"))
+        assertNull(home.openKey)
+        // The machine lists its agents without it yet: still waiting (an alert's would be dropped).
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING))))
+        assertNull(home.openKey)
+        nowMs += 2_000
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.WORKING)), others = listOf(other("t9"))))
+        assertEquals(key("t9"), home.openKey)
+        // A shell has nothing to mark seen.
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test
+    fun aStartedAgentOpensOnceListed() {
+        home.openWhenStarted(key("t9"))
+        publish(snapshot(ws, listOf(row("t9", AgentAttention.WORKING))))
+        assertEquals(key("t9"), home.openKey)
+    }
+
+    @Test
+    fun aStartedTerminalNotListedWithinTenSecondsIsNotOpenedLater() {
+        home.openWhenStarted(key("t9"))
+        nowMs += 10_001
+        publish(snapshot(ws, emptyList()))
+        nowMs += 5_000
+        publish(snapshot(ws, emptyList(), others = listOf(other("t9"))))
+        assertNull(home.openKey)
+    }
+
+    @Test
+    fun openingSomethingElseDropsAStartedTerminal() {
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE))))
+        home.openWhenStarted(key("t9"))
+        home.open(key("t1"))
+        home.close()
+        publish(snapshot(ws, listOf(row("t1", AgentAttention.IDLE)), others = listOf(other("t9"))))
         assertNull(home.openKey)
     }
 }

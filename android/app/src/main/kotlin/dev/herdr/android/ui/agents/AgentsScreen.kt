@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -66,6 +67,8 @@ import dev.herdr.android.R
 import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
 import dev.herdr.android.ui.components.OutlineButton
+import dev.herdr.android.ui.terminal.LineIcon
+import dev.herdr.android.ui.terminal.LineIconImage
 import dev.herdr.android.ui.theme.HerdrBorder
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrRadius
@@ -124,11 +127,13 @@ fun AgentsScreen(
     spin: Boolean,
     actions: AgentsActions,
     modifier: Modifier = Modifier,
+    new: NewEntryUi = NewEntryUi(enabled = true),
+    newActions: NewSheetActions = NewSheetActions.Preview,
 ) {
     val c = HerdrTheme.colors
     Box(modifier.fillMaxSize().background(c.chrome)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            TopBar(ui.machinesBadge, actions.onMachines)
+            TopBar(ui.machinesBadge, new.enabled, newActions.onNew, actions.onMachines)
             LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                 ui.storageNotice?.let { text ->
                     item(key = "storage") { StorageNotice(text) }
@@ -166,6 +171,8 @@ fun AgentsScreen(
             }
         }
         sheet?.let { AgentSheet(it, clock, actions.onCloseSheet) }
+        if (new.noMachine) NoMachineSnack(newActions.onNoMachineGone)
+        new.sheet?.let { NewTerminalSheet(it, newActions) }
     }
 }
 
@@ -193,9 +200,11 @@ private fun LazyItemScope.slide(spin: Boolean): Modifier =
     if (spin) Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(200)) else Modifier
 
 @Composable
-private fun TopBar(badge: Boolean, onMachines: () -> Unit) {
+private fun TopBar(badge: Boolean, newEnabled: Boolean, onNew: () -> Unit, onMachines: () -> Unit) {
     val c = HerdrTheme.colors
     val label = stringResource(R.string.machines_title)
+    val newLabel = stringResource(R.string.new_button)
+    val noMachine = stringResource(R.string.new_no_machine)
     Row(
         Modifier
             .fillMaxWidth()
@@ -209,6 +218,20 @@ private fun TopBar(badge: Boolean, onMachines: () -> Unit) {
             style = HerdrType.screenTitle.copy(color = c.fg),
             maxLines = 1,
         )
+        // Render 12: dimmed with nothing connected, and a tap still says why.
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(HerdrRadius.button))
+                .clickable(role = Role.Button, onClick = onNew)
+                .semantics {
+                    contentDescription = newLabel
+                    if (!newEnabled) stateDescription = noMachine
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            LineIconImage(LineIcon.Plus, c.muted, 22.dp, Modifier.alpha(if (newEnabled) 1f else 0.38f))
+        }
         Box(
             Modifier
                 .size(48.dp)

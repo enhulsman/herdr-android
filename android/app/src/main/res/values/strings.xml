@@ -31,6 +31,25 @@
     <string name="agents_empty_agents_title">No agents yet</string>
     <string name="agents_empty_agents_body">Agents you start in herdr on your machines show up here, the ones that need you first.</string>
 
+    <!-- The "New" sheet (start-agents; renders 9-12, signed off 2026-11-04). -->
+    <string name="new_button">New terminal</string>
+    <string name="new_no_machine">No machine connected</string>
+    <string name="new_title">New terminal</string>
+    <string name="new_machine">Machine</string>
+    <string name="new_space">Space</string>
+    <string name="new_folder">Folder</string>
+    <string name="new_folder_note">no spaces on %1$s yet, this makes the first</string>
+    <string name="new_where_space">Starts on %1$s in %2$s, as a new tab</string>
+    <string name="new_where_new_space">Starts on %1$s as a new space</string>
+    <string name="new_start">Start</string>
+    <string name="new_terminal">Terminal</string>
+    <string name="new_agents_checking">Checking which agents %1$s has…</string>
+    <string name="new_agents_unavailable">Could not check agents on %1$s · Terminal only</string>
+    <!-- Not in the renders: a space folder that is not a full path, a home not known yet. -->
+    <string name="new_place_home_instead">not a full path, starts in home</string>
+    <string name="new_place_home_unknown">home folder not known yet</string>
+    <string name="new_where_core_folder">herdr-core\'s own folder</string>
+
     <!-- The read-only agent sheet (M1 pick 1b; no signed-off render). -->
     <string name="sheet_machine">Machine</string>
     <string name="sheet_folder">Folder</string>

@@ -1,9 +1,18 @@
 name: CI
 
+# Pull requests only: main moves by fast-forward from a tested branch, and a
+# release tag runs every test again before anything is signed. Changes that
+# touch only docs, specs or designs skip it; run it by hand from the Actions tab.
 on:
-  push:
-    branches: [main]
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "openspec/**"
+      - "design/**"
+      - "research/**"
+      - "canvas/**"
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -203,6 +203,14 @@ pub fn check_argv(words: &[&str]) -> Vec<String> {
     vec!["sh".into(), "-c".into(), line, "sh".into()]
 }
 
+/// Seconds the core lets the check run before ending it.
+pub const CHECK_TIMEOUT_S: u64 = 5;
+
+/// `machine.exec` parameters for the check.
+pub fn check_params(words: &[&str]) -> Value {
+    json!({"argv": check_argv(words), "timeout": CHECK_TIMEOUT_S})
+}
+
 /// What a check told: home (also when the rest failed), and the agents found
 /// in table order, or None when the check failed.
 #[derive(Clone, Debug, PartialEq, Eq)]

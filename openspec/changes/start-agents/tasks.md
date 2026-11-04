@@ -15,10 +15,10 @@ file, never a stub script; the core's `shell` / `$SHELL` select them
 
 ## 2. Starting (herdr-mobile hub)
 
-- [ ] 2.1 Scratch-core tests: Terminal start (label, absolute cwd, `keep` on the record, no argv); agent start with zsh and with bash (rc defines `claude` only as an alias for a marker program: the marker runs; the marker exits 0: the shell remains, same folder); Darwin (stub `uname` printing `Darwin` first on the core's PATH, a shell that records its flags: check and start use `-lic`, the remaining shell `-li`); check against the real shells (alias counts, `claude` first in the list, home printed, a failing inner shell still yields home, fish-like failure gives no shortcuts, 5 s timeout); `spawn_failed` for a missing folder (no terminal created); zero spaces gets a fresh label
-- [ ] 2.2 `new_terminal(machine, space | folder, agent?)`: one `terminal.run` per design D1 and D2; refusals mapped to the sheet's text (design D7)
-- [ ] 2.3 Installed-agents check over `machine.exec` (design D5): background at connect, `timeout: 5`, successes cached per machine per app start, failures retried on the next sheet open
-- [ ] 2.4 uniffi surface for the sheet (machines, spaces or folders, home state, check state, agents)
+- [x] 2.1 Scratch-core tests: Terminal start (label, absolute cwd, `keep` on the record, no argv); agent start with zsh and with bash (rc defines `claude` only as an alias for a marker program: the marker runs; the marker exits 0: the shell remains, same folder); Darwin (stub `uname` printing `Darwin` first on the core's PATH, a shell that records its flags: check and start use `-lic`, the remaining shell `-li`); check against the real shells (alias counts, `claude` first in the list, home printed, a failing inner shell still yields home, fish-like failure gives no shortcuts, 5 s timeout); `spawn_failed` for a missing folder (no terminal created); zero spaces gets a fresh label
+- [x] 2.2 `new_terminal(machine, space | folder, agent?)`: one `terminal.run` per design D1 and D2; refusals mapped to the sheet's text (design D7)
+- [x] 2.3 Installed-agents check over `machine.exec` (design D5): background at connect, `timeout: 5`, successes cached per machine per app start, failures retried on the next sheet open
+- [x] 2.4 uniffi surface for the sheet (machines, spaces or folders, home state, check state, agents)
 
 ## 3. App (Android)
 

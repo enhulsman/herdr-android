@@ -23,5 +23,6 @@ tokio = { version = "1", default-features = false, features = ["io-util", "macro
 uniffi.workspace = true
 
 [dev-dependencies]
+base64 = "0.22"
 p256 = { version = "0.14.0", default-features = false, features = ["ecdsa", "std", "pkcs8", "pem"] }
 tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "test-util", "time"] }

@@ -17,6 +17,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
 
+mod starting;
 #[cfg(feature = "vt")]
 mod term;
 
@@ -44,6 +45,10 @@ struct Core {
     r: ReadHalf<DuplexStream>,
     w: WriteHalf<DuplexStream>,
     exit: Option<oneshot::Sender<Exit>>,
+    /// Whether the test answers the start sheet's reads itself (the layout
+    /// and the installed-agents check); otherwise [`Core::request`] answers
+    /// them as a machine with no layout and no agents, and skips them.
+    serve_start: bool,
 }
 
 impl Core {
@@ -81,7 +86,14 @@ impl Core {
                 .unwrap()
                 .expect("the app closed the connection");
             if f.channel == 0 && f.kind == wire::DATA {
-                return serde_json::from_slice(&f.payload).unwrap();
+                let req: Value = serde_json::from_slice(&f.payload).unwrap();
+                if !self.serve_start && starting::is_start_read(&req) {
+                    let reply = json!({"jsonrpc": "2.0", "id": req["id"],
+                                       "result": starting::quiet_answer(&req)});
+                    self.send(0, wire::DATA, reply.to_string().as_bytes()).await;
+                    continue;
+                }
+                return req;
             }
         }
     }
@@ -204,6 +216,7 @@ impl Dialer for FakeDialer {
                     r,
                     w,
                     exit: Some(exit_tx),
+                    serve_start: false,
                 });
                 Ok(Link {
                     reader: Box::new(app_r),

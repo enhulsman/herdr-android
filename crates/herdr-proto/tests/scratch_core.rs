@@ -47,6 +47,11 @@ struct Core {
     bin: PathBuf,
     dir: PathBuf,
     session: String,
+    /// The core's `$SHELL`: what it starts with no argv, and what the phone's
+    /// wrapper and check exec.
+    shell: String,
+    /// Put before the core's PATH (stub programs).
+    path_first: Option<PathBuf>,
 }
 
 impl Core {
@@ -68,15 +73,22 @@ impl Core {
             bin: std::fs::canonicalize(bin).unwrap(),
             dir,
             session: session.to_owned(),
+            shell: "/bin/sh".into(),
+            path_first: None,
         })
+    }
+
+    /// The scratch core's home, where a test puts rc files.
+    fn home(&self) -> PathBuf {
+        self.dir.join("home")
     }
 
     fn env(&self) -> Vec<(String, String)> {
         let d = |sub: &str| self.dir.join(sub).display().to_string();
         vec![
             ("HOME".into(), d("home")),
-            ("PATH".into(), "/usr/bin:/bin".into()),
-            ("SHELL".into(), "/bin/sh".into()),
+            ("PATH".into(), self.path()),
+            ("SHELL".into(), self.shell.clone()),
             ("HC_SESSION".into(), self.session.clone()),
             ("XDG_RUNTIME_DIR".into(), d("r")),
             ("XDG_STATE_HOME".into(), d("s")),
@@ -84,6 +96,13 @@ impl Core {
             // Heartbeats every 15 s by default; the test waits for one.
             ("HC_HEARTBEAT_MS".into(), "300".into()),
         ]
+    }
+
+    fn path(&self) -> String {
+        match &self.path_first {
+            Some(first) => format!("{}:/usr/bin:/bin", first.display()),
+            None => "/usr/bin:/bin".into(),
+        }
     }
 
     /// A command that runs a shell line (given as its last argument) in this
@@ -657,5 +676,301 @@ fn the_desk_keeps_its_size_and_colours_until_the_phone_types() {
         })
         .await;
         assert_eq!(size_of(&phone.client, &address).await, (100, 40));
+    });
+}
+
+// ---- starting terminals and agents (start-agents task 2.1) ----
+//
+// Real shells with their rc files in the scratch home, never stub scripts in
+// their place: what the phone relies on is how zsh and bash treat aliases and
+// `-c`. zsh is skipped (and says so) where it is not installed, unless
+// HERDR_REQUIRE_ZSH is set (CI installs it).
+
+use herdr_proto::start;
+
+const ZSH: &str = "/usr/bin/zsh";
+const BASH: &str = "/bin/bash";
+
+fn have(shell: &str) -> bool {
+    if Path::new(shell).exists() {
+        return true;
+    }
+    assert!(
+        std::env::var_os("HERDR_REQUIRE_ZSH").is_none() || shell != ZSH,
+        "HERDR_REQUIRE_ZSH is set but {shell} is missing"
+    );
+    eprintln!("skipped for {shell}: not installed");
+    false
+}
+
+fn write_exe(path: &Path, text: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, text).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+/// A scratch core running `shell`, whose rc makes `claude` an alias for a
+/// marker program that notes its folder in `$HOME/ran` and exits 0.
+fn core_with_alias(session: &str, shell: &str) -> Option<Core> {
+    let mut core = Core::new(session)?;
+    core.shell = shell.to_owned();
+    let home = core.home();
+    let marker = home.join("bin/marker");
+    write_exe(&marker, "#!/bin/sh\npwd > \"$HOME/ran\"\nexit 0\n");
+    let alias = format!("alias claude={}\n", marker.display());
+    std::fs::write(home.join(".zshrc"), &alias).unwrap();
+    std::fs::write(home.join(".bashrc"), &alias).unwrap();
+    std::fs::create_dir_all(home.join("src/website")).unwrap();
+    Some(core)
+}
+
+/// Polls `check` until it holds, or panics after [`WAIT`].
+async fn eventually<T>(what: &str, mut check: impl AsyncFnMut() -> Option<T>) -> T {
+    let deadline = tokio::time::Instant::now() + WAIT;
+    loop {
+        if let Some(v) = check().await {
+            return v;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "timed out waiting for {what}"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn record(client: &Client, address: &str) -> Value {
+    client
+        .call("terminal.get", json!({"terminal": address}))
+        .await
+        .unwrap()
+}
+
+#[test]
+fn a_new_terminal_runs_the_shell_in_the_folder_labelled_and_kept() {
+    let Some(mut core) = Core::new("newterm") else {
+        return;
+    };
+    core.shell = BASH.into();
+    let folder = core.home().join("src/website");
+    std::fs::create_dir_all(&folder).unwrap();
+    let folder = folder.display().to_string();
+    runtime().block_on(async {
+        let c = core.connect().await;
+        let run = c
+            .client
+            .call("terminal.run", start::run_params(Some(&folder), "s1", None))
+            .await
+            .unwrap();
+        let address = run["address"].as_str().unwrap();
+        let rec = record(&c.client, address).await;
+        assert_eq!(rec["labels"][start::SPACE_LABEL], "s1", "{rec:#}");
+        assert_eq!(rec["keep"], true, "{rec:#}");
+        assert_eq!(rec["cwd"], folder.as_str(), "{rec:#}");
+        assert_eq!(rec["argv"][0], BASH, "{rec:#}");
+    });
+}
+
+#[test]
+fn a_missing_folder_is_spawn_failed_and_starts_nothing() {
+    let Some(core) = Core::new("nofolder") else {
+        return;
+    };
+    let gone = core.home().join("gone").display().to_string();
+    runtime().block_on(async {
+        let c = core.connect().await;
+        let before = c.client.call("terminal.list", json!({})).await.unwrap();
+        let err = c
+            .client
+            .call(
+                "terminal.run",
+                start::run_params(Some(&gone), "s1", Some("claude")),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.kind(), Some("spawn_failed"), "{err:?}");
+        let after = c.client.call("terminal.list", json!({})).await.unwrap();
+        assert_eq!(before, after);
+    });
+}
+
+/// The shortcut runs the person's alias in the folder, and their shell stays.
+fn agent_start_runs_the_alias_and_the_shell_stays(shell: &str, session: &str) {
+    if !have(shell) {
+        return;
+    }
+    let Some(core) = core_with_alias(session, shell) else {
+        return;
+    };
+    let home = core.home();
+    let folder = home.join("src/website").display().to_string();
+    let name = Path::new(shell)
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    runtime().block_on(async {
+        let c = core.connect().await;
+        let run = c
+            .client
+            .call(
+                "terminal.run",
+                start::run_params(Some(&folder), "s1", Some("claude")),
+            )
+            .await
+            .unwrap();
+        let address = run["address"].as_str().unwrap().to_owned();
+        let ran = home.join("ran");
+        let pwd = eventually("the alias's marker", async || {
+            std::fs::read_to_string(&ran).ok()
+        })
+        .await;
+        assert_eq!(pwd.trim(), folder);
+        // The marker exited 0: the person's shell takes its place, same folder.
+        let rec = eventually("the shell in the foreground", async || {
+            let rec = record(&c.client, &address).await;
+            (rec.pointer("/foreground/name") == Some(&json!(name))).then_some(rec)
+        })
+        .await;
+        assert_eq!(rec["state"], "live", "{rec:#}");
+        assert_eq!(rec["foreground"]["cwd"], folder.as_str(), "{rec:#}");
+        assert_eq!(rec["keep"], true);
+        assert_eq!(rec["labels"][start::SPACE_LABEL], "s1");
+    });
+}
+
+#[test]
+fn agent_start_with_zsh() {
+    agent_start_runs_the_alias_and_the_shell_stays(ZSH, "agzsh");
+}
+
+#[test]
+fn agent_start_with_bash() {
+    agent_start_runs_the_alias_and_the_shell_stays(BASH, "agbash");
+}
+
+async fn check(c: &Connection, words: &[&str]) -> start::Check {
+    let result = c
+        .client
+        .call("machine.exec", start::check_params(words))
+        .await
+        .unwrap();
+    start::parse_exec_result(&result, words)
+}
+
+fn check_finds_aliases_and_home(shell: &str, session: &str) {
+    if !have(shell) {
+        return;
+    }
+    let Some(core) = core_with_alias(session, shell) else {
+        return;
+    };
+    let home = core.home().display().to_string();
+    runtime().block_on(async {
+        let c = core.connect().await;
+        // `claude` first: nothing may take it for the script's own name.
+        let got = check(&c, &["claude", "nope", "sh"]).await;
+        assert_eq!(got.home.as_deref(), Some(home.as_str()));
+        assert_eq!(got.found, Some(vec!["claude".to_owned(), "sh".to_owned()]));
+    });
+}
+
+#[test]
+fn check_with_zsh() {
+    check_finds_aliases_and_home(ZSH, "chzsh");
+}
+
+#[test]
+fn check_with_bash() {
+    check_finds_aliases_and_home(BASH, "chbash");
+}
+
+#[test]
+fn a_shell_that_cannot_run_the_check_gives_home_and_no_agents() {
+    let Some(mut core) = Core::new("chfail") else {
+        return;
+    };
+    // As fish does with `sh` syntax: complains and exits non-zero.
+    let shell = core.home().join("bin/notsh");
+    write_exe(
+        &shell,
+        "#!/bin/sh\necho 'notsh: Unsupported use of do' >&2\nexit 127\n",
+    );
+    core.shell = shell.display().to_string();
+    let home = core.home().display().to_string();
+    runtime().block_on(async {
+        let c = core.connect().await;
+        let got = check(&c, &["claude"]).await;
+        assert_eq!(got.home.as_deref(), Some(home.as_str()));
+        assert_eq!(got.found, None);
+    });
+}
+
+#[test]
+fn a_check_that_hangs_times_out_as_a_failure() {
+    let Some(mut core) = Core::new("chslow") else {
+        return;
+    };
+    let shell = core.home().join("bin/slowsh");
+    write_exe(&shell, "#!/bin/sh\nsleep 30\n");
+    core.shell = shell.display().to_string();
+    runtime().block_on(async {
+        let c = core.connect().await;
+        let started = std::time::Instant::now();
+        let got = check(&c, &["claude"]).await;
+        assert_eq!(got.found, None);
+        assert!(
+            started.elapsed() < Duration::from_secs(15),
+            "{:?}",
+            started.elapsed()
+        );
+    });
+}
+
+#[test]
+fn on_macos_the_check_and_the_agent_use_a_login_shell() {
+    if !have(BASH) {
+        return;
+    }
+    let Some(mut core) = core_with_alias("darwin", BASH) else {
+        return;
+    };
+    let home = core.home();
+    let stubs = home.join("stubs");
+    write_exe(&stubs.join("uname"), "#!/bin/sh\necho Darwin\n");
+    // A shell that notes its first flag, then is bash.
+    let shell = stubs.join("loginsh");
+    write_exe(
+        &shell,
+        &format!("#!/bin/sh\necho \"$1\" >> \"$HOME/flags\"\nexec {BASH} \"$@\"\n"),
+    );
+    core.shell = shell.display().to_string();
+    core.path_first = Some(stubs);
+    // A login bash reads .bash_profile, not .bashrc.
+    std::fs::copy(home.join(".bashrc"), home.join(".bash_profile")).unwrap();
+    let folder = home.join("src/website").display().to_string();
+    let flags = home.join("flags");
+    runtime().block_on(async {
+        let c = core.connect().await;
+        let got = check(&c, &["claude"]).await;
+        assert_eq!(got.found, Some(vec!["claude".to_owned()]));
+        assert_eq!(std::fs::read_to_string(&flags).unwrap(), "-lic\n");
+        std::fs::remove_file(&flags).unwrap();
+        c.client
+            .call(
+                "terminal.run",
+                start::run_params(Some(&folder), "s1", Some("claude")),
+            )
+            .await
+            .unwrap();
+        let noted = eventually("the shell after the agent", async || {
+            std::fs::read_to_string(&flags)
+                .ok()
+                .filter(|f| f.lines().count() == 2)
+        })
+        .await;
+        assert_eq!(noted, "-lic\n-li\n");
     });
 }

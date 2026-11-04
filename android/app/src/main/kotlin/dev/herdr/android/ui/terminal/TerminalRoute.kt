@@ -1,8 +1,6 @@
 package dev.herdr.android.ui.terminal
 
-import android.app.Activity
 import android.os.SystemClock
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -83,14 +81,8 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
         }
     }
 
-    // The window resizes for the keyboard while the terminal is open, so the grid follows it.
-    val activity = context as? Activity
-    DisposableEffect(activity) {
-        val window = activity?.window
-        val before = window?.attributes?.softInputMode
-        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        onDispose { if (before != null) window.setSoftInputMode(before) }
-    }
+    // The grid follows the keyboard: the window resizes for it (the manifest's
+    // adjustResize; set here at runtime, it was lost in the background, issue 5).
 
     val sink = remember(session) {
         object : KeyboardSink {

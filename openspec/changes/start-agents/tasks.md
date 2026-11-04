@@ -22,7 +22,7 @@ file, never a stub script; the core's `shell` / `$SHELL` select them
 
 ## 3. App (Android)
 
-- [ ] 3.1 Render in `design/`: the "New" entry on the Agents screen and the sheet (machine, space or folder, Terminal, the reserved agent row, error and "home folder unknown" states); Ezra signs it off
+- [x] 3.1 Render in `design/`: the "New" entry on the Agents screen and the sheet (machine, space or folder, Terminal, the reserved agent row, error and "home folder unknown" states); Ezra signs it off
 - [ ] 3.2 JVM tests: one machine skips the choice; nothing connected disables "New" with a reason; the agent row holds its place until the check answers and keeps its height; double tap starts once; errors keep the sheet open with the text; success closes the sheet and opens the terminal
 - [ ] 3.3 "New" entry and the sheet per the render; start button disabled while in flight
 - [ ] 3.4 On success open the terminal screen at phone size (design D7); on failure keep the sheet with the reason

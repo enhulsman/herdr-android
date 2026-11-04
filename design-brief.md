@@ -82,6 +82,10 @@ in v1.1.
 | `6-notification` | Lock screen: "Needs you" (loud) and "Finished" (quiet); agent, kind and machine only |
 | `7-machines` | Machine cards: alert status, mute, test alert, untested-version warning, unreachable machine |
 | `8-host-key` | First connection: trust the host key by fingerprint |
+| `9-new-spaces` | "New terminal" sheet (start-agents, signed off 2026-11-04): machine chips, spaces, where it starts, Terminal and the installed agents |
+| `10-new-folders` | The sheet on a machine without spaces: folders, "as a new space", the agent row held while the check runs |
+| `11-new-error` | A start the core refused: the reason above Start; agents could not be checked, Terminal only |
+| `12-new-off` | Nothing connected: the + dimmed, a tap says "No machine connected" |
 
 ## Components
 

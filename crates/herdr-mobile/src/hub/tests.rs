@@ -1586,7 +1586,10 @@ impl Core {
     /// been quiet for a second; returns the document as the app left it.
     async fn serve_push_docs(&mut self, mut doc: Value, mut version: u64) -> Value {
         while let Ok(req) = tokio::time::timeout(Duration::from_secs(1), self.request()).await {
-            let name = req["params"]["name"].as_str().unwrap_or_default().to_owned();
+            let name = req["params"]["name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
             let result = match (req["method"].as_str().unwrap(), name.as_str()) {
                 ("doc.get", "hdroid-push") => json!({"value": doc, "version": version}),
                 ("doc.set", "hdroid-push") => {
@@ -1595,7 +1598,9 @@ impl Core {
                     version += 1;
                     json!({"version": version})
                 }
-                ("doc.get", "hdroid-push-status") => json!({"value": status_doc(200), "version": 2}),
+                ("doc.get", "hdroid-push-status") => {
+                    json!({"value": status_doc(200), "version": 2})
+                }
                 _ => panic!("unexpected {req}"),
             };
             let reply = json!({"jsonrpc": "2.0", "id": req["id"], "result": result});
@@ -1617,7 +1622,8 @@ async fn a_second_endpoint_change_mid_write_leaves_only_the_latest() {
     let mut core = rig.core().await;
     core.connect("0.1.15", vec![]).await;
     let old = json!({"phones": [phone_entry(UP_OLD)]});
-    core.registers(Value::Null, old.clone(), status_doc(200)).await;
+    core.registers(Value::Null, old.clone(), status_doc(200))
+        .await;
     rig.until("registered", |s| {
         alerts(s).is_some_and(|a| a.registration == push::AlertsRegistration::Registered)
     })
@@ -1625,11 +1631,18 @@ async fn a_second_endpoint_change_mid_write_leaves_only_the_latest() {
 
     // The first change reads the document and sends its write ...
     rig.hub.set_push(Some(registration(UP_NEW)));
-    core.doc_call("doc.get", "hdroid-push", json!({"value": old, "version": 5}))
-        .await;
+    core.doc_call(
+        "doc.get",
+        "hdroid-push",
+        json!({"value": old, "version": 5}),
+    )
+    .await;
     let set = core.request().await;
     assert_eq!(set["method"], "doc.set", "{set}");
-    assert_eq!(set["params"]["value"], json!({"phones": [phone_entry(UP_NEW)]}));
+    assert_eq!(
+        set["params"]["value"],
+        json!({"phones": [phone_entry(UP_NEW)]})
+    );
     // ... and the second change comes before the core answers it.
     rig.hub.set_push(Some(registration(UP_THIRD)));
     let reply = json!({"jsonrpc": "2.0", "id": set["id"], "result": {"version": 6}});

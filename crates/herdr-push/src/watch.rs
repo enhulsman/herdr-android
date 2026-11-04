@@ -120,7 +120,11 @@ impl Watcher {
         // count as new once, and get what is open again.
         let known = state["known"]
             .as_array()
-            .map(|k| k.iter().filter_map(|e| e.as_str().map(str::to_owned)).collect())
+            .map(|k| {
+                k.iter()
+                    .filter_map(|e| e.as_str().map(str::to_owned))
+                    .collect()
+            })
             .unwrap_or_default();
         Watcher {
             known,

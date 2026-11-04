@@ -342,7 +342,10 @@ mod tests {
         r.due(2 * GRACE);
         assert_eq!(r.open_alerts(), vec![alert("t1", Word::Blocked)]);
         // Answered: nothing open.
-        r.observe(&[agent("t1", "working", 1), agent("t2", "idle", 0)], 3 * GRACE);
+        r.observe(
+            &[agent("t1", "working", 1), agent("t2", "idle", 0)],
+            3 * GRACE,
+        );
         assert_eq!(r.open_alerts(), vec![]);
     }
 

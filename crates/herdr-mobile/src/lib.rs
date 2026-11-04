@@ -267,6 +267,28 @@ impl Hub {
         self.core.import_machines(&json)
     }
 
+    /// The "New" sheet opened on `machine`: an agents check that failed runs
+    /// again (the sheet's choices are in `MachineView.start`).
+    pub fn start_sheet_opened(&self, machine: String) {
+        self.core.start_sheet_opened(&machine);
+    }
+
+    /// Starts a terminal at `place` (from `MachineView.start`), running the
+    /// machine's shell, or `agent` (a `StartAgent.word`). Blocks until the
+    /// machine answers: call it off the main thread. Returns the new
+    /// terminal's address; the error's text is for the sheet.
+    pub fn start_terminal(
+        &self,
+        machine: String,
+        place: hub::start::StartPlace,
+        agent: Option<String>,
+    ) -> Result<String, HubError> {
+        let core = self.core.clone();
+        self.core
+            .runtime()
+            .block_on(async move { core.start_terminal(&machine, place, agent).await })
+    }
+
     /// Opens a terminal, at the phone's size when `at_phone_size` (the app,
     /// since phone check round 2), else to watch; `phone_cols` x `phone_rows`
     /// is the phone's own grid. The listener hears frames and states.

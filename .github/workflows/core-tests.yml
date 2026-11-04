@@ -76,7 +76,8 @@ jobs:
         with:
           save-if: false
 
-      - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
+      # zsh: the start tests run the phone's agent wrapper in a real zsh.
+      - run: sudo apt-get install -y --no-install-recommends openssh-server zsh > /dev/null
 
       # The pinned version by its number; latest through latest.json, which
       # must still name the version resolved above.
@@ -100,6 +101,7 @@ jobs:
         env:
           HERDR_REQUIRE_CORE: "1"
           HERDR_REQUIRE_SSHD: "1"
+          HERDR_REQUIRE_ZSH: "1"
         run: |
           cargo test --locked -p herdr-proto --test scratch_core
           cargo test --locked -p herdr-push --test scratch_core

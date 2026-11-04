@@ -34,6 +34,7 @@ use crate::link::{DialError, Dialer, Exit, Target};
 use crate::machines::{self, ListError, MachineList};
 
 pub mod push;
+pub mod start;
 
 #[cfg(test)]
 mod tests;
@@ -132,6 +133,9 @@ pub struct MachineView {
     /// This phone's alerts here; None while alerts are off on the phone.
     #[uniffi(default = None)]
     pub alerts: Option<push::AlertsView>,
+    /// What the "New" sheet offers here; None unless connected.
+    #[uniffi(default = None)]
+    pub start: Option<start::StartView>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
@@ -288,6 +292,10 @@ struct Live {
     next_retry_ms: Option<u64>,
     /// What herdr-push wrote in `hdroid-push-status`, as of the last read.
     push_status: Option<push::PushStatusView>,
+    /// The spaces and folders a new terminal can go to (this connection's).
+    places: start::Places,
+    /// A start from the sheet is waiting for its answer.
+    starting: bool,
 }
 
 impl Live {
@@ -298,10 +306,13 @@ impl Live {
             task: None,
             next_retry_ms: None,
             push_status: None,
+            places: start::Places::default(),
+            starting: false,
         }
     }
 
     fn stop(&mut self) {
+        self.places = start::Places::default();
         self.epoch = 0;
         self.next_retry_ms = None;
         if let Some(task) = self.task.take() {
@@ -323,6 +334,8 @@ struct State {
     list_frozen: Option<String>,
     /// This phone's UnifiedPush registration; None while alerts are off.
     push: Option<push::PushRegistration>,
+    /// Each machine's installed-agents check, kept while the app runs.
+    checks: HashMap<String, start::CheckState>,
 }
 
 pub(crate) struct HubCore {
@@ -553,6 +566,7 @@ impl HubCore {
             notice: None,
             list_frozen: frozen,
             push: None,
+            checks: HashMap::new(),
         };
         let snapshot = build_snapshot(&state);
         Arc::new(HubCore {
@@ -994,6 +1008,7 @@ impl HubCore {
             let Some(live) = st.live.get_mut(name).filter(|l| l.epoch == epoch) else {
                 return false;
             };
+            live.places.folders = herdr_proto::start::folder_choices(lines.terminals(), None);
             if let Some(state) = connected {
                 live.state = state;
                 live.next_retry_ms = None;
@@ -1047,6 +1062,9 @@ fn build_snapshot(st: &State) -> HubSnapshot {
                         },
                         status: live.and_then(|l| l.push_status.clone()),
                     }),
+                    start: live
+                        .filter(|l| matches!(l.state, MachineState::Connected { .. }))
+                        .map(|l| start::view(&l.places, st.checks.get(&m.name))),
                     state,
                     last_connected_ms: m.last_connected_ms,
                 }
@@ -1211,12 +1229,27 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
             None,
         ));
     }
+    hub.runtime.spawn(start::read_layout(
+        hub.clone(),
+        name.to_owned(),
+        epoch,
+        client.clone(),
+    ));
+    start::check_if_needed(hub, name, epoch, client.clone());
     let why = loop {
         match events.recv().await {
             StreamItem::Data(d) => {
                 let pushed = lines.push(&d);
                 if pushed.terminals && !hub.observe(name, epoch, &lines, None) {
                     return Outcome::wait(MachineState::Paused);
+                }
+                if pushed.docs {
+                    hub.runtime.spawn(start::read_layout(
+                        hub.clone(),
+                        name.to_owned(),
+                        epoch,
+                        client.clone(),
+                    ));
                 }
                 if pushed.docs && hub.push_relevant(name) {
                     hub.runtime.spawn(read_push_status(

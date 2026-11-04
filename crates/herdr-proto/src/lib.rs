@@ -8,6 +8,8 @@ pub mod attention;
 pub mod compat;
 pub mod events;
 pub mod handshake;
+pub mod layout;
 pub mod rpc;
+pub mod start;
 pub mod viewer;
 pub mod wire;

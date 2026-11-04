@@ -42,8 +42,9 @@ or "core has zero terminals" in its log and status document.
 
 ### Requirement: The watcher follows the shared attention model
 `herdr-push` SHALL alert on entry into needs-you and finished as defined by
-`herdr-proto::attention`, SHALL suppress sub-agents and terminals not placed in a
-pane, and SHALL alert for unplaceable terminals when the layout cannot be read.
+`herdr-proto::attention`, SHALL suppress sub-agents and terminals neither placed
+in a pane nor labelled with a non-empty `herdr.space`, and SHALL alert for
+unplaceable terminals when the layout cannot be read.
 A grace delay (default 30 s, configurable) SHALL precede each alert and SHALL
 cancel it when the state moves on. With no `herdr-app` document every agent
 SHALL be treated as placed.
@@ -55,6 +56,14 @@ SHALL be treated as placed.
 #### Scenario: Blocked while away
 - **WHEN** an agent becomes blocked and stays blocked for 30 s
 - **THEN** exactly one alert is sent to each registered endpoint
+
+#### Scenario: Desk app closed
+- **WHEN** an agent started from the phone in the space "website" blocks while the desk app is not running
+- **THEN** herdr-push alerts for it after the grace delay
+
+#### Scenario: Parked terminals stay quiet
+- **WHEN** a terminal's `herdr.space` label is empty and the layout does not place it
+- **THEN** herdr-push does not alert for it
 
 #### Scenario: Layout unreadable
 - **WHEN** the `herdr-app` document cannot be parsed and an agent becomes blocked

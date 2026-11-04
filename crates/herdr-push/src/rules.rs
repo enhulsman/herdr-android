@@ -8,7 +8,7 @@
 //! time an agent leaves `working`, so the same key is never alerted twice, and
 //! the record of keys survives a restart.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use herdr_proto::attention::{Attention, Tracker};
 use serde_json::{Map, Value, json};
@@ -60,13 +60,7 @@ pub enum Action {
     Cleared { terminal: String },
 }
 
-/// Which terminals sit in a pane of the `herdr-app` layout.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Layout {
-    Placed(BTreeSet<String>),
-    /// No usable layout: every agent may alert (the note says why).
-    Unreadable(String),
-}
+pub use herdr_proto::layout::Layout;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Alerted {
@@ -110,7 +104,7 @@ impl Rules {
         Rules {
             grace_ms,
             tracker: Tracker::default(),
-            layout: Layout::Unreadable(crate::layout::NO_DOCUMENT.into()),
+            layout: Layout::Unreadable(herdr_proto::layout::NO_DOCUMENT.into()),
             terminals: Vec::new(),
             record,
             pending: BTreeMap::new(),
@@ -286,9 +280,18 @@ impl Rules {
         self.terminals.iter().find(|t| t["address"] == address)
     }
 
+    /// In a pane of the layout, or labelled with a space the desk will place
+    /// it in once it runs (a start from the phone, start-agents D6). A parked
+    /// terminal has its label emptied, so it stays quiet.
     fn placed(&self, address: &str) -> bool {
+        let labelled = || {
+            self.terminal(address)
+                .and_then(|t| t.pointer("/labels/herdr.space"))
+                .and_then(Value::as_str)
+                .is_some_and(|s| !s.is_empty())
+        };
         match &self.layout {
-            Layout::Placed(set) => set.contains(address),
+            Layout::Placed(set) => set.contains(address) || labelled(),
             Layout::Unreadable(_) => true,
         }
     }
@@ -297,6 +300,7 @@ impl Rules {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     const GRACE: u64 = 30_000;
 
@@ -467,6 +471,31 @@ mod tests {
             0,
         );
         assert_eq!(r.due(GRACE), vec![alert("t1", Word::Blocked)]);
+    }
+
+    #[test]
+    fn a_terminal_labelled_with_a_space_alerts_before_the_desk_places_it() {
+        // Started from the phone while the desk app is closed (start-agents D6).
+        let mut labelled = agent("t7", "working", 0);
+        labelled["labels"] = json!({"herdr.space": "s1"});
+        let mut r = rules();
+        r.set_layout(Layout::Placed(BTreeSet::from(["t1".to_owned()])));
+        r.observe(&[labelled.clone()], 0);
+        labelled["status"]["state"] = json!("blocked");
+        r.observe(&[labelled], 0);
+        assert_eq!(r.due(GRACE), vec![alert("t7", Word::Blocked)]);
+    }
+
+    #[test]
+    fn a_parked_terminal_with_an_empty_space_label_stays_quiet() {
+        let mut parked = agent("t8", "working", 0);
+        parked["labels"] = json!({"herdr.space": ""});
+        let mut r = rules();
+        r.set_layout(Layout::Placed(BTreeSet::from(["t1".to_owned()])));
+        r.observe(&[parked.clone()], 0);
+        parked["status"]["state"] = json!("blocked");
+        r.observe(&[parked], 0);
+        assert_eq!(r.due(GRACE), vec![]);
     }
 
     #[test]

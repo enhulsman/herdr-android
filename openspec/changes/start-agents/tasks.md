@@ -6,12 +6,12 @@ file, never a stub script; the core's `shell` / `$SHELL` select them
 
 ## 1. Shared core (Rust)
 
-- [ ] 1.1 Tests: layout reader (real document with spaces, unnamed space, empty and `~/` and relative folders, zero spaces, none, unreadable); folder list (distinct cwds, foreground first, home first, home unknown); fresh space id (`sp` + 32 hex); agent table (15 entries in the desk's order, every word one `[a-z0-9._-]+`); D1 wrapper string asserted whole for a word; D5 check string; check parse (home with spaces, markers glued to an escape prefix, `claude` first, no `herdr-done` = failure, zero agents = success); `program_of` names the shell for a wrapped start; compat completeness (every `call("...")` in `crates/*/src` plus `terminal.attach`, `events.subscribe` is in `USES`); herdr-push `placed()` both scenarios
-- [ ] 1.2 Move `herdr-push/src/layout.rs` and `Layout` to `herdr-proto`; add the spaces reader, lenient as now
-- [ ] 1.3 Folder resolution and folder list without spaces (design D2); fresh space id
-- [ ] 1.4 herdr-push `placed()`: a non-empty `herdr.space` label counts as placed (design D6); amend V1's alerts requirement in `openspec/changes/android-client-v1/specs/alerts/spec.md` in place with the two scenarios
-- [ ] 1.5 Agent table from the desk's `defaults/programs.json` (name, icon, word, order), source noted; wrapper and check strings and the check parser (design D1, D5); `program_of`
-- [ ] 1.6 `compat.rs`: add `terminal.run`, `machine.exec`, `doc.get`, `doc.set` to `USES`
+- [x] 1.1 Tests: layout reader (real document with spaces, unnamed space, empty and `~/` and relative folders, zero spaces, none, unreadable); folder list (distinct cwds, foreground first, home first, home unknown); fresh space id (`sp` + 32 hex); agent table (15 entries in the desk's order, every word one `[a-z0-9._-]+`); D1 wrapper string asserted whole for a word; D5 check string; check parse (home with spaces, markers glued to an escape prefix, `claude` first, no `herdr-done` = failure, zero agents = success); `program_of` names the shell for a wrapped start; compat completeness (every `call("...")` in `crates/*/src` plus `terminal.attach`, `events.subscribe` is in `USES`); herdr-push `placed()` both scenarios
+- [x] 1.2 Move `herdr-push/src/layout.rs` and `Layout` to `herdr-proto`; add the spaces reader, lenient as now
+- [x] 1.3 Folder resolution and folder list without spaces (design D2); fresh space id
+- [x] 1.4 herdr-push `placed()`: a non-empty `herdr.space` label counts as placed (design D6); amend V1's alerts requirement in `openspec/changes/android-client-v1/specs/alerts/spec.md` in place with the two scenarios
+- [x] 1.5 Agent table from the desk's `defaults/programs.json` (name, icon, word, order), source noted; wrapper and check strings and the check parser (design D1, D5); `program_of`
+- [x] 1.6 `compat.rs`: add `terminal.run`, `machine.exec`, `doc.get`, `doc.set` to `USES`
 
 ## 2. Starting (herdr-mobile hub)
 

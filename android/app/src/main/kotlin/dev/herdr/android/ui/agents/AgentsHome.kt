@@ -26,7 +26,12 @@ import uniffi.herdr_mobile.HubSnapshot
  * terminal without status has nothing to mark. Plain enough to test without a
  * composition (AgentsHomeTest).
  */
-class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> Boolean) {
+class AgentsHome(
+    private val hubHost: HubHost,
+    /** Monotonic ms, for how long a started terminal is waited for. */
+    private val now: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val isForeground: () -> Boolean,
+) {
     var openKey by mutableStateOf<AgentKey?>(null)
         private set
 
@@ -60,8 +65,11 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
     private val behind = ArrayDeque<AgentKey>()
     private val ahead = ArrayDeque<AgentKey>()
 
-    /** An alert's agent, opened once the hub lists it ([openWhenListed]). */
+    /** An alert's agent or a started terminal, opened once the hub lists it. */
     private var pending: AgentKey? = null
+
+    /** Set for a started terminal ([openWhenStarted]): it is waited for until then. */
+    private var pendingUntil: Long? = null
 
     /**
      * A tapped alert (alerts spec, "Blocked while the app is closed"): opens
@@ -72,22 +80,40 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
      */
     fun openWhenListed(key: AgentKey) {
         pending = key
+        pendingUntil = null
+        openPending(hubHost.snapshot.value)
+    }
+
+    /**
+     * A terminal the "New" sheet started (start-agents spec, "Started and
+     * open"): the hub lists it on a later snapshot, an agent among the agents
+     * and a fresh shell under "Other terminals", so it opens once listed. The
+     * machine's other rows say nothing about it meanwhile; it is given up after
+     * [STARTED_WAIT_MS], so a terminal listed much later never pops open.
+     */
+    fun openWhenStarted(key: AgentKey) {
+        pending = key
+        pendingUntil = now() + STARTED_WAIT_MS
         openPending(hubHost.snapshot.value)
     }
 
     private fun openPending(snapshot: HubSnapshot) {
         val key = pending ?: return
+        val until = pendingUntil
         when {
-            listed(snapshot, key) -> {
-                pending = null
-                open(key)
-            }
-            snapshot.agents.any { it.machine == key.machine } -> pending = null
+            until != null && now() > until -> dropPending()
+            listed(snapshot, key) -> open(key)
+            until == null && snapshot.agents.any { it.machine == key.machine } -> dropPending()
         }
     }
 
-    fun open(key: AgentKey) {
+    private fun dropPending() {
         pending = null
+        pendingUntil = null
+    }
+
+    fun open(key: AgentKey) {
+        dropPending()
         // Taken before marking seen re-sorts the list.
         walk = hubHost.snapshot.value.agents.map { AgentKey(it.machine, it.address) }
         behind.clear()
@@ -146,7 +172,7 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
     }
 
     fun close() {
-        pending = null
+        dropPending()
         openKey = null
         finishMarked = false
         walk = emptyList()
@@ -194,11 +220,14 @@ class AgentsHome(private val hubHost: HubHost, private val isForeground: () -> B
     }
 
     companion object {
+        /** How long a started terminal is waited for before it is given up. */
+        const val STARTED_WAIT_MS = 10_000L
+
         /** Keeps the open sheet and the group's state across rotation and process death. */
         fun saver(hubHost: HubHost, isForeground: () -> Boolean): Saver<AgentsHome, Any> = listSaver(
             save = { listOf(it.openKey?.machine, it.openKey?.address, it.othersExpanded) },
             restore = { saved ->
-                AgentsHome(hubHost, isForeground).apply {
+                AgentsHome(hubHost, isForeground = isForeground).apply {
                     val machine = saved[0] as String?
                     val address = saved[1] as String?
                     openKey = if (machine != null && address != null) AgentKey(machine, address) else null

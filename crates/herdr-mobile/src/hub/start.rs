@@ -24,6 +24,10 @@ pub struct StartView {
     pub places: Vec<StartPlace>,
     pub from_spaces: bool,
     pub agents: AgentsView,
+    /// The home folder, once a check printed it; the sheet writes folders
+    /// under it as `~/...`.
+    #[uniffi(default = None)]
+    pub home: Option<String>,
 }
 
 /// Where a new terminal goes; handed back to [`HubCore::start_terminal`].
@@ -162,6 +166,7 @@ pub(crate) fn view(places: &Places, check: Option<&CheckState>) -> StartView {
         places,
         from_spaces,
         agents,
+        home: home.map(str::to_owned),
     }
 }
 

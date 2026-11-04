@@ -38,6 +38,9 @@ enum class LineIcon(val strokeWidth: Float, val paths: List<String>) {
             "M7 16h10",
         ),
     ),
+    // The Agents top bar's "New" (`ico.plus`) and the sheet's Terminal (`ico.shell`).
+    Plus(1.8f, listOf("M12 5v14", "M5 12h14")),
+    Shell(2f, listOf("M4 17l6-6-6-6", "M12 19h8")),
     Eye(
         1.8f,
         listOf(

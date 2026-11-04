@@ -11,9 +11,9 @@ import dev.herdr.android.hub.UserAuthGate
 import dev.herdr.android.key.AndroidKeystoreBackend
 import dev.herdr.android.key.KeyManager
 import dev.herdr.android.key.KeystoreFrameCipher
-import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.AlarmScheduler
 import dev.herdr.android.lifecycle.ElapsedClock
+import dev.herdr.android.lifecycle.ForegroundTracker
 import dev.herdr.android.lifecycle.HandlerScheduler
 import dev.herdr.android.push.AlertSetup
 import dev.herdr.android.push.Alerts
@@ -22,6 +22,7 @@ import dev.herdr.android.push.PushStore
 import dev.herdr.android.push.SilenceCheckService
 import dev.herdr.android.push.timeOfDay
 import dev.herdr.android.ui.agents.AgentKey
+import dev.herdr.android.ui.agents.NewTerminal
 import dev.herdr.android.ui.terminal.TerminalCache
 import dev.herdr.android.ui.terminal.ZoomMemory
 import dev.herdr.android.ui.theme.ContrastSetting
@@ -34,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import org.unifiedpush.android.connector.UnifiedPush
 import uniffi.herdr_mobile.AlertsRegistration
 import uniffi.herdr_mobile.Hub
@@ -59,6 +61,10 @@ class HerdrApp : Application() {
 
     /** Export and import of the machine list; outlives activities so a rotation never cuts one short. */
     lateinit var transfer: MachineTransfer
+        private set
+
+    /** The "New" sheet's state and its start; outlives activities so a rotation never loses a start. */
+    lateinit var newTerminal: NewTerminal
         private set
 
     /** The "Text contrast" setting the theme follows, in its own preferences file. */
@@ -107,11 +113,10 @@ class HerdrApp : Application() {
         )
         userAuth = UserAuthGate(retry = hubHost::retry)
         hubHost.addSnapshotListener(userAuth::onSnapshot)
-        transfer = MachineTransfer(
-            hubHost,
-            ContentResolverStore(contentResolver),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO),
-        )
+        val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        transfer = MachineTransfer(hubHost, ContentResolverStore(contentResolver), io)
+        newTerminal = NewTerminal(hubHost, work = { io.launch { it.run() } }, main = mainExecutor)
+        hubHost.addSnapshotListener(newTerminal::onSnapshot)
         val main = Handler(mainLooper)
         foreground = ForegroundTracker(
             HandlerScheduler(main, ElapsedClock.SYSTEM),

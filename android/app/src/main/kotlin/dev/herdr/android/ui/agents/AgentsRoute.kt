@@ -2,6 +2,7 @@ package dev.herdr.android.ui.agents
 
 import android.provider.Settings
 import android.text.format.DateFormat
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -52,12 +53,29 @@ fun AgentsRoute(app: HerdrApp, flows: MachineFlows, home: AgentsHome) {
             onRetry = app.hubHost::retry,
         )
     }
+    val new = app.newTerminal
+    val newUi = NewEntryUi(
+        enabled = newEnabled(snapshot),
+        sheet = new.sheet?.let { newSheetUi(snapshot, it, res) },
+        noMachine = new.noMachine,
+    )
+    val newActions = remember(new) {
+        NewSheetActions(
+            onNew = new::tapNew,
+            onNoMachineGone = new::noMachineShown,
+            onMachine = new::chooseMachine,
+            onPlace = new::choosePlace,
+            onStart = new::start,
+            onClose = new::close,
+        )
+    }
     // Since M2 an agent opens its live terminal; the M1 read-only sheet is no longer shown.
     val open = home.openKey
     if (open != null) {
         TerminalRoute(app, home, open)
     } else {
-        AgentsScreen(ui, home.othersExpanded, null, clock, spin, actions)
+        BackHandler(enabled = new.sheet != null, onBack = new::close)
+        AgentsScreen(ui, home.othersExpanded, null, clock, spin, actions, new = newUi, newActions = newActions)
     }
 }
 

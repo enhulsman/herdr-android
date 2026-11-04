@@ -1,11 +1,16 @@
 package dev.herdr.android.ui.agents
 
 import uniffi.herdr_mobile.AgentAttention
+import uniffi.herdr_mobile.AgentsView
 import uniffi.herdr_mobile.AgentRow
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.MachineView
 import uniffi.herdr_mobile.OtherTerminal
+import uniffi.herdr_mobile.PlaceNote
+import uniffi.herdr_mobile.StartAgent
+import uniffi.herdr_mobile.StartPlace
+import uniffi.herdr_mobile.StartView
 
 // Invented machines, folders and agents for the Agents home tests (AGENTS.md:
 // no real names). Rows are given in the hub's order, as Rust sorts them.
@@ -57,3 +62,23 @@ fun other(
     folder: String = "docs",
     program: String? = null,
 ) = OtherTerminal(machine, address, name, folder, program)
+
+// The "New" sheet's choices (start-agents), as the hub offers them.
+
+fun space(title: String, folder: String?, id: String = "s-$title", note: PlaceNote = PlaceNote.NONE) =
+    StartPlace(title, folder, id, note)
+
+fun folder(title: String, path: String) = StartPlace(title, path, null, PlaceNote.NONE)
+
+fun agent(word: String, name: String, program: String = word) = StartAgent(program, name, word)
+
+fun ready(vararg agents: StartAgent) = AgentsView.Ready(agents.toList())
+
+fun startView(
+    places: List<StartPlace> = listOf(space("website", "/home/dev/src/website"), space("api", "/home/dev/src/api")),
+    agents: AgentsView = ready(agent("claude", "Claude Code"), agent("codex", "Codex")),
+    home: String? = "/home/dev",
+) = StartView(places, places.any { it.spaceId != null }, agents, home)
+
+/** A connected machine whose "New" sheet offers [start]. */
+fun connected(name: String, start: StartView) = connected(name).copy(start = start)

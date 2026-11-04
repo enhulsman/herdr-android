@@ -142,6 +142,8 @@ async fn a_connected_machine_offers_its_spaces_and_installed_agents() {
         ("Claude Code", "claude")
     );
     assert!(v.from_spaces);
+    // The sheet writes folders under home as `~/...`.
+    assert_eq!(v.home.as_deref(), Some("/home/dev"));
     assert_eq!(
         v.places,
         vec![

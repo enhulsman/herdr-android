@@ -19,6 +19,7 @@ import uniffi.herdr_mobile.PushRegistration
 import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.SignException
 import uniffi.herdr_mobile.SshSigner
+import uniffi.herdr_mobile.StartPlace
 import uniffi.herdr_mobile.TerminalListener
 import uniffi.herdr_mobile.TerminalView
 import uniffi.herdr_mobile.UniffiLib
@@ -274,4 +275,14 @@ class FakeHub : HubInterface {
         listener: TerminalListener,
     ): TerminalView = error("FakeHub does not open terminals")
     override fun updateMachine(name: String, host: String, port: UShort, user: String) { calls += "update $name" }
+
+    /** What the next start returns: the new terminal's address. */
+    var startAddress = "t9"
+
+    override fun startSheetOpened(machine: String) { calls += "sheet $machine" }
+    override fun startTerminal(machine: String, place: StartPlace, agent: String?): String {
+        refused()
+        calls += "start $machine ${place.title} ${agent ?: "terminal"}"
+        return startAddress
+    }
 }

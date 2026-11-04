@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
 private fun Root(app: HerdrApp) {
     val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
     val isForeground = { app.foreground.isForeground }
-    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost, isForeground)) { AgentsHome(app.hubHost, isForeground) }
+    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost, isForeground)) { AgentsHome(app.hubHost, isForeground = isForeground) }
     // Back in the foreground with an agent's sheet open: a finish it shows is now seen.
     LifecycleEventEffect(Lifecycle.Event.ON_START) { home.onForeground() }
     val snapshot by app.hubHost.snapshot.collectAsState()
@@ -67,6 +67,14 @@ private fun Root(app: HerdrApp) {
         app.alertTap.value = null
         flows.openAgents()
         home.openWhenListed(key)
+    }
+    // A terminal the "New" sheet started: opened once the hub lists it.
+    val started by app.newTerminal.opened.collectAsState()
+    LaunchedEffect(started) {
+        val key = started ?: return@LaunchedEffect
+        app.newTerminal.openedTaken()
+        flows.openAgents()
+        home.openWhenStarted(key)
     }
     // The export/import notice answers the picker just closed; it does not follow the person to other screens.
     LaunchedEffect(flows.screen) { if (flows.screen != Screen.Machines) app.transfer.dismiss() }

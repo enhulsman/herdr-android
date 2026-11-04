@@ -402,12 +402,21 @@ fn row(machine: &str, address: &str, t: &Value, a: &Agent) -> Row {
 }
 
 /// The program for the icon: the reported app, else the command's file name.
-fn program_of(t: &Value) -> Option<String> {
+/// A start wrapped by the phone (`start::wrapper`) is named after what runs in
+/// it now (the shell once the agent quit), else the agent it was started for.
+pub fn program_of(t: &Value) -> Option<String> {
     fn nonempty(v: Option<&Value>) -> Option<&str> {
         v.and_then(Value::as_str).filter(|s| !s.is_empty())
     }
     if let Some(app) = nonempty(t.pointer("/status/app")) {
         return Some(program_id(app));
+    }
+    if let Some(word) = crate::start::wrapped_word(&t["argv"]) {
+        if let Some(now) = nonempty(t.pointer("/foreground/name")) {
+            return Some(program_id(now));
+        }
+        let agent = crate::start::AGENTS.iter().find(|a| a.word == word);
+        return Some(agent.map_or_else(|| program_id(word), |a| a.program.to_owned()));
     }
     nonempty(t.pointer("/argv/0"))
         .map(|p| folder_name(p, None))

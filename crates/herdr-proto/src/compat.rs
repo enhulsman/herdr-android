@@ -17,10 +17,14 @@ pub const MIN_CORE: &str = "0.1.15";
 /// What the app calls on a core; a core lacking one of them is too old.
 /// Grows with the milestones; a test lists every method called in `src`.
 pub const USES: &[&str] = &[
+    "doc.get",
+    "doc.set",
     "events.subscribe",
+    "machine.exec",
     "terminal.attach",
     "terminal.get",
     "terminal.interrupt",
+    "terminal.run",
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]

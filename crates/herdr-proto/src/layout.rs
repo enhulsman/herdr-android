@@ -4,13 +4,50 @@
 //! (`content: {terminal}` or a mod pane) or a container with `children`. It is
 //! read leniently: unknown node types are walked for children, a tab whose root
 //! is not a node is skipped. Addresses are machine-local; a qualified one
-//! (`ws/t7`) names the same terminal as `t7`.
+//! (`ws/t7`) names the same terminal as `t7`. Moved here from herdr-push so
+//! the phone reads the same document (start-agents design D3).
 
 use std::collections::BTreeSet;
 
 use serde_json::Value;
 
-use crate::rules::Layout;
+/// Which terminals sit in a pane of the `herdr-app` layout.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Layout {
+    Placed(BTreeSet<String>),
+    /// No usable layout: every agent may alert (the note says why).
+    Unreadable(String),
+}
+
+/// A space as the phone offers it: where a new terminal goes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Space {
+    pub id: String,
+    /// Empty: called after its folder (`start::space_title`).
+    pub name: String,
+    /// As the desk wrote it: absolute, `~/...`, or empty for home.
+    pub folder: String,
+}
+
+/// The spaces a new terminal can join, in the desk's order. No document, an
+/// unreadable one and zero spaces all give none; an entry without a string id
+/// is skipped.
+pub fn spaces(doc: &Value) -> Vec<Space> {
+    let Some(list) = doc.get("spaces").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let text = |v: &Value, key: &str| v.get(key).and_then(Value::as_str).unwrap_or("").to_owned();
+    list.iter()
+        .filter_map(|s| {
+            let id = s.get("id")?.as_str().filter(|id| !id.is_empty())?;
+            Some(Space {
+                id: id.to_owned(),
+                name: text(s, "name"),
+                folder: text(s, "folder"),
+            })
+        })
+        .collect()
+}
 
 pub const NO_DOCUMENT: &str = "no layout document";
 pub const UNREADABLE: &str = "layout unreadable";

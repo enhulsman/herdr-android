@@ -16,10 +16,10 @@ use serde_json::{Value, json};
 use tokio::io::AsyncReadExt as _;
 
 use crate::deliver::{self, Allowlist, Post, Push};
-use crate::layout;
 use crate::phones::{self, Phone};
 use crate::rules::{Action, Layout, Rules};
 use crate::status::{self, Status};
+use herdr_proto::layout;
 
 /// Between attempts to reach a core that is not there.
 pub const RETRY: Duration = Duration::from_secs(30);

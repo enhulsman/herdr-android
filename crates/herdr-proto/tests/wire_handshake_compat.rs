@@ -286,3 +286,49 @@ fn every_method_the_app_calls_is_checked_at_connect() {
         );
     }
 }
+
+// ---- USES is complete (start-agents design D8) ----
+
+/// Every method the phone's code calls (`call("...")` outside tests in
+/// herdr-mobile and herdr-proto) is in `USES`, so an older core that lacks one
+/// is caught at connect instead of failing a tap later.
+#[test]
+fn uses_lists_every_method_the_phone_calls() {
+    fn scan(dir: &std::path::Path, found: &mut std::collections::BTreeSet<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path
+                .file_name()
+                .is_some_and(|n| n == "tests" || n == "tests.rs")
+            {
+                continue;
+            }
+            if path.is_dir() {
+                scan(&path, found);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let text = std::fs::read_to_string(&path).unwrap();
+                for piece in text.split("call(\"").skip(1) {
+                    let method: String = piece.chars().take_while(|c| *c != '"').collect();
+                    found.insert(method);
+                }
+            }
+        }
+    }
+    let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap();
+    let mut found = std::collections::BTreeSet::new();
+    scan(&crates.join("herdr-proto/src"), &mut found);
+    scan(&crates.join("herdr-mobile/src"), &mut found);
+    // Sent through `call` too today; listed by hand in case that changes.
+    found.extend(["terminal.attach", "events.subscribe"].map(String::from));
+    assert!(
+        found.contains("terminal.get"),
+        "the scan found nothing: {found:?}"
+    );
+    let missing: Vec<&String> = found
+        .iter()
+        .filter(|m| !compat::USES.contains(&m.as_str()))
+        .collect();
+    assert!(missing.is_empty(), "called but not in USES: {missing:?}");
+}

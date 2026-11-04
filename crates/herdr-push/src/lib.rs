@@ -3,7 +3,6 @@
 
 pub mod config;
 pub mod deliver;
-pub mod layout;
 pub mod phones;
 pub mod rules;
 pub mod status;

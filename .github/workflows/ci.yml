@@ -1,17 +1,11 @@
 name: CI
 
-# Pull requests only: main moves by fast-forward from a tested branch, and a
-# release tag runs every test again before anything is signed. Changes that
-# touch only docs, specs or designs skip it; run it by hand from the Actions tab.
+# Every pull request; main only changes through a pull request (repository
+# ruleset), and the ruleset requires the ci-ok job below. A change that touches
+# only docs, specs or designs skips the heavy jobs, which GitHub counts as
+# passed. Run it by hand from the Actions tab for a full run on any branch.
 on:
   pull_request:
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "openspec/**"
-      - "design/**"
-      - "research/**"
-      - "canvas/**"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +25,37 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Code or not: docs, specs, designs, research and Markdown alone skip the rest.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$BASE...HEAD")"
+          echo "$changed"
+          if echo "$changed" | grep -v -E '^(docs|openspec|design|research|canvas)/|\.md$' | grep -q .; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   rust:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -74,11 +98,15 @@ jobs:
 
   # Scratch-core and sshd tests against the oldest supported and the latest core.
   core:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/core-tests.yml
     with:
       cache: true
 
   android:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -116,3 +144,19 @@ jobs:
       - name: Unit tests and debug APK (builds the Rust core through scripts/build-rust-android.sh)
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest :app:verifyRoborazziDebug :app:assembleDebug
+
+  # The one check the main ruleset requires: green when every job above passed
+  # or was skipped for a docs-only change, red when any failed or was cancelled.
+  ci-ok:
+    if: always()
+    needs: [changes, rust, core, android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done

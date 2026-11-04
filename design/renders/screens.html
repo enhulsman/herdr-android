@@ -157,6 +157,30 @@ button{font-family:inherit;color:inherit}
 .dialog{position:absolute;left:20px;right:20px;top:200px;background:var(--popover);border-radius:24px;padding:24px 22px 18px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--border)}
 .dialog h3{margin:0;font-size:21px;font-weight:600}
 .dialog p{margin:0;font-size:15px;line-height:1.5;color:var(--muted)}
+/* New sheet (start-agents) */
+.iconbtn.off{opacity:.38}
+.snack{position:absolute;left:16px;right:16px;bottom:44px;height:48px;border-radius:12px;background:var(--solid);color:var(--solid-fg);display:flex;align-items:center;padding:0 16px;font-size:14.5px}
+.chips{display:flex;gap:8px;padding:0 20px 4px}
+.mchip{height:36px;border-radius:10px;border:1px solid var(--input);display:flex;align-items:center;gap:8px;padding:0 14px;font-size:14.5px}
+.mchip.on{background:var(--selected);border-color:var(--ring)}
+.cap{padding:14px 20px 6px;font-size:12.5px;font-weight:500;color:var(--dim)}
+.place{display:flex;align-items:center;gap:12px;min-height:56px;margin:0 8px;padding:0 12px;border-radius:12px}
+.place.on{background:var(--selected)}
+.place .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.place .name{font-size:16px}
+.place .sub{font-size:13px;color:var(--dim);font-family:"JetBrains Mono",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radio{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--input);flex:none}
+.place.on .radio{border:5px solid var(--fg)}
+.where{margin:8px 16px 0;border-radius:12px;background:var(--canvas);border:1px solid var(--border);padding:10px 14px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.where b{color:var(--fg);font-weight:500}
+.where .mono{font-size:12.5px;color:var(--term-fg)}
+.starts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 16px}
+.tile{height:64px;border-radius:12px;border:1px solid var(--input);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:13.5px}
+.tile img,.tile svg{width:20px;height:20px}
+.tile.shellbtn{grid-column:1/-1;flex-direction:row;height:48px;gap:10px;font-size:15px;font-weight:500;background:var(--solid);color:var(--solid-fg);border-color:var(--solid)}
+.tile.ghost{border-style:dashed;color:var(--dim)}
+.agentsnote{grid-column:1/-1;font-size:13px;color:var(--dim);padding:2px 2px 0}
+.err{margin:10px 16px 0;border-radius:10px;border-left:3px solid var(--blocked);background:color-mix(in srgb,var(--blocked) 9%,var(--popover));padding:9px 12px;font-size:13.5px;line-height:1.4}
 .fp{font-family:"JetBrains Mono",monospace;font-size:13.5px;line-height:1.6;background:var(--canvas);border:1px solid var(--border);border-radius:12px;padding:12px 14px;color:var(--fg);word-break:break-all}
 </style>
 </head>
@@ -175,6 +199,8 @@ const ico = {
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   kb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>',
   mic: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  shell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>',
   l:'←', d:'↓', u:'↑', r:'→',
 };
 const sysbar = (t='14:07') => `<div class="sysbar"><span>${t}</span><span class="sysicons"><i style="width:15px;height:11px;clip-path:polygon(0 100%,100% 0,100% 100%)"></i><i style="width:15px;height:11px;border-radius:50% 50% 0 0/100% 100% 0 0;clip-path:polygon(50% 100%,0 0,100% 0)"></i><i style="width:22px;height:11px;border-radius:3px"></i></span></div>`;
@@ -208,12 +234,14 @@ const card = (a) => `
   </div>`;
 const sec = (label, color, n, extra='') => `<div class="sec"><span style="color:var(--${color})">${label}</span><span class="n">${n}</span><span class="grow"></span>${extra}</div>`;
 
+const agentsTop = (off=false) => `<div class="top"><h1>Agents</h1>
+      <button class="iconbtn${off?' off':''}" aria-label="New terminal">${ico.plus}</button>
+      <button class="iconbtn" aria-label="Machines">${ico.server}<span class="badge"></span></button>
+    </div>`;
 function home(theme){
   return `<div class="phone ${theme}">
     ${sysbar()}
-    <div class="top"><h1>Agents</h1>
-      <button class="iconbtn" aria-label="Machines">${ico.server}<span class="badge"></span></button>
-    </div>
+    ${agentsTop()}
     <div class="notice"><span class="ring"></span><span style="flex:1"><span style="color:var(--fg)">server</span> unreachable · last connected 2h ago</span>${ico.right}</div>
     <div class="list">
       ${sec('Needs you','blocked',2)}
@@ -440,6 +468,88 @@ function hostkey(){
   </div>`;
 }
 
+// ---------- start-agents: the New sheet ----------
+const listBehind = () => `<div class="list">
+      ${sec('Working','working',2)}
+      ${row({p:'claude',n:'pricing page',space:'website',m:'workstation',w:'<1m',s:'working',pr:40})}
+      ${row({p:'codex',n:'changelog',space:'docs',m:'workstation',w:'9m',s:'working'})}
+      ${sec('Idle','dim',1)}
+      ${row({p:'claude',n:'readme',space:'docs',m:'workstation',w:'12m',s:'idle'})}
+    </div>`;
+const place = (name, folder, on=false, note='') => `<div class="place${on?' on':''}"><span class="radio"></span>
+  <div class="txt"><span class="name">${name}</span><span class="sub">${folder}${note?` <span style="font-family:Geist,sans-serif;color:var(--working)">· ${note}</span>`:''}</span></div></div>`;
+const where = (m, sp, f) => `<div class="where"><span>Starts on <b>${m}</b> ${sp?`in <b>${sp}</b>, as a new tab`:'as a new space'}</span><span class="mono">${f}</span></div>`;
+const tiles = (agents) => agents.map(([p,n])=>`<span class="tile">${ico[p]||ico.shell}<span>${n}</span></span>`).join('');
+function newSheet(body){
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${agentsTop()}
+    ${listBehind()}
+    ${navbar()}
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="handle"></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;padding:4px 20px 6px">
+        <span style="font-size:18px;font-weight:600">New terminal</span>
+      </div>
+      ${body}
+      <div style="height:20px"></div>
+      ${navbar()}
+    </div>
+  </div>`;
+}
+function newSpaces(){
+  return newSheet(`
+      <div class="cap">Machine</div>
+      <div class="chips"><span class="mchip on"><span class="dot" style="background:var(--a2)"></span>workstation</span><span class="mchip"><span class="dot" style="background:var(--a2)"></span>server</span></div>
+      <div class="cap">Space</div>
+      ${place('website','~/src/website',true)}
+      ${place('api','~/src/api')}
+      ${place('docs','~/src/docs')}
+      ${where('workstation','website','/home/dev/src/website')}
+      <div class="cap">Start</div>
+      <div class="starts">
+        <span class="tile shellbtn">${ico.shell}Terminal</span>
+        ${tiles([['claude','Claude Code'],['codex','Codex']])}
+      </div>`);
+}
+function newFolders(){
+  return newSheet(`
+      <div class="cap">Folder <span style="font-weight:400">· no spaces on server yet, this makes the first</span></div>
+      ${place('~','/home/dev',true)}
+      ${place('backups','/home/dev/backups')}
+      ${where('server','','/home/dev')}
+      <div class="cap">Start</div>
+      <div class="starts">
+        <span class="tile shellbtn">${ico.shell}Terminal</span>
+        <span class="tile ghost">${ico.spin.replace('class="spin"','style="color:var(--dim)"')}</span><span class="tile ghost"></span><span class="tile ghost"></span>
+        <span class="agentsnote">Checking which agents server has…</span>
+      </div>`);
+}
+function newError(){
+  return newSheet(`
+      <div class="cap">Space</div>
+      ${place('website','~/src/website')}
+      ${place('old site','~/src/old-site',true)}
+      ${where('workstation','old site','/home/dev/src/old-site')}
+      <div class="err">Could not start in /home/dev/src/old-site: No such file or directory</div>
+      <div class="cap">Start</div>
+      <div class="starts">
+        <span class="tile shellbtn">${ico.shell}Terminal</span>
+        <span class="agentsnote">Could not check agents on workstation · Terminal only</span>
+      </div>`);
+}
+function newOff(){
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${agentsTop(true)}
+    <div class="notice"><span class="ring"></span><span style="flex:1"><span style="color:var(--fg)">workstation</span> unreachable · last connected 5m ago</span>${ico.right}</div>
+    ${listBehind()}
+    <div class="snack">No machine connected</div>
+    ${navbar()}
+  </div>`;
+}
+
 const SCREENS = [
   ['1-home-dark','1 Agent list (graphite)',()=>home('graphite')],
   ['2-home-light','2 Agent list (paper)',()=>home('paper')],
@@ -450,6 +560,10 @@ const SCREENS = [
   ['6-notification','6 Needs-you notification',lockscreen],
   ['7-machines','7 Machines',machines],
   ['8-host-key','8 First connection: host key',hostkey],
+  ['9-new-spaces','9 New terminal: spaces, agents found',newSpaces],
+  ['10-new-folders','10 New terminal: no spaces, checking agents',newFolders],
+  ['11-new-error','11 New terminal: could not start',newError],
+  ['12-new-off','12 New, nothing connected',newOff],
 ];
 const want = new URLSearchParams(location.search).get('s');
 document.body.className = want ? 'single' : 'gallery';

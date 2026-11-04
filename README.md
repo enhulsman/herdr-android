@@ -15,12 +15,12 @@ changes between releases.
 - **Agents:** every agent on every machine in one list, "needs you" first, then
   finished (not yet seen), working and idle.
 - **Live terminal:** the terminal as the desk draws it, with colours, zoom and
-  scrollback. Watching never resizes the desk's window.
+  scrollback. Opening it switches the terminal to the phone's size. Type at the
+  desk and the desk gets its size back while the phone keeps watching; exit the
+  terminal's screen on the phone and the desk gets it back too.
 - **Typing:** the phone keyboard and two rows of terminal keys (esc, ctrl, alt,
   tab, arrows, ^C and more). A compose sheet takes long prompts with
-  autocorrect and dictation, and pastes them without pressing enter. While you
-  type, the terminal takes the phone's size; the desk gets its size back on its
-  next keystroke.
+  autocorrect and dictation, and pastes them without pressing enter.
 - **Alerts:** "Needs you" with sound, "Finished" silently, and a quiet warning
   when a machine has gone silent for 13 hours. Tap an alert to open that
   agent's terminal. Mute per machine, and a test alert that checks the whole

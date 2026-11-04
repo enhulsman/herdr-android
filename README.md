@@ -87,3 +87,8 @@ browser, custom theme files, image paste.
 - `openspec/`: the specification, and `decisions.md` the decisions behind it.
 - `design/`: the signed-off screen renders.
 - `THIRD_PARTY_NOTICES.md`: licences of the bundled material.
+
+## Licence
+
+Apache License 2.0; see [LICENSE](LICENSE). Bundled fonts and other third-party
+material keep their own licences, listed in `THIRD_PARTY_NOTICES.md`.

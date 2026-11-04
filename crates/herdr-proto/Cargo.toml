@@ -3,6 +3,7 @@ name = "herdr-proto"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 serde_json = "1"

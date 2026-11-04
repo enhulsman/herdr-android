@@ -31,8 +31,10 @@ against this table:
 The home screen SHALL list every terminal that reports agent status across
 connected machines, showing name, machine, state and the state's age. The name
 SHALL be the terminal's `name`, else the program's display name, else its id.
-Terminals that never reported status SHALL appear in a collapsed "Other
-terminals" group, from which they can be opened.
+Terminals with no status now SHALL appear in a collapsed "Other terminals"
+group, from which they can be opened: those that never reported status, and
+those whose agent quit back to the shell (the core clears `status` then but
+keeps `reported`).
 
 #### Scenario: Two agents on WSL
 - **WHEN** WSL runs two Claude Code agents
@@ -41,6 +43,11 @@ terminals" group, from which they can be opened.
 #### Scenario: A build tab
 - **WHEN** a terminal running a build has never reported status
 - **THEN** it is listed under "Other terminals" and opens like any terminal
+
+#### Scenario: An agent quits back to its shell
+- **WHEN** the agent in a terminal quits and the terminal is a plain shell again
+- **THEN** it moves from the agent list to "Other terminals", the title-bar
+  swipe no longer stops at it, and a finish it had not shown counts as seen
 
 ### Requirement: Agents needing you come first
 The list SHALL be ordered: needs you, finished-unseen, working, idle; within a

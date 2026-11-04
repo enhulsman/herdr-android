@@ -1,13 +1,9 @@
 # Upstream clones and local build output (research only)
 research/src/
 research/build-android/
-# Reference shots: ignored except the four upstream herdr.dev images.
-# Mac screenshots show client project names: never commit them.
+# Reference shots stay local: Mac screenshots show client project names, and
+# the herdr.dev images are upstream's material. Never commit them.
 reference-shots/*
-!reference-shots/herdr-1-top.png
-!reference-shots/herdr-2-app.png
-!reference-shots/herdr-3-needs.png
-!reference-shots/herdr-4-machines.png
 # Build
 .gradle/
 .kotlin/

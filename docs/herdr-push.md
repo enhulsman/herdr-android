@@ -18,7 +18,9 @@ the time. Never screen text or the agent's message. ntfy only sees ciphertext.
 - Sub-agents and terminals that are not in a herdr-app pane stay quiet. Without
   a herdr-app layout every agent may alert.
 - Every 6 hours it sends a canary, so the phone can tell a quiet machine from a
-  broken alert path (after 13 hours of silence it shows "Alert health").
+  broken alert path (after 13 hours of silence it shows "Alert health"). With
+  Battery Saver on, Android holds back that check until Battery Saver is off
+  again.
 - It writes what ntfy last answered into the `hdroid-push-status` document on
   the core; the app shows "Last accepted by ntfy hh:mm" or "Alerts failing".
 - It only connects to an existing core and never starts one. With no core it

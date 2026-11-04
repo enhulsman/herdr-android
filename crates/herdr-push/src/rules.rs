@@ -537,6 +537,32 @@ mod tests {
         assert_eq!(r.record(), json!({"terminals": {}}));
     }
 
+    /// Issue 4: the core clears `status` when an agent quits to its shell.
+    fn quit(address: &str, turn: u64) -> Value {
+        let mut t = agent(address, "idle", turn);
+        t["status"] = Value::Null;
+        t
+    }
+
+    #[test]
+    fn an_agent_that_quits_while_alerted_clears_its_alert() {
+        let mut r = rules();
+        r.observe(&[agent("t1", "working", 0)], 0);
+        r.observe(&[agent("t1", "blocked", 0)], 0);
+        r.due(GRACE);
+        assert_eq!(r.observe(&[quit("t1", 0)], 40_000), vec![cleared("t1")]);
+        assert_eq!(r.open_alerts(), vec![]);
+    }
+
+    #[test]
+    fn an_agent_that_quits_before_its_finish_alert_is_due_sends_nothing() {
+        let mut r = rules();
+        r.observe(&[agent("t1", "working", 0)], 0);
+        r.observe(&[agent("t1", "idle", 1)], 1_000);
+        assert_eq!(r.observe(&[quit("t1", 1)], 2_000), vec![]);
+        assert_eq!(r.due(1_000 + GRACE), vec![]);
+    }
+
     #[test]
     fn the_record_keeps_state_turn_and_whether_it_was_cleared() {
         let mut r = rules();

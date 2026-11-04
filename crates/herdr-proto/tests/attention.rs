@@ -678,3 +678,120 @@ fn other_terminals_name_their_program() {
     assert_eq!(others[0].program.as_deref(), Some("make"));
     assert_eq!(others[1].program, None);
 }
+
+// ---- an agent that quit back to its shell (issue 4) ----
+// The core keeps `reported` true for good, but clears `status` when the agent
+// quits: the terminal is a shell again and belongs under "Other terminals".
+
+/// The terminal an agent quit in: a live shell that once reported.
+fn quit(address: &str, turn: u64) -> Value {
+    with(
+        with(agent(address, None, turn), "argv", json!(["/usr/bin/zsh"])),
+        "foreground",
+        json!({"name": "zsh", "cwd": "/home/me/src/api"}),
+    )
+}
+
+#[test]
+fn an_agent_that_quit_is_listed_under_other_terminals() {
+    let mut t = tracker_knowing_wsl();
+    t.observe(
+        WSL,
+        &[
+            agent("t1", Some("idle"), 2),
+            agent("t2", Some("working"), 0),
+        ],
+        1,
+    );
+    t.observe(WSL, &[quit("t1", 2), agent("t2", Some("working"), 0)], 2);
+    let rows = t.rows();
+    assert_eq!(rows.len(), 1, "the swipe walks agents only");
+    assert_eq!(rows[0].address, "t2");
+    let others = t.others();
+    assert_eq!(others.len(), 1);
+    assert_eq!(
+        (
+            others[0].address.as_str(),
+            others[0].name.as_str(),
+            others[0].folder.as_str()
+        ),
+        ("t1", "zsh", "api")
+    );
+}
+
+#[test]
+fn an_agent_quit_before_the_app_saw_it_is_an_other_terminal_from_the_start() {
+    let mut t = Tracker::default();
+    t.observe(WSL, &[quit("t1", 3)], 1);
+    assert!(t.rows().is_empty());
+    assert_eq!(t.others().len(), 1);
+}
+
+#[test]
+fn a_named_terminal_keeps_its_name_under_other_terminals() {
+    let mut t = tracker_knowing_wsl();
+    t.observe(WSL, &[with(quit("t1", 0), "name", json!("fix login"))], 1);
+    assert_eq!(t.others()[0].name, "fix login");
+}
+
+#[test]
+fn quitting_while_working_or_unseen_leaves_nothing_behind() {
+    for before in ["working", "blocked", "idle"] {
+        let mut t = tracker_knowing_wsl();
+        t.observe(WSL, &[agent("t1", Some("working"), 0)], 1);
+        t.observe(WSL, &[agent("t1", Some(before), 1)], 2);
+        t.observe(WSL, &[quit("t1", 1)], 3);
+        assert!(t.rows().is_empty(), "{before}");
+        assert_eq!(t.others().len(), 1, "{before}");
+    }
+}
+
+#[test]
+fn an_agent_started_again_in_the_same_terminal_is_a_row_again_and_not_done() {
+    // Turns 1-4 were all seen; the agent quits and a new one starts there.
+    let mut t = tracker_knowing_wsl();
+    t.observe(WSL, &[agent("t1", Some("working"), 3)], 1);
+    t.observe(WSL, &[agent("t1", Some("idle"), 4)], 2);
+    t.mark_seen(WSL, "t1");
+    t.observe(WSL, &[quit("t1", 4)], 3);
+    t.observe(WSL, &[agent("t1", Some("idle"), 4)], 4);
+    assert_eq!(state_of(&t, "t1"), Some(Attention::Idle));
+    assert!(t.others().is_empty());
+    // A turn it then finishes is unseen as usual.
+    t.observe(WSL, &[agent("t1", Some("working"), 4)], 5);
+    t.observe(WSL, &[agent("t1", Some("idle"), 5)], 6);
+    assert_eq!(state_of(&t, "t1"), Some(Attention::Done));
+}
+
+#[test]
+fn an_agent_started_again_after_an_app_restart_is_not_done() {
+    let mut t = tracker_knowing_wsl();
+    t.observe(WSL, &[agent("t1", Some("working"), 3)], 1);
+    t.observe(WSL, &[agent("t1", Some("idle"), 4)], 2);
+    t.mark_seen(WSL, "t1");
+    t.observe(WSL, &[quit("t1", 4)], 3);
+    let mut t = Tracker::restore(&t.memory());
+    t.observe(WSL, &[agent("t1", Some("idle"), 4)], 4);
+    assert_eq!(state_of(&t, "t1"), Some(Attention::Idle));
+}
+
+#[test]
+fn a_sub_agent_that_quit_stays_hidden() {
+    let mut t = tracker_knowing_wsl();
+    let sub = with(quit("t2", 1), "parent", json!("t1"));
+    t.observe(WSL, &[agent("t1", Some("working"), 0), sub], 1);
+    assert!(t.others().is_empty());
+    assert_eq!(t.rows().len(), 1);
+}
+
+#[test]
+fn quitting_after_an_unseen_finish_counts_it_as_seen() {
+    // Quitting happens at the desk: the person saw the finish there.
+    let mut t = tracker_knowing_wsl();
+    t.observe(WSL, &[agent("t1", Some("working"), 0)], 1);
+    t.observe(WSL, &[agent("t1", Some("idle"), 1)], 2);
+    assert_eq!(state_of(&t, "t1"), Some(Attention::Done));
+    t.observe(WSL, &[quit("t1", 1)], 3);
+    t.observe(WSL, &[agent("t1", Some("idle"), 1)], 4);
+    assert_eq!(state_of(&t, "t1"), Some(Attention::Idle));
+}

@@ -67,7 +67,8 @@ pub struct Row {
     pub request: Option<String>,
 }
 
-/// A terminal that never reported status ("Other terminals").
+/// A terminal with no status now ("Other terminals"): it never reported, or
+/// the agent in it quit back to its shell.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Other {
     pub machine: String,
@@ -115,9 +116,25 @@ fn busy(word: Option<&str>) -> bool {
     matches!(word, Some("working" | "blocked" | "error"))
 }
 
-/// A terminal that is its own row: live, reporting, not a sub-agent.
-fn is_agent(t: &Value) -> bool {
+/// A terminal the tracker follows: live, reported at some point, not a
+/// sub-agent. Its seen turn is kept while the agent in it has quit, so an
+/// agent started again there does not show an old finish as unseen.
+fn is_tracked(t: &Value) -> bool {
     t["state"] == "live" && t["reported"] == true && t["parent"].is_null()
+}
+
+/// A terminal that is its own row: tracked, with a status now. The core keeps
+/// `reported` once set but clears `status` when the agent quits (issue 4).
+fn is_agent(t: &Value) -> bool {
+    is_tracked(t) && !t["status"].is_null()
+}
+
+/// A terminal under "Other terminals": live, no status now, not a sub-agent
+/// that reported (those never show).
+fn is_other(t: &Value) -> bool {
+    t["state"] == "live"
+        && t["status"].is_null()
+        && (t["reported"] != true || t["parent"].is_null())
 }
 
 fn word_of(t: &Value) -> Option<String> {
@@ -192,7 +209,7 @@ impl Tracker {
         let looking = self.looking.clone();
         let m = self.machines.entry(machine.to_owned()).or_default();
         let mut agents = HashMap::new();
-        for t in terminals.iter().filter(|t| is_agent(t)) {
+        for t in terminals.iter().filter(|t| is_tracked(t)) {
             let Some(address) = t["address"].as_str() else {
                 continue;
             };
@@ -248,7 +265,8 @@ impl Tracker {
                     a
                 }
             };
-            if looked_at {
+            // Looked at on the phone, or quit at the desk (issue 4).
+            if looked_at || a.word.is_none() {
                 a.unseen = false;
             }
             if !a.unseen && !busy(a.word.as_deref()) {
@@ -308,14 +326,14 @@ impl Tracker {
         rows
     }
 
-    /// Live terminals that never reported status, per machine in the core's order.
+    /// Live terminals with no status now, per machine in the core's order.
     pub fn others(&self) -> Vec<Other> {
         self.machines
             .iter()
             .flat_map(|(name, m)| {
                 m.terminals
                     .iter()
-                    .filter(|t| t["state"] == "live" && t["reported"] != true)
+                    .filter(|t| is_other(t))
                     .filter_map(move |t| {
                         let address = t["address"].as_str()?;
                         Some(Other {

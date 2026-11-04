@@ -57,11 +57,11 @@ pushes and workflow runs.
 
 ## Obtainium setup
 
-1. On GitHub, create a fine-grained personal access token: repository access
-   "Only select repositories", this repository only; permission Contents:
-   read-only. Nothing else.
-2. In Obtainium, add the token under the GitHub source settings, then add the app
-   by this repository's GitHub URL.
+1. In Obtainium, add the app by this repository's GitHub URL.
+2. Optional: GitHub limits how often Obtainium may check without a token. If
+   checks fail, create a fine-grained personal access token with repository
+   access "Public repositories" and nothing else, and add it under Obtainium's
+   GitHub source settings.
 3. Leave background installing off. Obtainium may check for updates and notify
    you, but you install by hand after the checks above.
 

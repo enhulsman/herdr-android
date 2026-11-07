@@ -151,6 +151,8 @@ pub fn space_title(space: &Space, home: Option<&str>) -> String {
 
 /// The folders a terminal can start in on a machine without spaces: home
 /// first, then each live terminal's (its foreground's, else its own), once.
+/// A folder deleted under its terminal (Linux reports `<path> (deleted)`) is
+/// left out: starting there can only fail.
 pub fn folder_choices(terminals: &[Value], home: Option<&str>) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
@@ -168,7 +170,7 @@ pub fn folder_choices(terminals: &[Value], home: Option<&str>) -> Vec<String> {
         } else {
             f
         };
-        if f.starts_with('/') && seen.insert(f.to_owned()) {
+        if f.starts_with('/') && !f.ends_with(" (deleted)") && seen.insert(f.to_owned()) {
             out.push(f.to_owned());
         }
     }

@@ -190,7 +190,8 @@ async fn nothing_is_offered_until_the_layout_is_read() {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     assert_eq!(start_of(&r.hub.snapshot(), WS), None);
     let req = held.unwrap();
-    core.reply(&req, json!({"value": layout(), "version": 1})).await;
+    core.reply(&req, json!({"value": layout(), "version": 1}))
+        .await;
     r.until("spaces", |s| start_of(s, WS).is_some_and(|v| v.from_spaces))
         .await;
 }

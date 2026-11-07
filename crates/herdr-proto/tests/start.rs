@@ -115,6 +115,18 @@ fn folder_choices_are_home_first_then_each_live_folder_once() {
     );
 }
 
+// Phone check: Linux names a deleted working folder "<path> (deleted)", and
+// the sheet offered it as a place that could only fail.
+#[test]
+fn a_deleted_folder_is_not_offered() {
+    let terminals = [
+        term("t1", "/home/me/src/old (deleted)", None),
+        term("t2", "/home/me", Some("/home/me/tmp (deleted)")),
+        term("t3", "/home/me/src/api", None),
+    ];
+    assert_eq!(folder_choices(&terminals, None), vec!["/home/me/src/api"]);
+}
+
 #[test]
 fn folder_choices_without_home_list_only_live_folders() {
     let terminals = [term("t1", "/home/me/src/api", None)];

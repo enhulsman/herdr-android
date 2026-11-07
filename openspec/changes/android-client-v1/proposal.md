@@ -25,7 +25,7 @@ That is version 1. Version 1.1: **M4** spaces drawer, tab overview, sub-agent
 peek, wide layout for landscape and tablets, the other four themes; **M5** the
 view-only Changes panel.
 
-Not planned: starting new agents, closing or killing anything, editing
+Not planned: closing or killing anything, editing
 spaces/tabs, the Files panel, mods, the command palette, custom theme files,
 image paste. The Mac is out: the phone cannot SSH into it. Agents on WSL show up
 whether you started them from the Mac app or not.

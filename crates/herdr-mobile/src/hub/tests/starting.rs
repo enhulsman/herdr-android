@@ -163,6 +163,38 @@ async fn a_connected_machine_offers_its_spaces_and_installed_agents() {
     );
 }
 
+// Codex review: before the layout answered, a machine with spaces looked like
+// one without, and a start then made a new space instead of joining one.
+#[tokio::test(start_paused = true)]
+async fn nothing_is_offered_until_the_layout_is_read() {
+    let mut r = rig("st-unread");
+    r.add_trusted(WS, WS_KEY);
+    r.hub.resume();
+    let mut core = r.core().await;
+    core.serve_start = true;
+    core.connect("0.1.15", vec![]).await;
+    // Hold the layout read; answer the check.
+    let mut held = None;
+    while held.is_none() {
+        let req = core.request().await;
+        match req["method"].as_str() {
+            Some("doc.get") => held = Some(req),
+            Some("machine.exec") => core.reply(&req, found(&["claude"])).await,
+            _ => panic!("not a start read: {req}"),
+        }
+    }
+    let s = r
+        .until("connected", |s| state(s, WS).is_some_and(connected))
+        .await;
+    assert_eq!(start_of(&s, WS), None);
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    assert_eq!(start_of(&r.hub.snapshot(), WS), None);
+    let req = held.unwrap();
+    core.reply(&req, json!({"value": layout(), "version": 1})).await;
+    r.until("spaces", |s| start_of(s, WS).is_some_and(|v| v.from_spaces))
+        .await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_disconnected_machine_offers_nothing() {
     let mut r = rig("st-off");

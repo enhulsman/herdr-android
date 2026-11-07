@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
 private fun Root(app: HerdrApp) {
     val flows = rememberSaveable(saver = MachineFlows.saver(app.hubHost)) { MachineFlows(app.hubHost) }
     val isForeground = { app.foreground.isForeground }
-    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost, isForeground)) { AgentsHome(app.hubHost, isForeground = isForeground) }
+    val home = rememberSaveable(saver = AgentsHome.saver(app.hubHost, isForeground = isForeground)) { AgentsHome(app.hubHost, isForeground = isForeground) }
     // Back in the foreground with an agent's sheet open: a finish it shows is now seen.
     LifecycleEventEffect(Lifecycle.Event.ON_START) { home.onForeground() }
     val snapshot by app.hubHost.snapshot.collectAsState()

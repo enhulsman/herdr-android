@@ -223,17 +223,37 @@ class AgentsHome(
         /** How long a started terminal is waited for before it is given up. */
         const val STARTED_WAIT_MS = 10_000L
 
-        /** Keeps the open sheet and the group's state across rotation and process death. */
-        fun saver(hubHost: HubHost, isForeground: () -> Boolean): Saver<AgentsHome, Any> = listSaver(
-            save = { listOf(it.openKey?.machine, it.openKey?.address, it.othersExpanded) },
+        /**
+         * Keeps the open sheet, the group's state and a terminal still to open
+         * across rotation and process death: a started terminal's result is
+         * taken before the hub lists it, so it would not come again.
+         */
+        fun saver(
+            hubHost: HubHost,
+            now: () -> Long = { System.nanoTime() / 1_000_000 },
+            isForeground: () -> Boolean,
+        ): Saver<AgentsHome, Any> = listSaver(
+            save = {
+                listOf(
+                    it.openKey?.machine,
+                    it.openKey?.address,
+                    it.othersExpanded,
+                    it.pending?.machine,
+                    it.pending?.address,
+                    it.pendingUntil,
+                )
+            },
             restore = { saved ->
-                AgentsHome(hubHost, isForeground = isForeground).apply {
-                    val machine = saved[0] as String?
-                    val address = saved[1] as String?
-                    openKey = if (machine != null && address != null) AgentKey(machine, address) else null
+                AgentsHome(hubHost, now, isForeground).apply {
+                    openKey = key(saved[0] as String?, saved[1] as String?)
                     othersExpanded = saved[2] as Boolean
+                    pending = key(saved.getOrNull(3) as String?, saved.getOrNull(4) as String?)
+                    pendingUntil = saved.getOrNull(5) as Long?
                 }
             },
         )
+
+        private fun key(machine: String?, address: String?): AgentKey? =
+            if (machine != null && address != null) AgentKey(machine, address) else null
     }
 }

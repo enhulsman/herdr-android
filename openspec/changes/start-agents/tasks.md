@@ -31,5 +31,5 @@ file, never a stub script; the core's `shell` / `$SHELL` select them
 ## 4. Close-out
 
 - [x] 4.1 Strike "Not planned: starting new agents" from the V1 proposal; in the README move the item from "Planned (not yet specified)" to "Next (specified)" as "New terminals and agents from the phone: open a terminal in a space, or start an installed agent there"
-- [ ] 4.2 Phone check: a terminal in a space appears as a desk tab; the Claude Code shortcut starts through the alias and alerts with the desk app closed; quitting it leaves the shell; a machine with zero spaces gets a new space; the missing-folder error
+- [x] 4.2 Phone check: a terminal in a space appears as a desk tab; the Claude Code shortcut starts through the alias and alerts with the desk app closed; quitting it leaves the shell; a machine with zero spaces gets a new space; the missing-folder error
 - [x] 4.3 Release notes draft (shown verbatim before it ships)

@@ -133,7 +133,7 @@ pub struct MachineView {
     /// This phone's alerts here; None while alerts are off on the phone.
     #[uniffi(default = None)]
     pub alerts: Option<push::AlertsView>,
-    /// What the "New" sheet offers here; None unless connected.
+    /// What the "New" sheet offers here; None unless connected and the layout was read.
     #[uniffi(default = None)]
     pub start: Option<start::StartView>,
 }
@@ -1064,6 +1064,9 @@ fn build_snapshot(st: &State) -> HubSnapshot {
                     }),
                     start: live
                         .filter(|l| matches!(l.state, MachineState::Connected { .. }))
+                        // Before the layout answers, a machine with spaces would
+                        // look like one without, and a start would make a new space.
+                        .filter(|l| l.places.spaces.is_some())
                         .map(|l| start::view(&l.places, st.checks.get(&m.name))),
                     state,
                     last_connected_ms: m.last_connected_ms,

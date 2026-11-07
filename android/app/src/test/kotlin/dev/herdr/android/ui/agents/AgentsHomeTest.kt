@@ -2,6 +2,7 @@ package dev.herdr.android.ui.agents
 
 import dev.herdr.android.hub.FakeHub
 import dev.herdr.android.hub.HubHost
+import androidx.compose.runtime.saveable.SaverScope
 import java.util.concurrent.Executor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -409,6 +410,44 @@ class AgentsHomeTest {
         nowMs += 5_000
         publish(snapshot(ws, emptyList(), others = listOf(other("t9"))))
         assertNull(home.openKey)
+    }
+
+    /** [home] through its saver, as a rotation does. */
+    private fun rotated(): AgentsHome {
+        val saver = AgentsHome.saver(hubHost, now = { nowMs }) { foreground }
+        val saved = with(saver) { SaverScope { true }.save(home) }!!
+        return saver.restore(saved)!!
+    }
+
+    // Codex review: a rotation between the start's answer and the snapshot
+    // listing it lost the opening, and the started result was already taken.
+    @Test
+    fun aStartedTerminalStillOpensAfterARotation() {
+        home.openWhenStarted(key("t9"))
+        nowMs += 2_000
+        val after = rotated()
+        listener.onSnapshot(snapshot(ws, emptyList(), others = listOf(other("t9"))))
+        after.onSnapshot(snapshot(ws, emptyList(), others = listOf(other("t9"))))
+        assertEquals(key("t9"), after.openKey)
+    }
+
+    @Test
+    fun aRotationKeepsTheStartedTerminalsDeadline() {
+        home.openWhenStarted(key("t9"))
+        val after = rotated()
+        nowMs += 10_001
+        listener.onSnapshot(snapshot(ws, emptyList(), others = listOf(other("t9"))))
+        after.onSnapshot(snapshot(ws, emptyList(), others = listOf(other("t9"))))
+        assertNull(after.openKey)
+    }
+
+    @Test
+    fun aTappedAlertStillOpensAfterARotation() {
+        home.openWhenListed(key("t3"))
+        val after = rotated()
+        listener.onSnapshot(snapshot(ws, listOf(row("t3", AgentAttention.NEEDS_YOU))))
+        after.onSnapshot(snapshot(ws, listOf(row("t3", AgentAttention.NEEDS_YOU))))
+        assertEquals(key("t3"), after.openKey)
     }
 
     @Test

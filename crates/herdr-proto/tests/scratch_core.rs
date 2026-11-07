@@ -721,6 +721,10 @@ fn core_with_alias(session: &str, shell: &str) -> Option<Core> {
     let alias = format!("alias claude={}\n", marker.display());
     std::fs::write(home.join(".zshrc"), &alias).unwrap();
     std::fs::write(home.join(".bashrc"), &alias).unwrap();
+    // Ubuntu's /etc/zsh/zshrc runs compinit, which in a terminal stops at
+    // "insecure directories ... [y/n]" where the fpath folders are not root's
+    // (CI runners): the test is about the alias, not the distro's completion.
+    std::fs::write(home.join(".zshenv"), "skip_global_compinit=1\n").unwrap();
     std::fs::create_dir_all(home.join("src/website")).unwrap();
     Some(core)
 }
@@ -823,10 +827,20 @@ fn agent_start_runs_the_alias_and_the_shell_stays(shell: &str, session: &str) {
             .unwrap();
         let address = run["address"].as_str().unwrap().to_owned();
         let ran = home.join("ran");
-        let pwd = eventually("the alias's marker", async || {
-            std::fs::read_to_string(&ran).ok()
-        })
-        .await;
+        let deadline = tokio::time::Instant::now() + WAIT;
+        let pwd = loop {
+            if let Ok(pwd) = std::fs::read_to_string(&ran) {
+                break pwd;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                let shown = c
+                    .client
+                    .call("terminal.read", json!({"terminal": address, "lines": 20}))
+                    .await;
+                panic!("timed out waiting for the alias's marker; the terminal shows:\n{shown:#?}");
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        };
         assert_eq!(pwd.trim(), folder);
         // The marker exited 0: the person's shell takes its place, same folder.
         let rec = eventually("the shell in the foreground", async || {

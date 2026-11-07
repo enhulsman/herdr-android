@@ -65,11 +65,11 @@ go to the app's notifications, open "Finished", and set it to alerting.
 - Four more themes, chosen per light and dark mode.
 - A view-only Changes panel: an agent's git changes, to review before you
   approve.
+- New terminals and agents from the phone: open a terminal in a space, or start
+  an installed agent there.
 
 **Planned (not yet specified):**
 
-- **Start agents from the phone:** pick a machine and what to run, and a new
-  agent starts there.
 - **An always-on status notification** (optional): every agent's state in one
   notification, kept up to date, with the connection kept open so the app opens
   at once. Possibly as a live status chip in the status bar on recent Android

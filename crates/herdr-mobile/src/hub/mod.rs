@@ -170,6 +170,8 @@ pub struct AgentRow {
     pub progress: Option<u8>,
     pub since_ms: Option<u64>,
     pub folder: String,
+    /// Where the desk shows it, "website / 2"; none when not placed.
+    pub place: Option<String>,
     /// For the icon: "claude", "codex", ...; none when unknown.
     pub program: Option<String>,
     /// Needs you or error: the card's heading ("Permission", "Needs you", "Error").
@@ -189,6 +191,7 @@ impl From<attention::Row> for AgentRow {
             progress: r.progress,
             since_ms: r.since_ms,
             folder: r.folder,
+            place: r.place,
             program: r.program,
             request_kind: r.request_kind,
             request: r.request,
@@ -203,6 +206,8 @@ pub struct OtherTerminal {
     pub address: String,
     pub name: String,
     pub folder: String,
+    /// Where the desk shows it, "website / 2"; none when not placed.
+    pub place: Option<String>,
     pub program: Option<String>,
 }
 
@@ -213,6 +218,7 @@ impl From<attention::Other> for OtherTerminal {
             address: o.address,
             name: o.name,
             folder: o.folder,
+            place: o.place,
             program: o.program,
         }
     }

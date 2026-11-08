@@ -21,6 +21,12 @@ data class AlertNote(
     val text: String?,
     /** Tapping it opens this agent's terminal; null opens the app. */
     val open: AgentKey?,
+    /**
+     * What a locked phone that hides sensitive content shows instead: no
+     * agent name, as that may be a session title (spec agent-names). Null:
+     * Android's own "contents hidden".
+     */
+    val publicTitle: String? = null,
 )
 
 /** Where notes go: Android's notification manager, or a test's list. */
@@ -36,7 +42,8 @@ interface AlertSink {
  * path. Every other push counts as word from its machine and clears that
  * machine's health notice; a muted machine's pushes post nothing. Notification
  * text carries the agent's name, the kind and the machine only, never screen
- * text or the program's message (the payload has neither).
+ * text or the program's message (the payload has neither). The name may be a
+ * session title, so each agent note has a public version without it.
  * [timeText] formats a time of day ("14:02").
  */
 class Alerts(
@@ -68,6 +75,7 @@ class Alerts(
                             res.getString(R.string.alert_test_title, machine),
                             res.getString(R.string.alert_test_text),
                             open = null,
+                            publicTitle = res.getString(R.string.alert_test_title, machine),
                         ),
                     )
                 }
@@ -106,11 +114,13 @@ class Alerts(
         val open = AgentKey(machine, terminal)
         val tag = agentTag(machine, terminal)
         if (push.state == "done") {
-            return AlertNote(AlertChannel.Finished, tag, res.getString(R.string.alert_finished_title, name, machine), null, open)
+            val public = res.getString(R.string.alert_finished_public, machine)
+            return AlertNote(AlertChannel.Finished, tag, res.getString(R.string.alert_finished_title, name, machine), null, open, public)
         }
         val kind = if (push.state == "error") res.getString(R.string.alert_kind_error) else push.kind?.let(::capitalized)
         val text = kind?.let { res.getString(R.string.alert_body, it, machine) } ?: machine
-        return AlertNote(AlertChannel.NeedsYou, tag, res.getString(R.string.alert_needs_you_title, name), text, open)
+        val public = res.getString(R.string.alert_needs_you_public, machine)
+        return AlertNote(AlertChannel.NeedsYou, tag, res.getString(R.string.alert_needs_you_title, name), text, open, public)
     }
 
     private data class Push(

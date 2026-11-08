@@ -32,8 +32,8 @@ class AlertsTest {
     private fun push(json: String, decrypted: Boolean = true, now: Long = NOW) =
         alerts.onMessage(json.toByteArray(), decrypted, now)
 
-    private fun alert(state: String, kind: String? = null, name: String = "docs nav", machine: String = "workstation") =
-        """{"v":1,"type":"alert","machine":"$machine","terminal":"t3","name":"$name","state":"$state"""" +
+    private fun alert(state: String, kind: String? = null, name: String = "docs nav", machine: String = "workstation", terminal: String = "t3") =
+        """{"v":1,"type":"alert","machine":"$machine","terminal":"$terminal","name":"$name","state":"$state"""" +
             (kind?.let { ""","kind":"$it"""" } ?: "") + ""","at":5}"""
 
     @Test
@@ -71,6 +71,32 @@ class AlertsTest {
         assertEquals("og tags finished · workstation", note.title)
         assertNull(note.text)
         assertEquals(AgentKey("workstation", "t3"), note.open)
+    }
+
+    // session-names: a session title in the name, hidden on a private lock
+    // screen behind a fixed public version.
+    @Test
+    fun aSessionTitleNamesTheAlert() {
+        push(alert("done", name = "Pricing page copy"))
+        assertEquals("Pricing page copy finished · workstation", sink.posted.single().title)
+    }
+
+    @Test
+    fun agentAlertsHaveAPublicVersionWithoutTheName() {
+        push(alert("blocked", kind = "permission", name = "Pricing page copy"))
+        push(alert("error", name = "Pricing page copy", terminal = "t4"))
+        push(alert("done", name = "Pricing page copy", terminal = "t5"))
+        assertEquals(
+            listOf("An agent needs you · workstation", "An agent needs you · workstation", "An agent finished · workstation"),
+            sink.posted.map { it.publicTitle },
+        )
+        assertTrue(sink.posted.none { it.publicTitle!!.contains("Pricing") })
+    }
+
+    @Test
+    fun theTestAlertHasAPublicVersion() {
+        push("""{"v":1,"type":"test","machine":"workstation","at":5}""")
+        assertEquals("Test alert from workstation", sink.posted.single().publicTitle)
     }
 
     @Test

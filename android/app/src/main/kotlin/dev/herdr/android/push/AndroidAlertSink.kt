@@ -29,8 +29,10 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
     fun createChannels() {
         manager.createNotificationChannels(
             listOf(
-                NotificationChannel(AlertChannel.NeedsYou.id, context.getString(R.string.channel_needs_you), NotificationManager.IMPORTANCE_HIGH)
-                    .apply { lockscreenVisibility = Notification.VISIBILITY_PUBLIC },
+                // No lock-screen override: Android ignores one set by the app
+                // (checked on the phone, session-names task 3.0); each note's
+                // public version and the phone's own setting decide.
+                NotificationChannel(AlertChannel.NeedsYou.id, context.getString(R.string.channel_needs_you), NotificationManager.IMPORTANCE_HIGH),
                 NotificationChannel(AlertChannel.Finished.id, context.getString(R.string.channel_finished), NotificationManager.IMPORTANCE_LOW),
                 NotificationChannel(AlertChannel.Health.id, context.getString(R.string.channel_alert_health), NotificationManager.IMPORTANCE_LOW),
             ),
@@ -55,6 +57,17 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
             .setContentIntent(tap)
             .setAutoCancel(true)
             .setCategory(if (note.channel == AlertChannel.Health) Notification.CATEGORY_STATUS else Notification.CATEGORY_MESSAGE)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .apply {
+                note.publicTitle?.let { title ->
+                    setPublicVersion(
+                        Notification.Builder(context, note.channel.id)
+                            .setSmallIcon(R.drawable.ic_notification)
+                            .setContentTitle(title)
+                            .build(),
+                    )
+                }
+            }
             .build()
         manager.notify(note.tag, ID, notification)
     }

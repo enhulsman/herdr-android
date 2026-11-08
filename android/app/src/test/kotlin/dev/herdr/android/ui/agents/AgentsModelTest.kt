@@ -54,6 +54,32 @@ class AgentsModelTest {
         assertEquals("website · workstation", ui.idle.single().lineTwo)
     }
 
+    // session-names: the desk's place replaces the folder when there is one.
+    @Test
+    fun lineTwoIsTheDeskPlaceThenTheMachine() {
+        val ui = ui(
+            snapshot(
+                listOf(connected("workstation")),
+                listOf(row("t1", AgentAttention.IDLE, name = "Pricing page copy", folder = "website", place = "website / 2")),
+                others = listOf(other("t3", folder = "api", place = "api / 1")),
+            ),
+        )
+        assertEquals("Pricing page copy", ui.idle.single().name)
+        assertEquals("website / 2 · workstation", ui.idle.single().lineTwo)
+        assertEquals("api / 1 · workstation", ui.others.single().lineTwo)
+    }
+
+    @Test
+    fun theTerminalHeaderShowsTheSessionAndThePlace() {
+        val s = snapshot(
+            listOf(connected("workstation")),
+            listOf(row("t1", AgentAttention.WORKING, name = "Pricing page copy", place = "website / 2")),
+        )
+        val header = dev.herdr.android.ui.terminal.terminalUi(s, AgentKey("workstation", "t1"), res).header
+        assertEquals("Pricing page copy", header.name)
+        assertEquals("website / 2 · workstation", header.lineTwo)
+    }
+
     @Test
     fun aCardShowsTheKindAboveTheRequest() {
         val blocked = row("t1", AgentAttention.NEEDS_YOU, label = "Permission: Run npm test?", kind = "Permission", request = "Run npm test?")

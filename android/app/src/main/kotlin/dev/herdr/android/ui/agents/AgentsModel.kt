@@ -145,7 +145,7 @@ private fun agentRow(r: AgentRow, asOf: String?, res: Resources) = AgentRowUi(
     icon = programIcon(r.program),
     attention = r.attention,
     folder = r.folder,
-    lineTwo = res.getString(R.string.agents_line_two, r.folder, r.machine),
+    lineTwo = res.getString(R.string.agents_line_two, r.place ?: r.folder, r.machine),
     sinceMs = r.sinceMs?.toLong(),
     progress = r.progress?.let { it.toInt().coerceIn(0, 100) / 100f },
     asOf = asOf,
@@ -159,7 +159,7 @@ private fun otherRow(o: OtherTerminal, asOf: String?, res: Resources) = OtherRow
     name = o.name,
     icon = programIcon(o.program),
     folder = o.folder,
-    lineTwo = res.getString(R.string.agents_line_two, o.folder, o.machine),
+    lineTwo = res.getString(R.string.agents_line_two, o.place ?: o.folder, o.machine),
     asOf = asOf,
 )
 

@@ -18,7 +18,8 @@ import uniffi.herdr_mobile.PushRegistration
 // a cause" (one notice after 13 h, cleared by the next push), "Mute per
 // machine" (dropped, still counts for health), "A test alert proves the path".
 // design-tokens.json notification: title "<agent> needs you" / "<agent>
-// finished · <machine>", body "<kind> · <machine>", never screen text or msg.
+// finished", body "<kind> · <place> · <machine>" with absent parts left out,
+// never screen text or msg.
 @RunWith(RobolectricTestRunner::class)
 class AlertsTest {
     private val context: Context = RuntimeEnvironment.getApplication()
@@ -32,9 +33,16 @@ class AlertsTest {
     private fun push(json: String, decrypted: Boolean = true, now: Long = NOW) =
         alerts.onMessage(json.toByteArray(), decrypted, now)
 
-    private fun alert(state: String, kind: String? = null, name: String = "docs nav", machine: String = "workstation", terminal: String = "t3") =
+    private fun alert(
+        state: String,
+        kind: String? = null,
+        name: String = "docs nav",
+        machine: String = "workstation",
+        terminal: String = "t3",
+        place: String? = null,
+    ) =
         """{"v":1,"type":"alert","machine":"$machine","terminal":"$terminal","name":"$name","state":"$state"""" +
-            (kind?.let { ""","kind":"$it"""" } ?: "") + ""","at":5}"""
+            (kind?.let { ""","kind":"$it"""" } ?: "") + (place?.let { ""","place":"$it"""" } ?: "") + ""","at":5}"""
 
     @Test
     fun blockedPostsNeedsYouWithKindAndMachineAndOpensTheTerminal() {
@@ -63,14 +71,61 @@ class AlertsTest {
     }
 
     @Test
-    fun doneGoesToFinishedOnOneLine() {
+    fun doneGoesToFinishedWithTheMachineOnTheSecondLine() {
         push(alert("done", name = "og tags"))
         val note = sink.posted.single()
         assertEquals(AlertChannel.Finished, note.channel)
         assertEquals("agent:workstation/t3", note.tag)
-        assertEquals("og tags finished · workstation", note.title)
-        assertNull(note.text)
+        assertEquals("og tags finished", note.title)
+        assertEquals("workstation", note.text)
         assertEquals(AgentKey("workstation", "t3"), note.open)
+    }
+
+    // notification-place: the desk's "space / tab" on the second line, before
+    // the machine; left out when the push has none (an older herdr-push, or a
+    // terminal not placed yet).
+    @Test
+    fun needsYouSaysWhereTheSessionSits() {
+        push(alert("blocked", kind = "permission", name = "Pricing page copy", place = "website / 2"))
+        val note = sink.posted.single()
+        assertEquals("Pricing page copy needs you", note.title)
+        assertEquals("Permission · website / 2 · workstation", note.text)
+    }
+
+    @Test
+    fun needsYouWithoutAKindStillSaysWhere() {
+        push(alert("blocked", place = "website / 2"))
+        assertEquals("website / 2 · workstation", sink.posted.single().text)
+    }
+
+    @Test
+    fun anErrorSaysWhereToo() {
+        push(alert("error", place = "api / 1"))
+        assertEquals("Error · api / 1 · workstation", sink.posted.single().text)
+    }
+
+    @Test
+    fun finishedSaysWhereTheSessionSits() {
+        push(alert("done", name = "Pricing page copy", place = "website / 2"))
+        val note = sink.posted.single()
+        assertEquals("Pricing page copy finished", note.title)
+        assertEquals("website / 2 · workstation", note.text)
+    }
+
+    @Test
+    fun aBlankPlaceIsLeftOut() {
+        push(alert("blocked", kind = "permission", place = "  "))
+        assertEquals("Permission · workstation", sink.posted.single().text)
+    }
+
+    @Test
+    fun thePublicVersionDoesNotSayWhere() {
+        push(alert("blocked", kind = "permission", place = "website / 2"))
+        push(alert("done", terminal = "t4", place = "website / 2"))
+        assertEquals(
+            listOf("An agent needs you · workstation", "An agent finished · workstation"),
+            sink.posted.map { it.publicTitle },
+        )
     }
 
     // session-names: a session title in the name, hidden on a private lock
@@ -78,7 +133,7 @@ class AlertsTest {
     @Test
     fun aSessionTitleNamesTheAlert() {
         push(alert("done", name = "Pricing page copy"))
-        assertEquals("Pricing page copy finished · workstation", sink.posted.single().title)
+        assertEquals("Pricing page copy finished", sink.posted.single().title)
     }
 
     @Test

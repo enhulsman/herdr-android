@@ -249,14 +249,13 @@
     <string name="channel_needs_you">Needs you</string>
     <string name="channel_finished">Finished</string>
     <string name="channel_alert_health">Alert health</string>
-    <!-- Notifications (render 6, design-tokens.json notification): the agent's name, the kind and the machine only. -->
+    <!-- Notifications (render 6, design-tokens.json notification): the agent's name, the kind, the desk's place and the machine only. -->
     <string name="alert_needs_you_title">%1$s needs you</string>
-    <!-- %1$s the agent, %2$s the machine. -->
-    <string name="alert_finished_title">%1$s finished · %2$s</string>
+    <string name="alert_finished_title">%1$s finished</string>
     <!-- On a locked phone that hides sensitive content (spec agent-names): %1$s the machine. -->
     <string name="alert_needs_you_public">An agent needs you · %1$s</string>
     <string name="alert_finished_public">An agent finished · %1$s</string>
-    <!-- %1$s the kind ("Permission"), %2$s the machine. -->
+    <!-- Joins the second line's parts: the kind ("Permission"), the desk's place ("website / 2"), the machine. -->
     <string name="alert_body">%1$s · %2$s</string>
     <string name="alert_kind_error">Error</string>
     <string name="alert_test_title">Test alert from %1$s</string>

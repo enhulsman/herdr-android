@@ -533,8 +533,8 @@
         "Finished (quiet)",
         "Alert health (quiet)"
       ],
-      "title": "'<agent> needs you' / '<agent> finished · <machine>'",
-      "body": "'<kind> · <machine>'",
+      "title": "'<agent> needs you' / '<agent> finished'",
+      "body": "'<kind> · <place> · <machine>' / '<place> · <machine>', absent parts left out",
       "never": "screen text or msg"
     },
     "button": {

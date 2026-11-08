@@ -410,11 +410,13 @@ fn push_of(action: Action) -> Push {
         Action::Alert {
             terminal,
             name,
+            place,
             state,
             kind,
         } => Push::Alert {
             terminal,
             name,
+            place,
             state,
             kind,
         },

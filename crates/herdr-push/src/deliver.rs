@@ -2,7 +2,8 @@
 //! minimal, and sent only to the allowlisted host").
 //!
 //! The payload carries only `{v, type, machine, terminal?, name?, state?, kind?,
-//! at}`: never screen text or the program's `msg`. A push goes only to an
+//! at}`: never screen text or the program's `msg`. `name` may be a session
+//! title (spec agent-names), which the phone hides on a private lock screen. A push goes only to an
 //! endpoint whose scheme, host and port match an allowlist entry, over https;
 //! the ntfy token goes with it, so it reaches no other host.
 
@@ -255,6 +256,25 @@ mod tests {
         assert_eq!(
             payload(&Push::Test, "w", 5),
             json!({"v": 1, "type": "test", "machine": "w", "at": 5})
+        );
+    }
+
+    // session-names: the longest name the rule makes (80 characters, each up
+    // to 4 bytes) and a 32-character machine stay far inside the 4 KiB body.
+    #[test]
+    fn the_longest_session_name_fits_the_body() {
+        let push = Push::Alert {
+            terminal: "t1zz".into(),
+            name: format!("{}…", "\u{1F600}".repeat(79)),
+            state: Word::Blocked,
+            kind: Some("permission".into()),
+        };
+        let plain = payload(&push, &"m".repeat(32), u64::MAX).to_string();
+        // aes128gcm adds an 86-byte header, a padding byte and a 16-byte tag.
+        assert!(
+            plain.len() + 103 < crate::webpush::MAX_BODY / 4,
+            "{} bytes",
+            plain.len()
         );
     }
 

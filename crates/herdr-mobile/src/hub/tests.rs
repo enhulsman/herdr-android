@@ -762,6 +762,42 @@ async fn events_move_rows_and_needing_you_comes_first() {
     assert_eq!(top.folder, "website");
 }
 
+// session-names: rows carry the session title and the desk's place, and a
+// title event renames the row.
+#[tokio::test(start_paused = true)]
+async fn rows_carry_the_session_title_and_the_desk_place() {
+    let mut rig = rig("names");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    let mut titled = agent("t1", "working", 0);
+    titled["title"] = json!("Pricing page copy");
+    titled["labels"] = json!({"herdr.space": "sp1", "where": "website / 2"});
+    let mut shell = agent("t3", "idle", 0);
+    shell["status"] = Value::Null;
+    shell["reported"] = json!(false);
+    shell["argv"] = json!(["/usr/bin/zsh"]);
+    shell["title"] = json!("dev@host: ~/src");
+    shell["labels"] = json!({"herdr.space": "sp1", "where": "website / 3"});
+    core.connect("0.1.15", vec![titled, shell]).await;
+    let s = rig
+        .until("rows", |s| !s.agents.is_empty() && !s.others.is_empty())
+        .await;
+    assert_eq!(s.agents[0].name, "Pricing page copy");
+    assert_eq!(s.agents[0].place.as_deref(), Some("website / 2"));
+    assert_eq!(s.others[0].name, "zsh");
+    assert_eq!(s.others[0].place.as_deref(), Some("website / 3"));
+
+    core.event(1, "title", "t1", json!({"title": "Fix login redirect"}))
+        .await;
+    rig.until("renamed", |s| {
+        s.agents
+            .first()
+            .is_some_and(|r| r.name == "Fix login redirect")
+    })
+    .await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn terminals_that_never_reported_are_other_terminals() {
     let mut rig = rig("others");

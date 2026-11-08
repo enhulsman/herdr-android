@@ -58,6 +58,8 @@ pub struct Row {
     pub since_ms: Option<u64>,
     /// The folder it works in now, as a name.
     pub folder: String,
+    /// Where the desk shows it, "website / 2" (see [`place_of`]).
+    pub place: Option<String>,
     /// Which program it is, for its icon: "claude", "codex", ... (see [`program_id`]).
     pub program: Option<String>,
     /// Needs you or error: the card's heading ("Permission", "Question",
@@ -75,6 +77,8 @@ pub struct Other {
     pub address: String,
     pub name: String,
     pub folder: String,
+    /// Where the desk shows it, "website / 2" (see [`place_of`]).
+    pub place: Option<String>,
     /// The command's file name ("make"), if it has one.
     pub program: Option<String>,
 }
@@ -341,6 +345,7 @@ impl Tracker {
                             address: address.to_owned(),
                             name: name_of(t, address),
                             folder: folder_of(t),
+                            place: place_of(t),
                             program: program_of(t),
                         })
                     })
@@ -385,7 +390,7 @@ fn row(machine: &str, address: &str, t: &Value, a: &Agent) -> Row {
     Row {
         machine: machine.to_owned(),
         address: address.to_owned(),
-        name: name_of(t, address),
+        name: agent_name_of(t, address),
         attention,
         label,
         progress: t
@@ -395,6 +400,7 @@ fn row(machine: &str, address: &str, t: &Value, a: &Agent) -> Row {
             .map(|p| p as u8),
         since_ms: a.since_ms,
         folder: folder_of(t),
+        place: place_of(t),
         program: program_of(t),
         request_kind,
         request,
@@ -440,12 +446,23 @@ fn capitalized(s: &str) -> String {
         .unwrap_or_default()
 }
 
-/// The terminal's name, else the program's display name, else its id.
+/// An agent's name: the terminal's name, else the session title the program
+/// set, else as [`name_of`] (session-names D1).
+fn agent_name_of(t: &Value, address: &str) -> String {
+    t["name"]
+        .as_str()
+        .and_then(clean)
+        .or_else(|| t["title"].as_str().and_then(clean))
+        .unwrap_or_else(|| name_of(t, address))
+}
+
+/// The terminal's name, else the program's display name, else its id. Never
+/// its title: a shell's prompt sets titles like "user@host: ~/src".
 fn name_of(t: &Value, address: &str) -> String {
-    let nonempty = |v: &Value| v.as_str().filter(|s| !s.is_empty()).map(str::to_owned);
-    if let Some(name) = nonempty(&t["name"]) {
+    if let Some(name) = t["name"].as_str().and_then(clean) {
         return name;
     }
+    let nonempty = |v: &Value| v.as_str().filter(|s| !s.is_empty()).map(str::to_owned);
     if let Some(app) = t.pointer("/status/app").and_then(nonempty) {
         return agent_name(&app);
     }
@@ -457,6 +474,43 @@ fn name_of(t: &Value, address: &str) -> String {
         return program;
     }
     address.to_owned()
+}
+
+/// Where the desk shows the terminal: its `where` label ("website / 2"), only
+/// while it sits in a space. Parking empties `herdr.space` but may leave
+/// `where` behind (session-names D2).
+fn place_of(t: &Value) -> Option<String> {
+    let label = |k: &str| t.pointer(&format!("/labels/{k}")).and_then(Value::as_str);
+    label("herdr.space").filter(|s| !s.trim().is_empty())?;
+    label("where").and_then(clean)
+}
+
+/// The longest name or place shown, in characters, the ellipsis included.
+const MAX_CHARS: usize = 80;
+
+/// Text a program or the desk set, made fit to show: control characters
+/// dropped, whitespace runs one space, trimmed, cut to [`MAX_CHARS`] on a
+/// char boundary. None when nothing is left.
+fn clean(text: &str) -> Option<String> {
+    let spaced: String = text
+        .chars()
+        .filter_map(|c| match c {
+            c if c.is_whitespace() => Some(' '),
+            c if c.is_control() => None,
+            c => Some(c),
+        })
+        .collect();
+    let joined = spaced.split_whitespace().collect::<Vec<_>>().join(" ");
+    if joined.is_empty() {
+        return None;
+    }
+    if joined.chars().count() <= MAX_CHARS {
+        return Some(joined);
+    }
+    let mut cut: String = joined.chars().take(MAX_CHARS - 1).collect();
+    cut.truncate(cut.trim_end().len());
+    cut.push('…');
+    Some(cut)
 }
 
 /// How people call an agent, from its 7501 `app`.

@@ -353,6 +353,28 @@ mod tests {
         assert_eq!(r.open_alerts(), vec![]);
     }
 
+    // session-names: the alert names the session; a title change while the
+    // alert waits neither delays nor repeats it.
+    #[test]
+    fn an_alert_names_the_session_by_its_title() {
+        let titled = |title: &str| {
+            let mut t = agent("t1", "blocked", 0);
+            t["title"] = title.into();
+            t
+        };
+        let mut r = rules();
+        r.observe(&[agent("t1", "working", 0)], 0);
+        r.observe(&[titled("Pricing page copy")], 1_000);
+        r.observe(&[titled("Fix login redirect")], 2_000);
+        let mut want = alert("t1", Word::Blocked);
+        if let Action::Alert { name, .. } = &mut want {
+            *name = "Fix login redirect".into();
+        }
+        assert_eq!(r.due(1_000 + GRACE), vec![want.clone()]);
+        assert_eq!(r.due(3 * GRACE), vec![]);
+        assert_eq!(r.open_alerts(), vec![want]);
+    }
+
     #[test]
     fn blocked_past_the_grace_delay_alerts_exactly_once() {
         let mut r = rules();

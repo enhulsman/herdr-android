@@ -30,7 +30,8 @@ against this table:
 ### Requirement: One list of agents across machines
 The home screen SHALL list every terminal that reports agent status across
 connected machines, showing name, machine, state and the state's age. The name
-SHALL be the terminal's `name`, else the program's display name, else its id.
+SHALL follow capability agent-names (the terminal's `name`, else the session
+title, else the program's display name, else its id).
 Terminals with no status now SHALL appear in a collapsed "Other terminals"
 group, from which they can be opened: those that never reported status, and
 those whose agent quit back to the shell (the core clears `status` then but

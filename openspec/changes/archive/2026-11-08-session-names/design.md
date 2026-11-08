@@ -103,7 +103,6 @@ new dependency.
   what the desk shows too.
 - Agents other than Claude Code may not set a title; they keep the program
   name.
-- Claude Code may prefix its title with a spinner or "✳" glyph during a turn;
-  checked only between turns so far. If it does, the row would rename many
-  times a second. Task 4.2 samples the title mid-turn; if glyphs show, a
-  leading run of non-alphanumeric characters is stripped and a scenario added.
+- Claude Code may prefix its title with a spinner or "✳" glyph during a turn:
+  sampled mid-turn on WSL 2026-11-08 (five reads over 3 s while working), the
+  title stayed plain, so nothing is stripped.

@@ -21,6 +21,6 @@ names (website, api, docs; "Pricing page copy").
 
 ## 4. Check and release
 
-- [ ] 4.1 Codex review of the branch
-- [ ] 4.2 Phone check: titled rows and place lines for sessions on WSL; rename and reorder a tab at the desk and see whether `where` follows (D2 risk); sample an agent's `title` mid-turn for spinner glyphs (design, open risks); with sensitive content hidden, a locked phone shows the public version and the title after unlocking; "Needs you" still alerts with sound
+- [x] 4.1 Codex review of the branch
+- [x] 4.2 Phone check (2026-11-08, debug build, herdr-push from this branch on WSL): titled rows and "space / tab · WSL" lines for the real sessions; a test terminal titled "Pricing page copy" alerted as "Pricing page copy needs you"; locked with sensitive content hidden, the lock screen showed "An agent needs you · WSL" (v0.2.0 beside it showed only "herdr"); titles sampled mid-turn carry no glyphs; "Needs you" alerted on its existing channel. Not checked: a tab rename or reorder at the desk (the desk app was not running), so `where` following a rename stays the open risk in design D2
 - [ ] 4.3 Archive the change; release notes tell you to update `herdr-push`

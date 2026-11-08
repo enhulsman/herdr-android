@@ -52,6 +52,8 @@ pub enum Action {
     Alert {
         terminal: String,
         name: String,
+        /// The desk's "space / tab" (spec agent-names), when it is placed.
+        place: Option<String>,
         state: Word,
         /// The program's request kind ("permission", "question"), blocked only.
         kind: Option<String>,
@@ -169,19 +171,14 @@ impl Rules {
             .filter(|(_, p)| p.due_ms <= now_ms)
             .map(|(a, p)| (a.clone(), *p))
             .collect();
-        let rows: BTreeMap<String, String> = self
-            .tracker
-            .rows()
-            .into_iter()
-            .map(|r| (r.address, r.name))
-            .collect();
+        let rows = self.names();
         let mut actions = Vec::new();
         for (address, p) in ready {
             self.pending.remove(&address);
             if !self.placed(&address) {
                 continue;
             }
-            let Some(name) = rows.get(&address) else {
+            let Some((name, place)) = rows.get(&address) else {
                 continue;
             };
             let kind = self.kind(&address, p.word);
@@ -196,6 +193,7 @@ impl Rules {
             actions.push(Action::Alert {
                 terminal: address,
                 name: name.clone(),
+                place: place.clone(),
                 state: p.word,
                 kind,
             });
@@ -206,24 +204,29 @@ impl Rules {
     /// The needs-you alerts sent and not cleared, as they would go out now: for
     /// a phone that registers while they are open (it missed them).
     pub fn open_alerts(&self) -> Vec<Action> {
-        let rows: BTreeMap<String, String> = self
-            .tracker
-            .rows()
-            .into_iter()
-            .map(|r| (r.address, r.name))
-            .collect();
+        let rows = self.names();
         self.record
             .iter()
             .filter(|(_, a)| a.word.needs_you() && !a.cleared)
             .filter_map(|(address, a)| {
-                let name = rows.get(address)?;
+                let (name, place) = rows.get(address)?;
                 Some(Action::Alert {
                     terminal: address.clone(),
                     name: name.clone(),
+                    place: place.clone(),
                     state: a.word,
                     kind: self.kind(address, a.word),
                 })
             })
+            .collect()
+    }
+
+    /// Each agent row's name and desk place, by address.
+    fn names(&self) -> BTreeMap<String, (String, Option<String>)> {
+        self.tracker
+            .rows()
+            .into_iter()
+            .map(|r| (r.address, (r.name, r.place)))
             .collect()
     }
 
@@ -320,6 +323,7 @@ mod tests {
         Action::Alert {
             terminal: terminal.into(),
             name: "Claude Code".into(),
+            place: None,
             state,
             kind: (state == Word::Blocked).then(|| "permission".to_owned()),
         }
@@ -373,6 +377,24 @@ mod tests {
         assert_eq!(r.due(1_000 + GRACE), vec![want.clone()]);
         assert_eq!(r.due(3 * GRACE), vec![]);
         assert_eq!(r.open_alerts(), vec![want]);
+    }
+
+    // notification-place: the alert says where the session sits at the desk,
+    // and says nothing when it is not placed.
+    #[test]
+    fn an_alert_says_where_the_session_sits() {
+        let mut placed = agent("t1", "blocked", 0);
+        placed["labels"] = json!({"herdr.space": "sp1", "where": "website / 2"});
+        let mut parked = agent("t2", "blocked", 0);
+        parked["labels"] = json!({"herdr.space": "", "where": "api / 1"});
+        let mut r = rules();
+        r.observe(&[placed, parked], 0);
+        let mut want = alert("t1", Word::Blocked);
+        if let Action::Alert { place, .. } = &mut want {
+            *place = Some("website / 2".into());
+        }
+        assert_eq!(r.due(GRACE), vec![want.clone(), alert("t2", Word::Blocked)]);
+        assert_eq!(r.open_alerts(), vec![want, alert("t2", Word::Blocked)]);
     }
 
     #[test]

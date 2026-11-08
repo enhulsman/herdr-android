@@ -80,9 +80,9 @@ against that record after `missed`.
 
 ### Requirement: Alerts are encrypted, minimal, and sent only to the allowlisted host
 Each push SHALL be encrypted with RFC 8291 aes128gcm to the phone's keys and SHALL
-carry only `{v, type, machine, terminal?, name?, state?, kind?, at}`, never screen
-text or `msg`; `name` is the agent's name, which may be its session title
-(capability agent-names). The watcher SHALL POST only to endpoints whose scheme and host match
+carry only `{v, type, machine, terminal?, name?, place?, state?, kind?, at}`,
+never screen text or `msg`; `name` is the agent's name, which may be its session
+title, and `place` the desk's "space / tab" (capability agent-names). The watcher SHALL POST only to endpoints whose scheme and host match
 its allowlist, over https, without following redirects, with a 10 s timeout and a
 4 KiB body cap, and SHALL send its ntfy access token only to that host.
 

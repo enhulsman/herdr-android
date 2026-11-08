@@ -41,8 +41,9 @@ interface AlertSink {
  * or one without a machine, is ignored entirely: it proves nothing about the
  * path. Every other push counts as word from its machine and clears that
  * machine's health notice; a muted machine's pushes post nothing. Notification
- * text carries the agent's name, the kind and the machine only, never screen
- * text or the program's message (the payload has neither). The name may be a
+ * text carries the agent's name, the kind, the desk's "space / tab" and the
+ * machine only, never screen text or the program's message (the payload has
+ * neither). The name may be a
  * session title, so each agent note has a public version without it.
  * [timeText] formats a time of day ("14:02").
  */
@@ -113,21 +114,26 @@ class Alerts(
         val name = push.name?.takeIf { it.isNotBlank() } ?: terminal
         val open = AgentKey(machine, terminal)
         val tag = agentTag(machine, terminal)
+        val place = push.place?.takeIf { it.isNotBlank() }
         if (push.state == "done") {
             val public = res.getString(R.string.alert_finished_public, machine)
-            return AlertNote(AlertChannel.Finished, tag, res.getString(R.string.alert_finished_title, name, machine), null, open, public)
+            return AlertNote(AlertChannel.Finished, tag, res.getString(R.string.alert_finished_title, name), body(place, machine), open, public)
         }
         val kind = if (push.state == "error") res.getString(R.string.alert_kind_error) else push.kind?.let(::capitalized)
-        val text = kind?.let { res.getString(R.string.alert_body, it, machine) } ?: machine
         val public = res.getString(R.string.alert_needs_you_public, machine)
-        return AlertNote(AlertChannel.NeedsYou, tag, res.getString(R.string.alert_needs_you_title, name), text, open, public)
+        return AlertNote(AlertChannel.NeedsYou, tag, res.getString(R.string.alert_needs_you_title, name), body(kind, place, machine), open, public)
     }
+
+    /** The second line: "Permission · website / 2 · WSL", absent parts left out. */
+    private fun body(vararg parts: String?): String =
+        parts.filterNotNull().reduce { a, b -> res.getString(R.string.alert_body, a, b) }
 
     private data class Push(
         val type: String,
         val machine: String,
         val terminal: String?,
         val name: String?,
+        val place: String?,
         val state: String?,
         val kind: String?,
     )
@@ -140,7 +146,7 @@ class Alerts(
         }
         fun text(key: String): String? = json.opt(key) as? String
         val machine = text("machine")?.takeIf { it.isNotEmpty() } ?: return null
-        return Push(text("type") ?: "", machine, text("terminal")?.takeIf { it.isNotEmpty() }, text("name"), text("state"), text("kind")?.takeIf { it.isNotEmpty() })
+        return Push(text("type") ?: "", machine, text("terminal")?.takeIf { it.isNotEmpty() }, text("name"), text("place"), text("state"), text("kind")?.takeIf { it.isNotEmpty() })
     }
 
     companion object {

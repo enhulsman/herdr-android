@@ -1,9 +1,10 @@
 //! What a push says and where it may go (alerts spec, "Alerts are encrypted,
 //! minimal, and sent only to the allowlisted host").
 //!
-//! The payload carries only `{v, type, machine, terminal?, name?, state?, kind?,
-//! at}`: never screen text or the program's `msg`. `name` may be a session
-//! title (spec agent-names), which the phone hides on a private lock screen. A push goes only to an
+//! The payload carries only `{v, type, machine, terminal?, name?, place?, state?,
+//! kind?, at}`: never screen text or the program's `msg`. `name` may be a
+//! session title and `place` is the desk's "space / tab" (spec agent-names);
+//! the phone hides both on a private lock screen. A push goes only to an
 //! endpoint whose scheme, host and port match an allowlist entry, over https;
 //! the ntfy token goes with it, so it reaches no other host.
 
@@ -19,6 +20,7 @@ pub enum Push {
     Alert {
         terminal: String,
         name: String,
+        place: Option<String>,
         state: Word,
         kind: Option<String>,
     },
@@ -36,12 +38,16 @@ pub fn payload(push: &Push, machine: &str, at_ms: u64) -> Value {
         Push::Alert {
             terminal,
             name,
+            place,
             state,
             kind,
         } => {
             p["type"] = "alert".into();
             p["terminal"] = terminal.as_str().into();
             p["name"] = name.as_str().into();
+            if let Some(place) = place {
+                p["place"] = place.as_str().into();
+            }
             p["state"] = state.as_str().into();
             if let Some(kind) = kind {
                 p["kind"] = kind.as_str().into();
@@ -215,6 +221,7 @@ mod tests {
         Push::Alert {
             terminal: "t3".into(),
             name: "Claude Code".into(),
+            place: Some("website / 2".into()),
             state: Word::Blocked,
             kind: Some("permission".into()),
         }
@@ -225,12 +232,13 @@ mod tests {
         assert_eq!(
             payload(&blocked(), "workstation", 1_730_650_000_000),
             json!({"v": 1, "type": "alert", "machine": "workstation", "terminal": "t3",
-                   "name": "Claude Code", "state": "blocked", "kind": "permission",
-                   "at": 1_730_650_000_000u64})
+                   "name": "Claude Code", "place": "website / 2", "state": "blocked",
+                   "kind": "permission", "at": 1_730_650_000_000u64})
         );
         let done = Push::Alert {
             terminal: "t3".into(),
             name: "Codex".into(),
+            place: None,
             state: Word::Done,
             kind: None,
         };
@@ -259,13 +267,15 @@ mod tests {
         );
     }
 
-    // session-names: the longest name the rule makes (80 characters, each up
-    // to 4 bytes) and a 32-character machine stay far inside the 4 KiB body.
+    // session-names, notification-place: the longest name and place the rule
+    // makes (80 characters each, each up to 4 bytes) and a 32-character
+    // machine stay inside the 4 KiB body.
     #[test]
     fn the_longest_session_name_fits_the_body() {
         let push = Push::Alert {
             terminal: "t1zz".into(),
             name: format!("{}…", "\u{1F600}".repeat(79)),
+            place: Some(format!("{}…", "\u{1F600}".repeat(79))),
             state: Word::Blocked,
             kind: Some("permission".into()),
         };

@@ -35,6 +35,7 @@ fun row(
     machine: String = "workstation",
     name: String = address,
     folder: String = "website",
+    place: String? = null,
     program: String? = "claude",
     label: String = attention.name,
     kind: String? = null,
@@ -50,6 +51,7 @@ fun row(
     progress = progress?.toUByte(),
     sinceMs = since?.toULong(),
     folder = folder,
+    place = place,
     program = program,
     requestKind = kind ?: if (attention == AgentAttention.NEEDS_YOU) "Needs you" else if (attention == AgentAttention.ERROR) "Error" else null,
     request = request,
@@ -60,8 +62,9 @@ fun other(
     machine: String = "workstation",
     name: String = address,
     folder: String = "docs",
+    place: String? = null,
     program: String? = null,
-) = OtherTerminal(machine, address, name, folder, program)
+) = OtherTerminal(machine, address, name, folder, place, program)
 
 // The "New" sheet's choices (start-agents), as the hub offers them.
 

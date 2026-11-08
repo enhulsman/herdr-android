@@ -74,6 +74,24 @@ class AgentsScreenshotTest {
         ),
     )
 
+    /** session-names: rows named by session titles, the desk's place on line two, the longest title the rule keeps. */
+    private val titled = snapshot(
+        machines = listOf(connected("workstation")),
+        agents = listOf(
+            row("t1", AgentAttention.NEEDS_YOU, name = "Pricing page copy", place = "website / 2", kind = "Permission",
+                request = "Bash: npm test", since = NOW - 20 * SECOND),
+            row("t3", AgentAttention.DONE, name = "Fix login redirect", place = "api / 1", since = NOW - 4 * MINUTE),
+            row("t4", AgentAttention.WORKING, name = "Rate limits for the public endpoints, with a test per route and a short note…",
+                place = "api / Rate limits", since = NOW - 30 * SECOND),
+            row("t6", AgentAttention.WORKING, name = "Codex", folder = "docs", program = "codex", since = NOW - 9 * MINUTE),
+        ),
+        others = listOf(other("t10", name = "zsh", place = "website / 3", program = "zsh")),
+    )
+
+    @Test fun titledGraphite() = capture("agents-titled-graphite", dark = true, titled, othersExpanded = true)
+
+    @Test fun titledPaper() = capture("agents-titled-paper", dark = false, titled, othersExpanded = true)
+
     @Test fun unreachableGraphite() = capture("agents-unreachable-graphite", dark = true, dropped)
 
     @Test fun unreachablePaper() = capture("agents-unreachable-paper", dark = false, dropped)

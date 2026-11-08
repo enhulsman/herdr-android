@@ -12,7 +12,7 @@
     <string name="agents_working">Working</string>
     <string name="agents_idle">Idle</string>
     <string name="agents_other">Other terminals</string>
-    <!-- A row's second line: %1$s is the folder name, %2$s the machine. -->
+    <!-- A row's second line: %1$s is the desk's place ("website / 2") or else the folder name, %2$s the machine. -->
     <string name="agents_line_two">%1$s · %2$s</string>
     <!-- How long ago the state changed, as in render 1. -->
     <string name="age_now">&lt;1m</string>
@@ -253,6 +253,9 @@
     <string name="alert_needs_you_title">%1$s needs you</string>
     <!-- %1$s the agent, %2$s the machine. -->
     <string name="alert_finished_title">%1$s finished · %2$s</string>
+    <!-- On a locked phone that hides sensitive content (spec agent-names): %1$s the machine. -->
+    <string name="alert_needs_you_public">An agent needs you · %1$s</string>
+    <string name="alert_finished_public">An agent finished · %1$s</string>
     <!-- %1$s the kind ("Permission"), %2$s the machine. -->
     <string name="alert_body">%1$s · %2$s</string>
     <string name="alert_kind_error">Error</string>

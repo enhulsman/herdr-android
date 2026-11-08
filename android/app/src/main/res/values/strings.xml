@@ -73,6 +73,11 @@
     <string name="machines_text_contrast">Text contrast</string>
     <string name="machines_text_contrast_mac">Like the Mac</string>
     <string name="machines_text_contrast_higher">Higher</string>
+    <!-- Stay connected: a row that toggles in place; the second line says whether its notification shows. -->
+    <string name="machines_stay_connected">Stay connected</string>
+    <string name="machines_stay_connected_off">Off</string>
+    <string name="machines_stay_connected_on">On · shows a notification</string>
+    <string name="machines_stay_connected_unseen">On · notifications are off</string>
     <string name="machines_export">Export machine list</string>
     <string name="machines_export_detail">Without keys</string>
     <!-- The export row, disabled while the list is empty. -->
@@ -249,6 +254,21 @@
     <string name="channel_needs_you">Needs you</string>
     <string name="channel_finished">Finished</string>
     <string name="channel_alert_health">Alert health</string>
+    <string name="channel_status">Status</string>
+    <!-- The status notification (stay-connected spec): counts only, never a name, so the lock screen shows it in full. -->
+    <plurals name="status_note_need_you">
+        <item quantity="one">%d needs you</item>
+        <item quantity="other">%d need you</item>
+    </plurals>
+    <string name="status_note_working">%d working</string>
+    <string name="status_note_quiet">Nothing needs you</string>
+    <string name="status_note_connected">Connected</string>
+    <string name="status_note_connected_some">Connected to %1$d of %2$d machines</string>
+    <string name="status_note_connected_some_unlock">Connected to %1$d of %2$d machines · unlock to reconnect</string>
+    <string name="status_note_unlock">Disconnected · unlock to reconnect</string>
+    <string name="status_note_reconnecting">Reconnecting</string>
+    <string name="status_note_open_app">Not connected · open the app</string>
+    <string name="status_note_no_machines">No machines</string>
     <!-- Notifications (render 6, design-tokens.json notification): the agent's name, the kind, the desk's place and the machine only. -->
     <string name="alert_needs_you_title">%1$s needs you</string>
     <string name="alert_finished_title">%1$s finished</string>

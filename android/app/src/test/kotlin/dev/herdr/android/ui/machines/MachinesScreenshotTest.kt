@@ -3,6 +3,7 @@ package dev.herdr.android.ui.machines
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.herdr.android.push.AlertSetup
 import dev.herdr.android.push.MachineAlerts
+import dev.herdr.android.stay.StayConnectedRow
 import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.transfer.TransferResult
@@ -174,6 +175,17 @@ class MachinesScreenshotTest {
 
     @Test fun contrastHigherPaper() = capture("machines-contrast-higher-paper", dark = false, render7, contrast = Contrast.Aa)
 
+    /** Stay connected on, and on with notifications off (stay-connected spec); off is in every other golden. */
+    @Test fun stayConnectedOnGraphite() = capture("machines-stay-on-graphite", dark = true, render7, stay = StayConnectedRow.On)
+
+    @Test fun stayConnectedOnPaper() = capture("machines-stay-on-paper", dark = false, render7, stay = StayConnectedRow.On)
+
+    @Test fun stayConnectedUnseenGraphite() =
+        capture("machines-stay-unseen-graphite", dark = true, render7, stay = StayConnectedRow.OnUnseen)
+
+    @Test fun stayConnectedUnseenPaper() =
+        capture("machines-stay-unseen-paper", dark = false, render7, stay = StayConnectedRow.OnUnseen)
+
     private fun capture(
         name: String,
         dark: Boolean,
@@ -184,8 +196,9 @@ class MachinesScreenshotTest {
         error: String? = null,
         contrast: Contrast = Contrast.Default,
         alerts: PhoneAlerts? = null,
+        stay: StayConnectedRow = StayConnectedRow.Off,
     ) {
-        val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res, contrast, alerts)
+        val ui = machinesUi(HubSnapshot(machines, emptyList(), emptyList(), null), null, NOW, res, contrast, alerts, stay)
             .copy(transfer = transfer?.let { transferNotice(it, res) }, removing = removing, error = error)
         if (tall) RuntimeEnvironment.setQualifiers("w412dp-h1400dp-xhdpi")
         captureRoboImage("src/test/snapshots/$name.png") {

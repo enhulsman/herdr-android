@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import dev.herdr.android.R
 import dev.herdr.android.push.AlertSetup
 import dev.herdr.android.push.MachineAlerts
+import dev.herdr.android.stay.StayConnectedRow
 import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.transfer.TransferNoticeUi
 import uniffi.herdr_mobile.AlertsRegistration
@@ -91,11 +92,14 @@ data class MachinesUi(
     val error: String? = null,
     /** The "Text contrast" row's second line: "Like the Mac" or "Higher". */
     val textContrastDetail: String = "",
+    /** The "Stay connected" row's second line: "Off", "On · shows a notification" or "On · notifications are off". */
+    val stayConnectedDetail: String = "",
 )
 
 /**
  * [startError]: why the hub (and with it the phone key) could not start, from
- * HubHost; [alerts]: the phone's alert state, null for cards without alert rows.
+ * HubHost; [alerts]: the phone's alert state, null for cards without alert rows;
+ * [stayConnected]: the option and whether its notification can show.
  */
 fun machinesUi(
     snapshot: HubSnapshot,
@@ -104,6 +108,7 @@ fun machinesUi(
     res: Resources,
     contrast: Contrast = Contrast.Default,
     alerts: PhoneAlerts? = null,
+    stayConnected: StayConnectedRow = StayConnectedRow.Off,
 ): MachinesUi =
     MachinesUi(
         machines = snapshot.machines.map { m ->
@@ -120,6 +125,13 @@ fun machinesUi(
             when (contrast) {
                 Contrast.Mac -> R.string.machines_text_contrast_mac
                 Contrast.Aa -> R.string.machines_text_contrast_higher
+            },
+        ),
+        stayConnectedDetail = res.getString(
+            when (stayConnected) {
+                StayConnectedRow.Off -> R.string.machines_stay_connected_off
+                StayConnectedRow.On -> R.string.machines_stay_connected_on
+                StayConnectedRow.OnUnseen -> R.string.machines_stay_connected_unseen
             },
         ),
     )

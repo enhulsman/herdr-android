@@ -21,6 +21,8 @@ import dev.herdr.android.push.AndroidAlertSink
 import dev.herdr.android.push.PushStore
 import dev.herdr.android.push.SilenceCheckService
 import dev.herdr.android.push.timeOfDay
+import dev.herdr.android.stay.StayConnectedService
+import dev.herdr.android.stay.StayConnectedSetting
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.NewTerminal
 import dev.herdr.android.ui.terminal.TerminalCache
@@ -35,6 +37,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.unifiedpush.android.connector.UnifiedPush
 import uniffi.herdr_mobile.AlertsRegistration
@@ -46,8 +50,10 @@ import uniffi.herdr_mobile.PushRegistration
  * fingerprint prompt on NeedsUserAuth, export/import of the machine list,
  * and the started-activity count that
  * resumes the hub in the foreground and suspends it 60 s after the last
- * activity stops. Nothing touches the Keystore or the network until the first
- * activity starts.
+ * activity stops, unless Stay connected is on: then StayConnectedService
+ * keeps the hub connected and those 60 s only detach an open terminal
+ * ([terminalIdle]). Nothing touches the Keystore or the network until the
+ * first activity starts.
  */
 class HerdrApp : Application() {
     lateinit var keyManager: KeyManager
@@ -70,6 +76,15 @@ class HerdrApp : Application() {
     /** The "Text contrast" setting the theme follows, in its own preferences file. */
     lateinit var contrast: ContrastSetting
         private set
+
+    /** The "Stay connected" option, in its own preferences file. */
+    lateinit var stayConnected: StayConnectedSetting
+        private set
+
+    private val idle = MutableStateFlow(0)
+
+    /** Bumped each time the app has spent 60 s in the background with Stay connected on; an open terminal detaches. */
+    val terminalIdle: StateFlow<Int> = idle.asStateFlow()
 
     /** The instant-open cache of each terminal's last screen; used on [terminalCacheExecutor] only. */
     lateinit var terminalCache: TerminalCache
@@ -97,6 +112,7 @@ class HerdrApp : Application() {
     override fun onCreate() {
         super.onCreate()
         contrast = ContrastSetting.open(this)
+        stayConnected = StayConnectedSetting.open(this)
         pushStore = PushStore.open(this)
         val sink = AndroidAlertSink(this).apply { createChannels() }
         alerts = Alerts(pushStore, sink, resources) { ms -> timeOfDay(this)(ms) }
@@ -111,13 +127,18 @@ class HerdrApp : Application() {
             },
             mainExecutor = mainExecutor,
         )
-        userAuth = UserAuthGate(retry = hubHost::retry)
+        val main = Handler(mainLooper)
+        userAuth = UserAuthGate(
+            retry = hubHost::retry,
+            stayConnected = stayConnected::isOn,
+            scheduler = HandlerScheduler(main, ElapsedClock.SYSTEM),
+            clock = ElapsedClock.SYSTEM,
+        )
         hubHost.addSnapshotListener(userAuth::onSnapshot)
         val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         transfer = MachineTransfer(hubHost, ContentResolverStore(contentResolver), io)
         newTerminal = NewTerminal(hubHost, work = { io.launch { it.run() } }, main = mainExecutor)
         hubHost.addSnapshotListener(newTerminal::onSnapshot)
-        val main = Handler(mainLooper)
         foreground = ForegroundTracker(
             HandlerScheduler(main, ElapsedClock.SYSTEM),
             AlarmScheduler(getSystemService(AlarmManager::class.java), main),
@@ -125,6 +146,11 @@ class HerdrApp : Application() {
             onResume = hubHost::resume,
             onSuspend = hubHost::suspend,
             onForeground = hubHost::foreground,
+            keepConnected = stayConnected::isOn,
+            onBackgroundIdle = {
+                idle.value++
+                userAuth.onBackgroundIdle()
+            },
         )
         registerActivityLifecycleCallbacks(Callbacks())
         terminalCache = TerminalCache(File(noBackupFilesDir, "terminal-cache"), KeystoreFrameCipher(), System::currentTimeMillis)
@@ -185,6 +211,8 @@ class HerdrApp : Application() {
 
     private inner class Callbacks : ActivityLifecycleCallbacks {
         override fun onActivityStarted(activity: Activity) {
+            // From the foreground only (design D1): every start while on, so it comes back after a process end.
+            if (stayConnected.isOn()) StayConnectedService.start(this@HerdrApp)
             foreground.activityStarted()
             promptActivity = activity
             userAuth.onHost(BiometricPromptHost(activity))

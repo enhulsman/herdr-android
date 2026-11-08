@@ -68,7 +68,13 @@ class AlarmScheduler(private val alarms: AlarmManager, private val handler: Hand
  * then resumes, so the connections are fresh. A configuration change stops
  * and starts within one frame, so it never suspends. The hub starts paused,
  * so the first start resumes it. Every return to the foreground also calls
- * [onForeground]. Main thread only.
+ * [onForeground].
+ *
+ * While [keepConnected] holds (Stay connected, design D2), read when the
+ * deadline fires, the deadline calls [onBackgroundIdle] instead and nothing
+ * suspends, so a return calls no [onResume]; a start after a deadline that
+ * neither callback ran for only disarms, as the person is back. Main thread
+ * only.
  */
 class ForegroundTracker(
     private val timer: Scheduler,
@@ -78,6 +84,8 @@ class ForegroundTracker(
     private val onSuspend: () -> Unit,
     private val onForeground: () -> Unit = {},
     private val delayMs: Long = BACKGROUND_GRACE_MS,
+    private val keepConnected: () -> Boolean = { false },
+    private val onBackgroundIdle: () -> Unit = {},
 ) {
     private var started = 0
     private var suspended = true
@@ -95,7 +103,7 @@ class ForegroundTracker(
         if (started > 1) return
         if (pending.isNotEmpty()) {
             disarm()
-            if (clock.elapsedRealtime() >= deadline) suspendNow()
+            if (clock.elapsedRealtime() >= deadline && !keepConnected()) suspendNow()
         }
         if (suspended) {
             suspended = false
@@ -114,7 +122,7 @@ class ForegroundTracker(
         val fire = {
             if (armed == generation) {
                 disarm()
-                suspendNow()
+                if (keepConnected()) onBackgroundIdle() else suspendNow()
             }
         }
         pending = listOf(timer.scheduleAt(deadline, fire), alarm.scheduleAt(deadline, fire))

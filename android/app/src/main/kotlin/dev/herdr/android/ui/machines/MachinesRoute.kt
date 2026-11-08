@@ -28,7 +28,11 @@ import dev.herdr.android.R
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.hub.HubHost
 import dev.herdr.android.hub.UserAuthGate
+import dev.herdr.android.push.AndroidStatusSink
 import dev.herdr.android.push.timeOfDay
+import dev.herdr.android.stay.StayConnectedRow
+import dev.herdr.android.stay.StayConnectedService
+import dev.herdr.android.stay.StayConnectedSetting
 import dev.herdr.android.ui.components.rememberWallClock
 import dev.herdr.android.ui.flows.MachineFlows
 import dev.herdr.android.ui.theme.ContrastSetting
@@ -63,6 +67,23 @@ private fun notificationsAllowed(context: Context): Boolean =
 fun withTextContrast(actions: MachinesActions, setting: ContrastSetting): MachinesActions =
     actions.copy(onTextContrast = setting::toggle)
 
+/**
+ * The "Stay connected" row switches [setting] in place; [onTurnedOn] and
+ * [onTurnedOff] start and stop the service (and ask for notifications).
+ */
+fun withStayConnected(
+    actions: MachinesActions,
+    setting: StayConnectedSetting,
+    onTurnedOn: () -> Unit,
+    onTurnedOff: () -> Unit = {},
+): MachinesActions =
+    actions.copy(
+        onStayConnected = {
+            setting.toggle()
+            if (setting.isOn()) onTurnedOn() else onTurnedOff()
+        },
+    )
+
 /** What the import picker offers: JSON, and everything, since some storage apps label JSON as something else. */
 private val IMPORT_TYPES = arrayOf("application/json", "*/*")
 
@@ -79,6 +100,7 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     val snapshot by app.hubHost.snapshot.collectAsState()
     val startError by app.hubHost.startError.collectAsState()
     val contrast by app.contrast.contrast.collectAsState()
+    val stayConnected by app.stayConnected.on.collectAsState()
     val clock = rememberWallClock()
     val res = LocalContext.current.resources
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -92,11 +114,18 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     // Alerts: the store's writes (the push service's too) and the permission, read again on each return.
     val alertChanges by app.pushStore.changes.collectAsState()
     var permitted by remember { mutableStateOf(notificationsAllowed(context)) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { permitted = notificationsAllowed(context) }
+    // The Status channel can be blocked on its own in Android settings.
+    val statusSink = remember(context) { AndroidStatusSink(context) }
+    var statusShown by remember { mutableStateOf(statusSink.shown()) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        permitted = notificationsAllowed(context)
+        statusShown = statusSink.shown()
+    }
     // "Turn on" asks for the permission first; the registration follows whatever the answer.
     var registerAfterAsking by remember { mutableStateOf(false) }
     val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         permitted = notificationsAllowed(context)
+        statusShown = statusSink.shown()
         if (registerAfterAsking) {
             registerAfterAsking = false
             (context as? Activity)?.let(app::turnOnAlerts)
@@ -116,7 +145,17 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
         } catch (e: ActivityNotFoundException) {
             transfer.noPicker()
         }
-        withTextContrast(flows.actions(hubActions(app.userAuth, app.hubHost, onBack)), app.contrast).copy(
+        val base = withTextContrast(flows.actions(hubActions(app.userAuth, app.hubHost, onBack)), app.contrast)
+        withStayConnected(
+            base,
+            app.stayConnected,
+            onTurnedOn = {
+                StayConnectedService.start(context)
+                // Through the Alerts flow's request; the option works whatever the answer.
+                if (canAsk && !notificationsAllowed(context)) ask()
+            },
+            onTurnedOff = { StayConnectedService.stop(context) },
+        ).copy(
             onExport = { pick { exportPicker.launch(fileName) } },
             onImport = { pick { importPicker.launch(IMPORT_TYPES) } },
             onOpenSettings = {
@@ -173,8 +212,9 @@ fun MachinesRoute(app: HerdrApp, flows: MachineFlows, onBack: (() -> Unit)?) {
     val currentAlerts by rememberUpdatedState(phoneAlerts)
     val tick by remember(clock) { derivedStateOf { machinesTick(snapshot, clock.value, currentAlerts) } }
     // Read without subscribing: the route follows [tick], not every clock change.
-    val machines = remember(snapshot, startError, tick, res, contrast, phoneAlerts) {
-        machinesUi(snapshot, startError, Snapshot.withoutReadObservation { clock.value }, res, contrast, phoneAlerts)
+    val stayRow = StayConnectedRow.of(stayConnected, permitted && statusShown)
+    val machines = remember(snapshot, startError, tick, res, contrast, phoneAlerts, stayRow) {
+        machinesUi(snapshot, startError, Snapshot.withoutReadObservation { clock.value }, res, contrast, phoneAlerts, stayRow)
     }
     val ui = machines.copy(
         transfer = transferResult?.let { transferNotice(it, res) },

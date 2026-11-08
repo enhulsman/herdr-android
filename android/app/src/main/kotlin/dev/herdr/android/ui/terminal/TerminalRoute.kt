@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.AgentsHome
@@ -27,6 +28,7 @@ import dev.herdr.android.ui.agents.SheetTone
 import dev.herdr.android.ui.agents.agentSheet
 import dev.herdr.android.ui.agents.agentsUi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.TerminalViewInterface
 
@@ -34,8 +36,10 @@ import uniffi.herdr_mobile.TerminalViewInterface
  * The terminal screen fed by the app: opens [key] through the hub once the
  * screen knows the phone's grid, shows the cached last screen meanwhile,
  * sends the phone size once the keyboard settles, keeps the zoom, and on
- * leaving detaches and caches the last screen. The queue strip and the
- * title-bar swipe open other agents through [home], which marks them seen.
+ * leaving detaches and caches the last screen. With Stay connected on, 60 s
+ * in the background detaches it as well and the return opens it again
+ * ([TerminalReopen]). The queue strip and the title-bar swipe open other
+ * agents through [home], which marks them seen.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -43,28 +47,37 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     val context = LocalContext.current
     val res = context.resources
     val snapshot by app.hubHost.snapshot.collectAsState()
-    val session = remember(key) { TerminalSession(key, context.mainExecutor) }
+    val reopen = remember(key) { TerminalReopen() }
+    val generation = reopen.generation
+    val session = remember(key, generation) { TerminalSession(key, context.mainExecutor) }
     val screen = remember(key) { TerminalScreenState(app.terminalZoom[key]) }
-    val opener = remember(key) {
+    val opener = remember(key, generation) {
         TerminalOpener(session) { size ->
             // Opened at the phone's size (phone check round 2); closing lets the desk take its size back.
             app.hubHost.hub?.openTerminal(key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), true, session.listener)
         }
     }
     var phone by remember(key) { mutableStateOf<GridSize?>(null) }
-    LaunchedEffect(phone) {
+    // A reopened generation opens again at the last phone size.
+    LaunchedEffect(phone, generation) {
         val size = phone ?: return@LaunchedEffect
         opener.onPhoneGrid(size, SystemClock.uptimeMillis())
         delay(TerminalMetrics.SETTLE_MS)
         opener.tick(SystemClock.uptimeMillis())
     }
 
-    // Instant open: the last screen, until the live first paint replaces it.
-    DisposableEffect(key) {
+    // Instant open: the last screen, until the live first paint replaces it; after a
+    // background detach, the frame kept in memory, with no disk load or Keystore call.
+    DisposableEffect(key, generation) {
         var cancelled = false
-        app.terminalCacheExecutor.execute {
-            val frame = app.terminalCache.load(key) ?: return@execute
-            context.mainExecutor.execute { if (!cancelled) session.showCached(frame) }
+        val seed = reopen.takeSeed()
+        if (seed != null) {
+            session.showCached(seed)
+        } else {
+            app.terminalCacheExecutor.execute {
+                val frame = app.terminalCache.load(key) ?: return@execute
+                context.mainExecutor.execute { if (!cancelled) session.showCached(frame) }
+            }
         }
         onDispose {
             cancelled = true
@@ -72,8 +85,24 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             if (last != null) app.terminalCacheExecutor.execute { app.terminalCache.store(key, last) }
         }
     }
+    // Background idle (Stay connected): detach while stopped and keep the last frame;
+    // collected as a coroutine, as nothing composes while the activity is stopped.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(key, generation) {
+        app.terminalIdle.drop(1).collect {
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@collect
+            reopen.onIdle {
+                session.close()?.also { last ->
+                    app.terminalCacheExecutor.execute { app.terminalCache.store(key, last) }
+                }
+            }
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { reopen.onStart() }
+
     // Leaving the app may be the last chance to keep the screen.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        reopen.onStop()
         if (session.painted) {
             session.grid.toFullFrameOrNull()?.let { frame ->
                 app.terminalCacheExecutor.execute { app.terminalCache.store(key, frame) }

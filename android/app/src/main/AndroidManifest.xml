@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Keeps the hourly "Alert health" check scheduled across reboots. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Stay connected: a foreground service keeps the connections open in the background. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".HerdrApp"
@@ -48,6 +51,16 @@
             android:name=".push.SilenceCheckService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Stay connected (opt-in): started only from the foreground, with an ongoing
+             status notification; specialUse has no daily time limit, unlike dataSync. -->
+        <service
+            android:name=".stay.StayConnectedService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the user's opt-in SSH connections to their own machines open, so the agent list stays current and returning to the app needs no reconnect." />
+        </service>
     </application>
 
 </manifest>

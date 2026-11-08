@@ -6,11 +6,14 @@ import dev.herdr.android.ui.agents.AgentKey
 import org.json.JSONException
 import org.json.JSONObject
 
-/** The three notification channels (alerts spec, "Three notification channels"). */
+/** The three alert channels (alerts spec, "Three notification channels") and Stay connected's Status channel. */
 enum class AlertChannel(val id: String) {
     NeedsYou("needs-you"),
     Finished("finished"),
     Health("alert-health"),
+
+    /** The Stay connected status notification (AndroidStatusSink); never an agent alert. */
+    Status("status"),
 }
 
 /** One notification to post; [tag] identifies it for replacing and clearing. */

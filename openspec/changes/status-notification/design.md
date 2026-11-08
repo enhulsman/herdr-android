@@ -219,9 +219,10 @@ first starts it, the second sees `retrying`.
 
 ## Risks / Trade-offs
 
-- [Battery: 15 s heartbeats wake the phone all day] → measure one night at the
-  phone check against +0.3 %/h (task 4.6); add Battery Saver and idle stops if it
-  fails (decision 5).
+- [Battery: 15 s heartbeats wake the phone all day] → measure a night and day
+  windows at the phone check and ship the estimate as a notice (tasks 4.6,
+  5.1); add Battery Saver and idle stops only for a clearly large cost
+  (decision 5).
 - [GrapheneOS may close sockets despite the service] → phone check under
   forced Doze (`dumpsys deviceidle force-idle`) and with the screen off for
   30+ minutes.
@@ -250,9 +251,15 @@ turning the option off, or an app version without the service.
 
 ## Open Questions
 
-None. The battery pass mark (task 4.6) comes from Ezra's August 2026
-battery investigation: a 2.0 %/h screen-off target, a normal night at about
-2.0 %/h, and an open `herdr --remote` session at +0.3 to +1.0 %/h. This
-feature may add at most +0.3 %/h. The 15 s heartbeat adds roughly 500 packets
-an hour against that session's roughly 3,500 (moderate-low confidence that the
-cost scales with packets).
+None. Battery has no pass mark, as the cost differs per phone (Ezra,
+2026-11-08). The phone check measures one phone and the result ships as an
+estimate in a notice (tasks 4.6, 5.1). References from Ezra's August 2026
+battery investigation on that phone: a normal night at about 2.0 %/h screen-off
+(1.93 and 2.08), daytime screen-off at 2.5-6.4 %/h, and screen-on use at
+9-16 %/h. One day reading cannot price a cost below about 1 %/h, so the night
+reading carries the estimate. An open `herdr --remote` session cost +0.3 to
++1.0 %/h at night. That was a different client, the herdr CLI's terminal UI in
+Termux redrawing over SSH, so it is a reference point for "a held connection to
+the workstation", not a prediction. This feature's 15 s heartbeat is roughly
+500 packets an hour against that session's roughly 3,500 (low confidence that
+the cost scales with packets, and none that the two clients behave alike).

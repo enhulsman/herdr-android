@@ -82,6 +82,8 @@ data class MachinesActions(
     val onImport: () -> Unit,
     /** The "Text contrast" row: switches to the other choice in place. */
     val onTextContrast: () -> Unit = {},
+    /** The "Stay connected" row: turns the option on or off in place (MachinesRoute). */
+    val onStayConnected: () -> Unit = {},
     /** The card's "Remove machine", by machine name: opens the confirm. */
     val onRemove: (String) -> Unit = {},
     /** The confirm's Remove. */
@@ -173,6 +175,13 @@ private fun MachinesList(ui: MachinesUi, actions: MachinesActions) {
                 ui.textContrastDetail,
                 chevron = false,
                 onClick = actions.onTextContrast,
+            )
+            // Toggles in place too.
+            CardRow(
+                stringResource(R.string.machines_stay_connected),
+                ui.stayConnectedDetail,
+                chevron = false,
+                onClick = actions.onStayConnected,
             )
             // Shown even with no machines (the spec makes export unconditional), but dim and inert until one exists.
             CardRow(

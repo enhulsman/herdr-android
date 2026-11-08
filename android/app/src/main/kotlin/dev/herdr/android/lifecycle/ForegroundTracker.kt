@@ -73,8 +73,9 @@ class AlarmScheduler(private val alarms: AlarmManager, private val handler: Hand
  * While [keepConnected] holds (Stay connected, design D2), read when the
  * deadline fires, the deadline calls [onBackgroundIdle] instead and nothing
  * suspends, so a return calls no [onResume]; a start after a deadline that
- * neither callback ran for only disarms, as the person is back. Main thread
- * only.
+ * neither callback ran for (deep sleep, deferred alarm) calls [onCaughtUp]
+ * rather than [onBackgroundIdle], as the person is back and an open terminal
+ * stays, but the 60 s did pass. Main thread only.
  */
 class ForegroundTracker(
     private val timer: Scheduler,
@@ -86,6 +87,7 @@ class ForegroundTracker(
     private val delayMs: Long = BACKGROUND_GRACE_MS,
     private val keepConnected: () -> Boolean = { false },
     private val onBackgroundIdle: () -> Unit = {},
+    private val onCaughtUp: () -> Unit = {},
 ) {
     private var started = 0
     private var suspended = true
@@ -103,7 +105,9 @@ class ForegroundTracker(
         if (started > 1) return
         if (pending.isNotEmpty()) {
             disarm()
-            if (clock.elapsedRealtime() >= deadline && !keepConnected()) suspendNow()
+            if (clock.elapsedRealtime() >= deadline) {
+                if (keepConnected()) onCaughtUp() else suspendNow()
+            }
         }
         if (suspended) {
             suspended = false

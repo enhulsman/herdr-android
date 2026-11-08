@@ -84,9 +84,10 @@ construction and tests stay as they are).
 - The deadline fires: `keepConnected()` is read then, at fire time. True:
   `onBackgroundIdle()`, and `suspended` stays false. False: suspend as today.
 - The catch-up branch of `activityStarted` (deadline passed, neither callback
-  ran, as after deep sleep): true, disarm only, with no idle and no suspend,
-  since the person is back and the terminal never detached; false: suspend
-  then resume as today.
+  ran, as after deep sleep): true, disarm and call `onCaughtUp`, with no idle
+  and no suspend, since the person is back and the terminal never detached;
+  `onCaughtUp` re-arms the key prompt (D6), as the 60 s did pass (found in
+  the Codex review, task 3.1); false: suspend then resume as today.
 - With the option on, `suspended` is therefore false whenever the hub is not
   suspended, and a return calls no `onResume` and so no resume-kick.
   `onForeground` still runs (it only retries `NetworkOff` machines).
@@ -94,9 +95,9 @@ construction and tests stay as they are).
   is resumed. A deadline armed while on that fires after the option was turned
   off suspends (V1).
 
-`HerdrApp` passes `stayConnected::isOn`, `hubHost::suspend` and an idle
+`HerdrApp` passes `stayConnected::isOn`, `hubHost::suspend`, an idle
 handler that bumps `terminalIdle` (D5) and calls `userAuth.onBackgroundIdle()`
-(D6).
+(D6), and `userAuth.onBackgroundIdle()` as `onCaughtUp`.
 
 The alarm side stays the inexact listener alarm plus the Handler, as in V1.
 `setAndAllowWhileIdle` has no listener overload; it would need a

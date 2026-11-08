@@ -1,6 +1,7 @@
 package dev.herdr.android.hub
 
 import dev.herdr.android.lifecycle.FakeDevice
+import dev.herdr.android.lifecycle.ForegroundTracker
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import uniffi.herdr_mobile.MachineState
@@ -248,5 +249,41 @@ class StayConnectedGateTest {
         gate.onHost(host)
         assertEquals(1, host.shown)
         assertEquals(0, retries)
+    }
+
+    // (h) across deep sleep, with the tracker wired as HerdrApp wires it: both
+    // deadline callbacks held back past 60 s, so no background idle ran; the
+    // return still re-arms the prompt (V1's suspend does it with Paused).
+    @Test
+    fun aCancelThenDeepSleepPastTheDeadlineThenAReturnRetriesThenPromptsOnce() {
+        val tracker = ForegroundTracker(
+            device.timer,
+            device.alarm,
+            device,
+            onResume = {},
+            onSuspend = {},
+            keepConnected = { on },
+            onBackgroundIdle = gate::onBackgroundIdle,
+            onCaughtUp = gate::onBackgroundIdle,
+        )
+        fun start() {
+            tracker.activityStarted()
+            gate.onHost(host)
+        }
+        fun stop() {
+            gate.onHost(null)
+            tracker.activityStopped()
+        }
+        start()
+        needsKey()
+        host.finish(success = false)
+        stop()
+        device.sleep(5 * 60_000)
+        start()
+        assertEquals(1, retries)
+        assertEquals(1, host.shown)
+        connecting()
+        needsKey()
+        assertEquals(2, host.shown)
     }
 }

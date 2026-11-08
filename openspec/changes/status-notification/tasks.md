@@ -19,8 +19,8 @@
 
 ## 3. Review
 
-- [ ] 3.1 Codex adversarial review of the branch (key gate, service lifecycle)
-- [ ] 3.2 `openspec validate status-notification --strict`
+- [x] 3.1 Codex adversarial review of the branch (key gate, service lifecycle): two findings. Fixed: a return after deep sleep past the deadline left the key prompt disarmed (tracker `onCaughtUp` re-arms it, D2). Not taken: "a foreground service loses the network in Doze without a battery-optimization exemption"; foreground-service priority is exempt from the Doze network rule, and 4.1 checks it on the phone
+- [x] 3.2 `openspec validate status-notification --strict`
 
 ## 4. Phone check (debug build over adb)
 

@@ -22,6 +22,7 @@ class StayConnectedTrackerTest {
         onForeground = { events += "foreground" },
         keepConnected = { on },
         onBackgroundIdle = { events += "idle" },
+        onCaughtUp = { events += "caught up" },
     )
 
     @Test
@@ -64,11 +65,13 @@ class StayConnectedTrackerTest {
         clock.sleep(5 * 60_000)
         events.clear()
         tracker.activityStarted()
-        assertEquals(listOf("foreground"), events)
+        // No idle (the terminal never detached), but the 60 s did pass: the key prompt re-arms.
+        assertEquals(listOf("caught up", "foreground"), events)
+        events.clear()
         // The deferred alarm was cancelled: no idle lands while the person is back.
         clock.deliverDeferredAlarms()
         clock.advance(10 * 60_000)
-        assertEquals(listOf("foreground"), events)
+        assertEquals(emptyList<String>(), events)
     }
 
     @Test

@@ -151,6 +151,8 @@ class HerdrApp : Application() {
                 idle.value++
                 userAuth.onBackgroundIdle()
             },
+            // Back after deep sleep past the deadline: no detach, but the key prompt re-arms.
+            onCaughtUp = { userAuth.onBackgroundIdle() },
         )
         registerActivityLifecycleCallbacks(Callbacks())
         terminalCache = TerminalCache(File(noBackupFilesDir, "terminal-cache"), KeystoreFrameCipher(), System::currentTimeMillis)

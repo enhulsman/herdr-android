@@ -219,8 +219,8 @@ first starts it, the second sees `retrying`.
 
 ## Risks / Trade-offs
 
-- [Battery: 15 s heartbeats wake the phone all day] → measure at the phone
-  check against Ezra's daily figure; add Battery Saver and idle stops if it
+- [Battery: 15 s heartbeats wake the phone all day] → measure one night at the
+  phone check against +0.3 %/h (task 4.6); add Battery Saver and idle stops if it
   fails (decision 5).
 - [GrapheneOS may close sockets despite the service] → phone check under
   forced Doze (`dumpsys deviceidle force-idle`) and with the screen off for
@@ -250,5 +250,9 @@ turning the option off, or an app version without the service.
 
 ## Open Questions
 
-- Ezra's daily battery figure for the measurement (asked before the phone
-  check).
+None. The battery pass mark (task 4.6) comes from Ezra's August 2026
+battery investigation: a 2.0 %/h screen-off target, a normal night at about
+2.0 %/h, and an open `herdr --remote` session at +0.3 to +1.0 %/h. This
+feature may add at most +0.3 %/h. The 15 s heartbeat adds roughly 500 packets
+an hour against that session's roughly 3,500 (moderate-low confidence that the
+cost scales with packets).

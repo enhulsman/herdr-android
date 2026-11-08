@@ -1,11 +1,11 @@
 ## 1. Tests first
 
-- [ ] 1.1 `StatusTextTest`: every title and second line in the spec, one case per machine group and the precedence among them, `startError`, singular and plural, counts only from connected machines, Error counted as need you, Done and Idle not counted, no names in any string, equal inputs give equal lines
-- [ ] 1.2 `ForegroundTrackerTest`: with `keepConnected` true the deadline calls `onBackgroundIdle` and never suspends, and a return calls no `onResume`; the deep-sleep catch-up with it true does nothing; with it false V1 behaviour is unchanged; the predicate is read at fire time (on when armed, off when fired: suspends)
-- [ ] 1.3 `UserAuthGateTest`, each with its armed precondition: (a) unlock then activity start, one silent retry, no prompt; (b) activity start then unlock, one silent retry; (c) a stale NeedsUserAuth after the retry is ignored; (d) Connecting dropped, prompt at the 10 s fallback; (e) armed, retry fails, exactly one prompt, then no loop; (f) option off, existing tests unchanged; (g) unlock with only a backoff machine, one plain retry; (h) cancel, background idle, return, failed silent retry, exactly one prompt; (i) cancel then a restart within seconds, no retry, no prompt; (j) unlock while not armed and the retry fails, no prompt
-- [ ] 1.4 `StatusNotifierTest`: posts only when the line changes; after `stop` nothing is posted; never touches alert tags
-- [ ] 1.5 Setting and Machines row: off by default, toggles in place, all three second lines; screenshot tests in paper and graphite
-- [ ] 1.6 `TerminalReopenTest`: idle while stopped closes and keeps the last frame; start after idle gives a new generation seeded from memory; start without idle does nothing; idle while started is ignored; two cycles in a row each detach and reopen
+- [x] 1.1 `StatusTextTest`: every title and second line in the spec, one case per machine group and the precedence among them, `startError`, singular and plural, counts only from connected machines, Error counted as need you, Done and Idle not counted, no names in any string, equal inputs give equal lines
+- [x] 1.2 `ForegroundTrackerTest`: with `keepConnected` true the deadline calls `onBackgroundIdle` and never suspends, and a return calls no `onResume`; the deep-sleep catch-up with it true does nothing; with it false V1 behaviour is unchanged; the predicate is read at fire time (on when armed, off when fired: suspends)
+- [x] 1.3 `UserAuthGateTest`, each with its armed precondition: (a) unlock then activity start, one silent retry, no prompt; (b) activity start then unlock, one silent retry; (c) a stale NeedsUserAuth after the retry is ignored; (d) Connecting dropped, prompt at the 10 s fallback; (e) armed, retry fails, exactly one prompt, then no loop; (f) option off, existing tests unchanged; (g) unlock with only a backoff machine, one plain retry; (h) cancel, background idle, return, failed silent retry, exactly one prompt; (i) cancel then a restart within seconds, no retry, no prompt; (j) unlock while not armed and the retry fails, no prompt
+- [x] 1.4 `StatusNotifierTest`: posts only when the line changes; after `stop` nothing is posted; never touches alert tags
+- [ ] 1.5 Setting and Machines row: off by default, toggles in place, all three second lines; screenshot tests in paper and graphite (setting and row tests written; screenshots recorded at 2.1)
+- [x] 1.6 `TerminalReopenTest`: idle while stopped closes and keeps the last frame; start after idle gives a new generation seeded from memory; start without idle does nothing; idle while started is ignored; two cycles in a row each detach and reopen
 
 ## 2. Build
 
@@ -29,7 +29,7 @@
 - [ ] 4.3 Wi-Fi to mobile data in the background: reconnects, no prompt
 - [ ] 4.4 Terminal left open, two cycles, screen on and screen off: desk size back, reopens on return, typing works; measure the screen-off detach delay
 - [ ] 4.5 An alert while connected arrives once, through ntfy
-- [ ] 4.6 Battery: `dumpsys batterystats` over a day against Ezra's daily figure; if over, propose the Battery Saver and idle stops as a spec change
+- [ ] 4.6 Battery, one bracketed night with the battery-investigation capture method (phone-side capture script and `batteryreport.py`, one variable per night): Stay connected on, otherwise the night-19 configuration. Pass: screen-off drain at most +0.3 %/h over that configuration's reference (2.08 and 1.93 %/h, so at most about 2.3 %/h), below the low end of the +0.3 to +1.0 %/h measured for an open `herdr --remote` session in August. Over that: propose the Battery Saver and idle stops as a spec change
 - [ ] 4.7 Silent link death: the desk drops the phone's traffic in its firewall for 10+ minutes with the screen off; on unlock the notification is right within about 50 s; record whether the link had died
 - [ ] 4.8 GrapheneOS lock screen: record whether silent notifications show by default, and that the counts show
 - [ ] 4.9 Swipe the notification away: it comes back on the next change, connections kept

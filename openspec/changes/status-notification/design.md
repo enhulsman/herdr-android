@@ -119,7 +119,11 @@ JVM like `Alerts`. Machines fall into four groups:
 - `startError` set: "Not connected · open the app".
 - At least one connected: the title is the counts, from agents on connected
   machines only (other rows are stale). "Need you" counts `NeedsYou` and
-  `Error` (both alert on the "Needs you" channel); "working" counts `Working`.
+  `Error` (both alert on the "Needs you" channel); "done" counts `Done`, a
+  finish the person has not opened in the app since (the hub's per-phone seen
+  turn; opening it there makes it `Idle`, looking on the desk does not);
+  "working" counts `Working`. The order is need you, done, working, each left
+  out at zero.
   The second line: "Connected" when all machines are connected; "Connected to
   n of m machines · unlock to reconnect" when another machine waits for the
   key; else "Connected to n of m machines".

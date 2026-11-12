@@ -15,8 +15,9 @@ import uniffi.herdr_mobile.MachineState
 import uniffi.herdr_mobile.MachineView
 
 // stay-connected spec, "The status notification shows counts only": counts
-// from connected machines only ("need you" = needs you + error, "working" =
-// working), the second line by how many machines are connected, and with none
+// from connected machines only ("need you" = needs you + error, "done" =
+// finished and not opened in the app since, "working" = working), the second
+// line by how many machines are connected, and with none
 // connected the title by precedence: start error, key, retrying, needs the
 // app, no machines. No agent, project, folder or machine names, ever.
 @RunWith(RobolectricTestRunner::class)
@@ -57,13 +58,77 @@ class StatusTextTest {
     }
 
     @Test
-    fun idleAndFinishedAreNotCounted() {
+    fun idleIsNotCounted() {
         val s = hub(
+            listOf("workstation" to CONNECTED),
+            agent("workstation", AgentAttention.IDLE),
+            agent("workstation", AgentAttention.IDLE),
+        )
+        assertEquals(StatusLine("Nothing needs you", "Connected"), line(s))
+    }
+
+    @Test
+    fun finishedAndNotOpenedInTheAppCountsAsDone() {
+        val s = hub(
+            listOf("workstation" to CONNECTED),
+            agent("workstation", AgentAttention.DONE),
+            agent("workstation", AgentAttention.DONE),
+            agent("workstation", AgentAttention.IDLE),
+        )
+        assertEquals(StatusLine("2 done", "Connected"), line(s))
+    }
+
+    @Test
+    fun doneSitsBetweenNeedYouAndWorking() {
+        val s = hub(
+            listOf("workstation" to CONNECTED),
+            agent("workstation", AgentAttention.WORKING),
+            agent("workstation", AgentAttention.DONE),
+            agent("workstation", AgentAttention.ERROR),
+            agent("workstation", AgentAttention.WORKING),
+            agent("workstation", AgentAttention.DONE),
+            agent("workstation", AgentAttention.WORKING),
+        )
+        assertEquals(StatusLine("1 needs you · 2 done · 3 working", "Connected"), line(s))
+    }
+
+    @Test
+    fun openingAFinishInTheAppTakesItOffTheDoneCount() {
+        // Opening it marks it seen in the hub, which shows it as idle from then on.
+        val before = hub(
+            listOf("workstation" to CONNECTED),
+            agent("workstation", AgentAttention.DONE),
+            agent("workstation", AgentAttention.DONE),
+        )
+        val oneOpened = hub(
             listOf("workstation" to CONNECTED),
             agent("workstation", AgentAttention.IDLE),
             agent("workstation", AgentAttention.DONE),
         )
-        assertEquals(StatusLine("Nothing needs you", "Connected"), line(s))
+        val bothOpened = hub(
+            listOf("workstation" to CONNECTED),
+            agent("workstation", AgentAttention.IDLE),
+            agent("workstation", AgentAttention.IDLE),
+        )
+        assertEquals("2 done", line(before).title)
+        assertEquals("1 done", line(oneOpened).title)
+        assertEquals("Nothing needs you", line(bothOpened).title)
+    }
+
+    @Test
+    fun oneDone() {
+        val s = hub(listOf("workstation" to CONNECTED), agent("workstation", AgentAttention.DONE))
+        assertEquals(StatusLine("1 done", "Connected"), line(s))
+    }
+
+    @Test
+    fun doneOnAMachineThatIsDownIsStaleAndNotCounted() {
+        val s = hub(
+            listOf("workstation" to CONNECTED, "server" to MachineState.Unreachable("timed out")),
+            agent("workstation", AgentAttention.WORKING),
+            agent("server", AgentAttention.DONE),
+        )
+        assertEquals(StatusLine("1 working", "Connected to 1 of 2 machines"), line(s))
     }
 
     @Test

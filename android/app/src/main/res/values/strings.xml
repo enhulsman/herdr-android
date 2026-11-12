@@ -260,6 +260,7 @@
         <item quantity="one">%d needs you</item>
         <item quantity="other">%d need you</item>
     </plurals>
+    <string name="status_note_done">%d done</string>
     <string name="status_note_working">%d working</string>
     <string name="status_note_quiet">Nothing needs you</string>
     <string name="status_note_connected">Connected</string>

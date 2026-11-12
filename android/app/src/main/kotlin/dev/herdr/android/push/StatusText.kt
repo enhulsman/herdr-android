@@ -13,7 +13,8 @@ data class StatusLine(val title: String, val text: String?)
  * The status notification's text, a pure function of the hub snapshot and
  * whether the hub started (stay-connected spec, "The status notification
  * shows counts only"; design D3). Counts come from agents on connected
- * machines only, as other rows are stale. No agent, project, folder or
+ * machines only, as other rows are stale; "done" is a finish not opened in
+ * the app since, which opening it there clears. No agent, project, folder or
  * machine name ever appears, so the lock screen can show it in full.
  */
 object StatusText {
@@ -32,9 +33,11 @@ object StatusText {
         }
         val live = snapshot.agents.filter { it.machine in connected }
         val needYou = live.count { it.attention == AgentAttention.NEEDS_YOU || it.attention == AgentAttention.ERROR }
+        val done = live.count { it.attention == AgentAttention.DONE }
         val working = live.count { it.attention == AgentAttention.WORKING }
         val counts = buildList {
             if (needYou > 0) add(res.getQuantityString(R.plurals.status_note_need_you, needYou, needYou))
+            if (done > 0) add(res.getString(R.string.status_note_done, done))
             if (working > 0) add(res.getString(R.string.status_note_working, working))
         }
         val title = counts.joinToString(res.getString(R.string.status_separator))

@@ -90,11 +90,14 @@ alert. Its text SHALL be a function of the agent list, the machine states and
 whether the hub started, SHALL be reposted only when that text changes, and
 SHALL name no agent, project, folder or machine, so the lock screen shows it in
 full. Counts SHALL include only agents on connected machines: "need you"
-counts agents that need you or are in error, "working" counts working agents.
+counts agents that need you or are in error, "done" counts agents that
+finished and have not been opened in the app since, "working" counts working
+agents.
 
-With at least one machine connected, the title SHALL be the counts joined by
-" · " ("2 need you · 3 working", "1 needs you", "3 working"), or "Nothing needs
-you" when both are zero; the second line SHALL be "Connected" when every
+With at least one machine connected, the title SHALL be the counts in that
+order joined by " · ", each left out at zero ("2 need you · 1 done · 3
+working", "1 needs you", "2 done", "3 working"), or "Nothing needs you" when
+all three are zero; the second line SHALL be "Connected" when every
 machine is connected, "Connected to <n> of <m> machines · unlock to reconnect"
 when another machine waits for the key, else "Connected to <n> of <m>
 machines".
@@ -119,8 +122,16 @@ changes.
 - **WHEN** one agent needs you and none is working on the only, connected machine
 - **THEN** the notification reads "1 needs you" over "Connected"
 
+#### Scenario: Finished and not yet opened
+- **WHEN** on the only, connected machine one agent is in error, two finished and have not been opened in the app since, and three are working
+- **THEN** the notification reads "1 needs you · 2 done · 3 working" over "Connected"
+
+#### Scenario: A finish opened in the app
+- **WHEN** Ezra opens one of two finished agents in the app and nothing else changes
+- **THEN** the notification reads "1 done", and once Ezra opens the other it reads "Nothing needs you"
+
 #### Scenario: Quiet
-- **WHEN** every agent is idle or finished
+- **WHEN** every agent is idle, or finished and opened in the app since
 - **THEN** the notification reads "Nothing needs you" over "Connected"
 
 #### Scenario: One of two machines down

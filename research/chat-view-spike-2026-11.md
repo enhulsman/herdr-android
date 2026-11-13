@@ -50,7 +50,8 @@ Evidence per case (all observed, high confidence for the versions above):
   start hook wrote. The spike keeps showing what it already read, without the
   message box.
 - **Stale and reused pids.** The session file's `procStart` equals field 22 of
-  `/proc/<pid>/stat`; a mismatch is refused.
+  `/proc/<pid>/stat`; a mismatch is refused. Claude Code writes it as a JSON
+  string, not a number (the first phone try failed on that).
 
 Limits: Linux only (`/proc`); a moved `CLAUDE_CONFIG_DIR` or `CODEX_HOME` is
 found for Codex (the script matches `*/sessions/*/rollout-*`) but not for

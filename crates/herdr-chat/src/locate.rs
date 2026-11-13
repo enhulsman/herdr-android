@@ -100,7 +100,11 @@ fn claude(p: &Probe) -> Found {
     let Some(session) = v["sessionId"].as_str() else {
         return Found::Nothing("session file unreadable");
     };
-    if v["procStart"].as_u64().is_none() || v["procStart"].as_u64() != p.proc_start {
+    // Claude Code writes it as a string ("756754"); accept a number too.
+    let start = v["procStart"]
+        .as_u64()
+        .or_else(|| v["procStart"].as_str().and_then(|s| s.trim().parse().ok()));
+    if start.is_none() || start != p.proc_start {
         return Found::Nothing("process start differs");
     }
     match p.claude_logs.as_slice() {

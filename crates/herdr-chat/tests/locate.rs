@@ -31,6 +31,16 @@ fn claude_log_comes_from_the_pid_file() {
 }
 
 #[test]
+fn claude_writes_proc_start_as_a_string() {
+    // As Claude Code 2.1.322-2.1.323 write it: "procStart":"9001".
+    let file = PIDFILE.replace("\"procStart\":9001", "\"procStart\":\"9001\"");
+    let p = claude_probe(&file, Some(9001), &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"]);
+    assert!(matches!(locate::decide(&p), Found::Log { .. }), "{:?}", locate::decide(&p));
+    let p = claude_probe(&file, Some(9002), &["/x/a.jsonl"]);
+    assert_eq!(locate::decide(&p), Found::Nothing("process start differs"));
+}
+
+#[test]
 fn a_reused_pid_does_not_match() {
     // The file names a process that started at another time: a stale file whose
     // pid now belongs to someone else.

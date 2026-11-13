@@ -13,7 +13,11 @@ changes between releases.
 ## What works today
 
 - **Agents:** every agent on every machine in one list, "needs you" first, then
-  finished (not yet seen), working and idle.
+  finished (not yet seen), working and idle. Each goes by its session's name
+  ("Pricing page copy") and shows where it sits at the desk ("website / 2").
+- **New terminals and agents:** start a terminal, or an agent installed on that
+  machine (Claude Code, Codex and the others herdr knows), in one of the desk's
+  spaces. It opens on the phone and shows up on the desk as a new tab.
 - **Live terminal:** the terminal as the desk draws it, with colours, zoom and
   scrollback. Opening it switches the terminal to the phone's size. Type at the
   desk and the desk gets its size back while the phone keeps watching; exit the
@@ -22,8 +26,8 @@ changes between releases.
   tab, arrows, ^C and more). A compose sheet takes long prompts with
   autocorrect and dictation, and pastes them without pressing enter.
 - **Alerts:** "Needs you" with sound, "Finished" silently, and a quiet warning
-  when a machine has gone silent for 13 hours. Tap an alert to open that
-  agent's terminal. Mute per machine, and a test alert that checks the whole
+  when a machine has gone silent for 13 hours. Alerts name the session and
+  where it sits. Tap an alert to open that agent's terminal. Mute per machine, and a test alert that checks the whole
   path.
 - **Security:** the SSH key is made in the phone's secure hardware and never
   leaves it. It works for 30 minutes after you unlock the phone or use your
@@ -60,20 +64,23 @@ go to the app's notifications, open "Finished", and set it to alerting.
 
 **Next (specified):**
 
+- **Stay connected** (built, in testing): an optional setting that keeps the
+  connection open in the background, with a quiet notification that counts
+  the agents that need you, have finished or are working, so the app opens at
+  once.
 - A spaces drawer, a tab overview and a peek at sub-agents.
 - A wide layout for landscape and tablets.
 - Four more themes, chosen per light and dark mode.
 - A view-only Changes panel: an agent's git changes, to review before you
   approve.
-- New terminals and agents from the phone: open a terminal in a space, or start
-  an installed agent there.
 
 **Planned (not yet specified):**
 
-- **An always-on status notification** (optional): every agent's state in one
-  notification, kept up to date, with the connection kept open so the app opens
-  at once. Possibly as a live status chip in the status bar on recent Android
-  versions.
+- **A reader view beside the terminal:** switch between an agent's live
+  terminal and its conversation as formatted text, the way a chat app shows it.
+- **Mute a session:** leave one session out of alerts and the status
+  notification, for an agent stuck in a loop or an orchestrator you never talk
+  to.
 
 **Not planned:** closing or killing agents, editing spaces and tabs, a file
 browser, custom theme files, image paste.

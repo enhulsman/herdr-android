@@ -1,10 +1,8 @@
 package dev.herdr.android.stay
 
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -34,11 +32,7 @@ class StayConnectedService : Service() {
     private lateinit var sink: AndroidStatusSink
     private lateinit var notifier: StatusNotifier
 
-    private val unlocked = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_USER_PRESENT) app().userAuth.onUnlocked()
-        }
-    }
+    private val unlocked = UnlockReceiver { app().userAuth.onUnlocked() }
 
     private fun app() = application as HerdrApp
 
@@ -46,12 +40,7 @@ class StayConnectedService : Service() {
         super.onCreate()
         sink = AndroidStatusSink(this)
         notifier = StatusNotifier(sink)
-        val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(unlocked, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(unlocked, filter)
-        }
+        unlocked.register(this)
         val hub = app().hubHost
         scope.launch {
             combine(hub.snapshot, hub.startError) { snapshot, error -> StatusText.of(snapshot, error, resources) }
@@ -76,7 +65,7 @@ class StayConnectedService : Service() {
     override fun onDestroy() {
         scope.cancel()
         notifier.stop()
-        unregisterReceiver(unlocked)
+        unlocked.unregister(this)
         super.onDestroy()
     }
 

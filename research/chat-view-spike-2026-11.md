@@ -186,9 +186,9 @@ the tail 60 ms, the lookup 100-200 ms when due, and every poll while a new
 session's log does not exist yet); the sent message shows at
 once, dimmed, until its row is in the log (0.9 s after the tap); a short
 answer showed 0.3 s after the agent's `done` event. A pending message is
-taken as arrived when any new message of the person appears (no text
-match), and the battery and desk cost of polling every 0.5 s were not
-measured.
+taken as arrived when a message of the person's with the same text appears
+(it never expires: the spec needs a limit), and the battery and desk cost
+of polling every 0.5 s were not measured.
 
 **No streaming.** The logs hold finished blocks only: an answer appears
 whole when the agent ends that block, not word by word as in the agents' own
@@ -332,6 +332,33 @@ and images at its front when older text is merged in. The spec should give
 each row a stable identity instead: the byte offset of the line that starts
 it plus its index within that line (one line can give several rows, and
 rows merge across lines), which needs the tail to report line offsets.
+
+## Reviews
+
+Two independent read-only reviews (Codex and a second Claude model) judged
+whether this answers questions 1-5; after fixes in two rounds both said
+sufficient in round 3. What they left for the spec, not fixed in the spike:
+
+- **Send target:** remember the agent (and session) at the first check and
+  refuse when it differs right before typing; while photos upload, a poll
+  can replace it. An ambiguous Codex rollout must not stay sendable.
+- **Row identity that survives merging:** a folded tool row can gain calls
+  at its front after a read-back, and a queued copy brought in by read-back
+  can drop a held duplicate; positional keys shift in both cases.
+- **The guard against read-back:** 30 bookkeeping lines in the recent
+  window must not show the terminal before older messages are read; keep
+  the check running after messages exist.
+- **Oversized records:** the live tail stops for good at a record over
+  7.5 MB (four large photos in one message might be one); skip it going
+  forward instead.
+- **Expiry of a pending message**, a reason shown on an empty chat, a tool
+  detail that follows the live call, Codex images cached by path (a reused
+  path shows another image), a session file whose id the script misses
+  giving an empty chat instead of the terminal, and saying on screen that a
+  message while the agent works steers its turn.
+- **Untested:** `/resume` inside either agent's interface, other leading
+  characters the input boxes treat specially, a person-attached image in a
+  Codex log, mirrored EXIF.
 
 ## Go or no-go
 

@@ -130,8 +130,31 @@ characters. It prints the size and the next offset. First open reads the last
 Claude Code stayed at 30-58% of raw because each tool result is stored twice
 (`toolUseResult`, a structured copy). Most of that copy was image base64,
 which the tail now empties too: see section 5.
-The spike polls every 2 s while the chat is open; the feature should read on
-`turn`, `title` and `status` events and while the agent is working.
+
+**Reading back.** The script takes an end bound too (`sh SCRIPT path start
+end`) and leaves out a first line cut by `start` (the byte before it is not a
+newline); it reports where its first whole line starts. Scrolling up reads
+the 2 MB before the oldest line held, doubled while one line is longer, puts
+that text in front of what is held and parses it all again in one parser, so
+tool results still meet their calls. Desk tests read a log back in pieces and
+get every line exactly once.
+
+**Latency.** First measured with the 2 s poll: a message reached the log
+0.33 s after `terminal.send`, but new content showed after about 1.3 s on
+average and up to 2.5 s, all of it the poll's wait plus three calls in a row.
+The spike now polls right after each `status`, `turn` or `title` event of the
+terminal (its own `events.subscribe` for that terminal), every 0.5 s while
+the agent works or a sent message waits, and every 5 s otherwise; it looks the
+log up again only when the process in front changes or 10 s have passed (a
+`/clear` keeps the process but starts a new log). On the test phone over
+Wi-Fi: a poll takes 110-420 ms (`terminal.get` 50-600 ms with Wi-Fi jitter,
+the tail 60 ms, the lookup 100-200 ms when due); the sent message shows at
+once, dimmed, until its row is in the log (0.9 s after the tap); a short
+answer showed 0.3 s after the agent's `done` event.
+
+**No streaming.** The logs hold finished blocks only: an answer appears
+whole when the agent ends that block, not word by word as in the agents' own
+apps. Streaming would need the agent's live output, which neither log offers.
 
 ## 4. Sending
 
@@ -221,6 +244,15 @@ window), switching between an agent's sessions from the chat, and slash
 command completion (careful: section 4's pasted slash command opened the
 wrong dialog).
 
+A second round asked for, and the spike now has: the sent message shown at
+once (above); the folded line naming what ran ("Ran 7 commands, read 2
+files, started 1 agent"); a lone tool call opening its detail straight away;
+older messages loading on scrolling up, back to the start; the chat staying
+the chosen view when switching agents (a terminal with no chat shows the
+terminal, unless the chat was opened there by hand, which says why); and the
+terminal's own title bar in the chat (icon, status, swipes), with a switch
+labelled Terminal or Chat.
+
 ## Go or no-go
 
 - **Claude Code: go.** Matching is exact for a running agent through its
@@ -242,7 +274,8 @@ wrong dialog).
    a desk setting, so the spec offers it rather than requiring it.
 3. Read through `machine.exec` and the tail script, never `file.read`; first
    open from the end with a budget, older messages on scroll back, new bytes
-   on `turn`/`status` events.
+   after the terminal's events and every 0.5 s while it works; show a sent
+   message at once.
 4. Parse in Rust (`herdr-chat`), one module per agent, with the health guard;
    fixtures stay synthetic.
 5. Send with `terminal.send` from the API, gated on foreground and status as

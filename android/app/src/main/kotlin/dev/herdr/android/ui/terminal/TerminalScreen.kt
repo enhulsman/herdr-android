@@ -219,8 +219,18 @@ interface TerminalInputHandle {
 
 // --- Title bar and queue strip ---------------------------------------------
 
+/**
+ * The terminal's title bar, also the chat's (spike, issue 17): back, icon,
+ * name, status pill and the view switch ([switchLabel], hidden when
+ * [onSwitch] is null); swipes step through the agents.
+ */
 @Composable
-private fun TitleBar(header: TerminalHeader, actions: TerminalActions) {
+internal fun TitleBar(
+    header: TerminalHeader,
+    actions: TerminalActions,
+    switchLabel: String = "Chat",
+    onSwitch: (() -> Unit)? = actions.onChat,
+) {
     val c = HerdrTheme.colors
     val view = LocalView.current
     val threshold = with(LocalDensity.current) { SWIPE_STEP.toPx() }
@@ -278,7 +288,7 @@ private fun TitleBar(header: TerminalHeader, actions: TerminalActions) {
             BasicText(header.lineTwo, style = HerdrType.secondary.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (header.state != null && header.tone != SheetTone.None) StatePill(header.state, header.tone)
-        actions.onChat?.let { dev.herdr.android.ui.chat.ViewSwitch("Chat", it) }
+        onSwitch?.let { dev.herdr.android.ui.chat.ViewSwitch(switchLabel, it) }
     }
 }
 

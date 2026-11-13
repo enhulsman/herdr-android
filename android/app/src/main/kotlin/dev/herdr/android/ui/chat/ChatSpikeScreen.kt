@@ -53,7 +53,11 @@ import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
 import dev.herdr.android.ui.terminal.LineIcon
 import dev.herdr.android.ui.terminal.LineIconImage
+import dev.herdr.android.ui.terminal.TerminalActions
 import dev.herdr.android.ui.terminal.TerminalHeader
+import dev.herdr.android.ui.terminal.TitleBar
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrRadius
 import dev.herdr.android.ui.theme.HerdrSpacing
@@ -66,6 +70,9 @@ import uniffi.herdr_mobile.ChatRow
 // Spike for issue 17 (never merged): the try-it chat view. Wording and look
 // are rough on purpose; the OpenSpec change designs the real one.
 
+/** A message sent from the phone that the log does not hold yet; [at] is where its row will be. */
+data class Pending(val text: String, val images: Int, val at: Int)
+
 class ChatSpikeState {
     var draft by mutableStateOf("")
     var sheet by mutableStateOf<List<ChatCall>?>(null)
@@ -73,55 +80,78 @@ class ChatSpikeState {
     /** The image shown full screen, by key. */
     var viewer by mutableStateOf<String?>(null)
     var attached by mutableStateOf<List<Attachment>>(emptyList())
+    var pending by mutableStateOf<List<Pending>>(emptyList())
+    /** Rows put in front by reading back: row i has the stable position i - base. */
+    var base by mutableStateOf(0)
+    /** Follow new rows at the bottom; off once the person scrolls up. */
+    var stick by mutableStateOf(true)
+    var loadingOlder by mutableStateOf(false)
+    /** Read-backs finished, so a top still in view asks for the next part. */
+    var olderLoads by mutableStateOf(0)
+
+    /** A tap on a folded line: one call opens straight to its detail. */
+    fun openTools(calls: List<ChatCall>) {
+        sheet = calls
+        detail = calls.singleOrNull()
+    }
+
+    /** Back in the sheet: to the list, or closed when there is only one call. */
+    fun closeDetail() {
+        if (sheet?.size == 1) sheet = null
+        detail = null
+    }
+
+    /** A message went out while the log held [rows] rows. */
+    fun sent(text: String, images: Int, rows: Int) {
+        pending = pending + Pending(text, images, rows - base)
+        stick = true
+    }
+
+    /**
+     * Drops the pending messages whose user row has arrived, oldest first;
+     * each row confirms one message, and those still waiting look past it.
+     */
+    fun confirm(rows: List<ChatRow>) {
+        if (pending.isEmpty()) return
+        val users = rows.withIndex().filter { it.value.kind == "user" }.map { it.index - base }
+        var after = Int.MIN_VALUE
+        val left = mutableListOf<Pending>()
+        for (p in pending) {
+            val hit = if (left.isEmpty()) users.firstOrNull { it >= maxOf(p.at, after) } else null
+            if (hit != null) after = hit + 1 else left += if (after > p.at) p.copy(at = after) else p
+        }
+        if (left != pending) pending = left
+    }
 }
 
 @Composable
 fun ChatSpikeScreen(
     header: TerminalHeader,
+    actions: TerminalActions,
     poll: ChatPoll?,
     state: ChatSpikeState,
     images: ChatImageSource,
-    onBack: () -> Unit,
     onTerminal: () -> Unit,
     onPick: () -> Unit,
     onSend: (String) -> Unit,
+    onOlder: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = HerdrTheme.colors
     Box(modifier.fillMaxSize().background(c.bg)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            ChatTitle(header, onBack, onTerminal)
+            TitleBar(header, actions, "Terminal", onTerminal)
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when {
                     poll == null -> Centered("Reading the session…")
                     poll.state != "ready" -> Fallback(poll.reason, onTerminal)
-                    else -> Messages(poll, state, images)
+                    else -> Messages(poll, state, images, onOlder)
                 }
             }
             if (poll?.state == "ready") MessageBox(state, poll.canSend, onPick, onSend)
         }
         state.sheet?.let { calls -> ToolSheet(calls, state, images) }
         state.viewer?.let { key -> ImageViewer(key, images) { state.viewer = null } }
-    }
-}
-
-@Composable
-private fun ChatTitle(header: TerminalHeader, onBack: () -> Unit, onTerminal: () -> Unit) {
-    val c = HerdrTheme.colors
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = HerdrLayout.terminalTitleHeight).background(c.chrome)
-            .padding(start = HerdrSpacing.s4, end = HerdrSpacing.s12),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(HerdrRadius.button)).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
-            ChevronIcon(Chevron.Left, 22.dp, c.fg)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            BasicText(header.name, style = HerdrType.terminalTitle.copy(color = c.fg), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            BasicText(header.lineTwo, style = HerdrType.secondary.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        ViewSwitch("Terminal", onTerminal)
     }
 }
 
@@ -156,26 +186,75 @@ private fun Fallback(reason: String, onTerminal: () -> Unit) {
 }
 
 @Composable
-private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSource) {
+private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSource, onOlder: () -> Unit) {
     val list = rememberLazyListState()
     val rows = poll.rows
-    LaunchedEffect(rows.size) { if (rows.isNotEmpty()) list.scrollToItem(rows.size - 1 + if (poll.cut) 1 else 0) }
-    if (rows.isEmpty()) return Centered("No messages yet.")
-    LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (poll.cut) item { Note("Earlier messages are not loaded") }
-        itemsIndexed(rows) { _, row ->
-            when (row.kind) {
-                "user" -> UserBubble(row, images) { state.viewer = it }
-                "said" -> Copyable(row.text) { Said(row.text) }
-                "agent" -> AgentCard(row)
-                "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ToolLine(row.calls) { state.sheet = row.calls }
-                    val shots = row.calls.flatMap { it.images }
-                    if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { state.viewer = it }
-                }
-                else -> Note(row.text)
-            }
+    val pending = state.pending
+    if (rows.isEmpty() && pending.isEmpty()) return Centered("No messages yet.")
+    // Follow the bottom unless the person scrolled up; back at the bottom, follow again.
+    LaunchedEffect(list) {
+        snapshotFlow { list.isScrollInProgress to list.canScrollForward }.collect { (moving, more) -> if (moving) state.stick = !more }
+    }
+    // The keyboard opening shrinks the list: keep the bottom in view.
+    LaunchedEffect(list) {
+        snapshotFlow { list.layoutInfo.viewportSize.height }.collect {
+            val last = list.layoutInfo.totalItemsCount - 1
+            if (state.stick && last >= 0) list.scrollToItem(last)
         }
+    }
+    val end = rows.size - state.base + pending.size
+    var settled by remember { mutableStateOf(false) }
+    LaunchedEffect(end) {
+        if (state.stick || !settled) list.scrollToItem(rows.size + pending.size - 1)
+        settled = true
+    }
+    // The top row in view reads the part before it, back to the start.
+    // Not "index 0 in view": a row with nothing to show has no height and never counts as visible.
+    val atTop by remember { derivedStateOf { !list.canScrollBackward } }
+    // Keyed on the loads as well: while the top stays in view (a short list), each load asks for the next.
+    LaunchedEffect(atTop, poll.cut, settled, state.olderLoads) { if (atTop && poll.cut && settled && !state.loadingOlder) onOlder() }
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            itemsIndexed(rows, key = { i, _ -> i - state.base }) { _, row ->
+                when (row.kind) {
+                    "user" -> UserBubble(row, images) { state.viewer = it }
+                    "said" -> Copyable(row.text) { Said(row.text) }
+                    "agent" -> AgentCard(row)
+                    "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ToolLine(row.calls) { state.openTools(row.calls) }
+                        val shots = row.calls.flatMap { it.images }
+                        if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { state.viewer = it }
+                    }
+                    else -> Note(row.text)
+                }
+            }
+            itemsIndexed(pending, key = { i, p -> "pending ${p.at} $i" }) { _, p -> PendingBubble(p) }
+        }
+        if (state.loadingOlder) {
+            BasicText(
+                "Loading earlier messages…",
+                style = HerdrType.secondary.copy(color = HerdrTheme.colors.fg),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).clip(RoundedCornerShape(HerdrRadius.chip))
+                    .background(HerdrTheme.colors.raised).padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+    }
+}
+
+/** A message on its way: dimmed until the log holds it. */
+@Composable
+private fun PendingBubble(p: Pending) {
+    val c = HerdrTheme.colors
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val text = listOfNotNull(
+            p.text.takeIf { it.isNotBlank() },
+            if (p.images == 1) "1 image" else if (p.images > 1) "${p.images} images" else null,
+        ).joinToString("\n")
+        BasicText(
+            text, style = HerdrType.body.copy(color = c.dimText),
+            modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+        BasicText("Sending…", style = HerdrType.secondary.copy(color = c.dimText))
     }
 }
 
@@ -252,15 +331,39 @@ private fun Said(text: String, maxBlocks: Int = Int.MAX_VALUE) {
     }
 }
 
-/** Tool calls in a row, folded: "Ran 3 commands ›", or the one call's title. */
+/** Tool calls in a row, folded: "Ran 7 commands, read 2 files", or the one call's title. */
 fun toolLine(calls: List<ChatCall>): String {
     val running = calls.any { !it.done }
     val failed = calls.count { it.failed }
-    val base = if (calls.size == 1) calls[0].title else {
-        val shells = calls.all { it.name == "Bash" || it.name == "Shell" }
-        if (shells) "Ran ${calls.size} commands" else "Used ${calls.size} tools"
-    }
+    val base = if (calls.size == 1) calls[0].title else toolKinds(calls)
     return base + (if (failed > 0) " · $failed failed" else "") + (if (running) " · running" else "")
+}
+
+private enum class ToolKind(val one: String, val many: String) {
+    Command("ran 1 command", "ran %d commands"),
+    Search("searched for 1 pattern", "searched for %d patterns"),
+    Read("read 1 file", "read %d files"),
+    Edit("edited 1 file", "edited %d files"),
+    Image("viewed 1 image", "viewed %d images"),
+    Agent("started 1 agent", "started %d agents"),
+    Other("used 1 tool", "used %d tools"),
+}
+
+private fun kindOf(name: String) = when (name) {
+    "Bash", "Shell" -> ToolKind.Command
+    "Grep", "Glob" -> ToolKind.Search
+    "Read" -> ToolKind.Read
+    "Edit", "Write", "MultiEdit", "NotebookEdit" -> ToolKind.Edit
+    "View image" -> ToolKind.Image
+    "Agent", "Task" -> ToolKind.Agent
+    else -> ToolKind.Other
+}
+
+/** "Ran 7 commands, read 2 files, started 1 agent": each kind once, in [ToolKind] order. */
+private fun toolKinds(calls: List<ChatCall>): String {
+    val counts = calls.groupingBy { kindOf(it.name) }.eachCount()
+    val parts = ToolKind.entries.mapNotNull { k -> counts[k]?.let { n -> if (n == 1) k.one else k.many.format(n) } }
+    return parts.joinToString(", ").replaceFirstChar { it.uppercase() }
 }
 
 @Composable
@@ -334,7 +437,7 @@ private fun ToolSheet(calls: List<ChatCall>, state: ChatSpikeState, images: Chat
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(36.dp).clip(CircleShape).clickable { state.detail = null }, contentAlignment = Alignment.Center) { ChevronIcon(Chevron.Left, 18.dp, c.fg) }
+                    Box(Modifier.size(36.dp).clip(CircleShape).clickable { state.closeDetail() }, contentAlignment = Alignment.Center) { ChevronIcon(Chevron.Left, 18.dp, c.fg) }
                     BasicText(d.name + if (!d.done) " · running" else if (d.failed) " · failed" else "", style = HerdrType.sheetTitle.copy(color = c.fg))
                 }
                 BasicText(d.title, style = HerdrType.secondary.copy(color = c.dimText))

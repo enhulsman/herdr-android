@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.herdr.android.ui.agents.ProgramIcon
 import dev.herdr.android.ui.agents.SheetTone
+import dev.herdr.android.ui.terminal.TerminalActions
 import dev.herdr.android.ui.terminal.TerminalHeader
 import dev.herdr.android.ui.theme.HerdrTheme
 import org.junit.Assert.assertEquals
@@ -30,7 +31,8 @@ import uniffi.herdr_mobile.ChatRow
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class ChatSpikeScreenshotTest {
-    private val header = TerminalHeader("upload retry", ProgramIcon.Claude, "website · workstation", "done", SheetTone.None)
+    private val header = TerminalHeader("upload retry", ProgramIcon.Claude, "website · workstation", "done", SheetTone.Done)
+    private val actions = TerminalActions(onBack = {}, onOpen = {}, onSwipe = { false }, onPhoneGrid = {})
 
     private fun call(name: String, title: String, failed: Boolean = false, done: Boolean = true, out: String = "ok", images: List<ChatImage> = emptyList()) =
         ChatCall(name, title, title, out, done, failed, images)
@@ -60,7 +62,7 @@ class ChatSpikeScreenshotTest {
 
     private val withImages = ChatPoll(
         state = "ready", reason = "", agent = "claude", title = "Login screen", version = "2.1.323",
-        canSend = true, cut = false,
+        status = "idle", canSend = true, cut = false, timings = "",
         rows = listOf(
             row("user", "The login button sits too low on this phone. Fix it?", images = listOf(img("log:100:0"), img("log:200:0"))),
             row("said", "Taking a screenshot of the current screen first."),
@@ -78,7 +80,7 @@ class ChatSpikeScreenshotTest {
 
     private val poll = ChatPoll(
         state = "ready", reason = "", agent = "claude", title = "Upload retry fix", version = "2.1.323",
-        canSend = true, cut = true,
+        status = "done", canSend = true, cut = true, timings = "",
         rows = listOf(
             row("user", "The upload job gives up after one try. Fix the **retry** and add a test."),
             row("said", "Looking at the job first."),
@@ -93,9 +95,62 @@ class ChatSpikeScreenshotTest {
     @Test
     fun foldedLineSaysWhatRan() {
         assertEquals("Ran 2 commands", toolLine(listOf(call("Bash", "a"), call("Shell", "b"))))
-        assertEquals("Used 3 tools · 1 failed", toolLine(calls))
+        assertEquals("Ran 2 commands, read 1 file · 1 failed", toolLine(calls))
         assertEquals("Check the build · running", toolLine(listOf(call("Bash", "Check the build", done = false))))
+        // Each kind by name, in a fixed order, whatever order they ran in.
+        val mixed = List(7) { call("Bash", "c$it") } + listOf(call("Agent", "a"), call("Read", "r1"), call("Read", "r2"))
+        assertEquals("Ran 7 commands, read 2 files, started 1 agent", toolLine(mixed))
+        val rest = listOf(
+            call("Grep", "g"), call("Glob", "h"), call("Edit", "e"), call("Write", "w"), call("MultiEdit", "m"),
+            call("Task", "t"), call("Task", "u"), call("View image", "v"), call("WebFetch", "f"), call("mcp__x__y", "x"),
+        )
+        assertEquals("Searched for 2 patterns, edited 3 files, viewed 1 image, started 2 agents, used 2 tools", toolLine(rest))
+        assertEquals("Ran 1 command, used 1 tool", toolLine(listOf(call("Shell", "a"), call("TodoWrite", "b"))))
     }
+
+    @Test
+    fun oneToolOpensItsDetailAtOnce() {
+        val s = ChatSpikeState()
+        s.openTools(listOf(calls[1]))
+        assertEquals(calls[1], s.detail)
+        s.closeDetail()
+        assertEquals("back from a lone call closes the sheet", null, s.sheet)
+        s.openTools(calls)
+        assertEquals(null, s.detail)
+        s.detail = calls[0]
+        s.closeDetail()
+        assertEquals("back from one of several shows the list", calls, s.sheet)
+        assertEquals(null, s.detail)
+    }
+
+    @Test
+    fun aSentMessageShowsUntilItsRowArrives() {
+        val s = ChatSpikeState()
+        val before = poll.rows
+        s.sent("Run the tests", images = 0, rows = before.size)
+        s.sent("And push", images = 1, rows = before.size)
+        assertEquals(2, s.pending.size)
+        // A poll with nothing new keeps both.
+        s.confirm(before)
+        assertEquals(2, s.pending.size)
+        // The first one arrives (with an answer after it): only the second waits.
+        s.confirm(before + row("user", "Run the tests") + row("said", "Running."))
+        assertEquals(listOf("And push"), s.pending.map { it.text })
+        // Older rows put in front (scrolling back) confirm nothing.
+        s.base += 3
+        s.confirm(List(3) { row("user", "older $it") } + before + row("user", "Run the tests") + row("said", "Running."))
+        assertEquals(listOf("And push"), s.pending.map { it.text })
+        s.confirm(List(3) { row("user", "older $it") } + before + row("user", "Run the tests") + row("said", "Running.") + row("user", "And push"))
+        assertEquals(emptyList<Pending>(), s.pending)
+    }
+
+    @Test
+    fun pendingMessage() = capture(
+        "chat-spike-pending",
+        poll.copy(rows = poll.rows.dropLast(1)),
+        ChatSpikeState().apply { sent("Also check the upload size limit", images = 2, rows = poll.rows.size - 1) },
+        dark = true,
+    )
 
     @Test
     fun markdownBlocks() {
@@ -126,7 +181,7 @@ class ChatSpikeScreenshotTest {
 
     private val feedback = ChatPoll(
         state = "ready", reason = "", agent = "claude", title = "Docs check", version = "2.1.323",
-        canSend = true, cut = false,
+        status = "idle", canSend = true, cut = false, timings = "",
         rows = listOf(
             row("tools", calls = listOf(call("Shell", "! ls src", out = "main.rs\nupload.rs"))),
             row("said", "Here is the comparison:\n\n| Log | Raw | Sent |\n|---|---|---|\n| website | 30 MB | 2.4 MB |\n| api | 45 MB | 8.0 MB |\n\n```\ncargo test -p upload --features retry-backoff -- --nocapture retries_three_times_with_backoff\n```"),
@@ -196,7 +251,7 @@ class ChatSpikeScreenshotTest {
     private fun capture(name: String, poll: ChatPoll, state: ChatSpikeState, dark: Boolean) {
         captureRoboImage("src/test/snapshots/$name.png") {
             HerdrTheme(dark = dark) {
-                ChatSpikeScreen(header, poll, state, source, onBack = {}, onTerminal = {}, onPick = {}, onSend = {})
+                ChatSpikeScreen(header, actions, poll, state, source, onTerminal = {}, onPick = {}, onSend = {})
             }
         }
     }

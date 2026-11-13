@@ -248,6 +248,11 @@ impl Parser {
                         text: "Conversation compacted".into(),
                     });
                 }
+                // A slash command and its output (`/usage` writes both here,
+                // once its dialog closes).
+                if v["subtype"] == "local_command" && v["isSidechain"] != true {
+                    self.claude_user(&v["content"]);
+                }
                 return;
             }
             _ => return,
@@ -403,6 +408,11 @@ impl Parser {
             }
             if let Some(cmd) = between(t, "<bash-input>", "</bash-input>") {
                 let cmd = cmd.trim().to_owned();
+                // The person typed it: their message, then the command and its output.
+                self.push(Item::User {
+                    text: format!("!{cmd}"),
+                    images: vec![],
+                });
                 self.add_call(
                     Some(BASH.into()),
                     ToolCall {
@@ -430,7 +440,14 @@ impl Parser {
             }
             if let Some(rest) = t.strip_prefix("<command-name>") {
                 let cmd = rest.split("</command-name>").next().unwrap_or("").trim();
-                self.push(Item::Note { text: cmd.into() });
+                let args = between(t, "<command-args>", "</command-args>").unwrap_or("").trim();
+                let text = if args.is_empty() { cmd.to_owned() } else { format!("{cmd} {args}") };
+                self.push(Item::User { text, images: vec![] });
+            } else if let Some(out) = between(t, "<local-command-stdout>", "</local-command-stdout>") {
+                let out = strip_ansi(out);
+                if !out.trim().is_empty() {
+                    self.push(Item::Note { text: out.trim().to_owned() });
+                }
             } else if !t.starts_with("<local-command") {
                 self.push(Item::User {
                     text: unwrap_sent(s),
@@ -554,6 +571,13 @@ impl Parser {
                             .map(str::to_owned)
                     })
                     .unwrap_or_default();
+                // A `!` command the person ran: their message, then the command.
+                if item["source"] == "user_shell" {
+                    self.push(Item::User {
+                        text: format!("!{cmd}"),
+                        images: vec![],
+                    });
+                }
                 self.add_call(
                     None,
                     ToolCall {
@@ -625,6 +649,28 @@ impl Parser {
 
 /// The key a `!` shell command waits under for its output record.
 const BASH: &str = "!bash";
+
+/// `s` without terminal escape sequences (a command's output can be coloured).
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                // Parameters and intermediates, then one final byte in @..~.
+                for c in chars.by_ref() {
+                    if ('@'..='~').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        out.push(c);
+    }
+    out
+}
 
 /// The text between the first `open` and the `close` after it.
 fn between<'a>(s: &'a str, open: &str, close: &str) -> Option<&'a str> {

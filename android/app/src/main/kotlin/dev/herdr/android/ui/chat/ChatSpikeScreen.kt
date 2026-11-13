@@ -71,23 +71,32 @@ import uniffi.herdr_mobile.ChatRow
 // Spike for issue 17 (never merged): the try-it chat view. Wording and look
 // are rough on purpose; the OpenSpec change designs the real one.
 
-/** A message sent from the phone that the log does not hold yet; [at] is where its row will be. */
-data class Pending(val text: String, val images: Int, val at: Int) {
+/**
+ * A message sent from the phone that the log does not hold yet; [at] is where
+ * its row will be, [sentAt] when it went out (uptime ms).
+ */
+data class Pending(val text: String, val images: Int, val at: Int, val sentAt: Long = 0) {
     /**
      * The log's row for this message: the same text, or images and no text for
-     * a photo sent alone. A `!` message is a shell command: the agent logs it
-     * as a shell call with the command, not as the person's message.
+     * a photo sent alone. `!` and `/` commands come back as the person's row too.
      */
-    val bang: Boolean get() = text.trim().startsWith("!")
+    fun matches(row: ChatRow): Boolean = when {
+        row.kind != "user" -> false
+        text.isBlank() -> row.text.isBlank() && row.images.isNotEmpty()
+        else -> row.text.trim() == text.trim()
+    }
 
-    fun matches(row: ChatRow): Boolean {
-        val bang = text.trim().takeIf { it.startsWith("!") }?.removePrefix("!")?.trim()
-        return when {
-            bang != null -> row.kind == "tools" && row.calls.any { it.name == "Shell" && it.input.trim() == bang }
-            row.kind != "user" -> false
-            text.isBlank() -> row.text.isBlank() && row.images.isNotEmpty()
-            else -> row.text.trim() == text.trim()
-        }
+    /**
+     * A slash command that shows nothing after [WAIT_MS] most likely opened a
+     * dialog in the terminal (Claude Code logs `/usage` only once it closes).
+     */
+    fun waiting(now: Long): Boolean = text.trimStart().startsWith("/") && now - sentAt >= WAIT_MS
+
+    val waitingText: String
+        get() = "Waiting for the terminal: ${text.trim().substringBefore(' ')} may have opened a dialog there."
+
+    companion object {
+        const val WAIT_MS = 3_000L
     }
 }
 
@@ -120,8 +129,8 @@ class ChatSpikeState {
     }
 
     /** A message went out while the log held [rows] rows. */
-    fun sent(text: String, images: Int, rows: Int) {
-        pending = pending + Pending(text, images, rows - base)
+    fun sent(text: String, images: Int, rows: Int, now: Long = android.os.SystemClock.uptimeMillis()) {
+        pending = pending + Pending(text, images, rows - base, now)
         stick = true
     }
 
@@ -132,13 +141,14 @@ class ChatSpikeState {
      */
     fun confirm(rows: List<ChatRow>) {
         if (pending.isEmpty()) return
-        val users = rows.withIndex().filter { it.value.kind == "user" || it.value.kind == "tools" }.map { (it.index - base) to it.value }
+        val users = rows.withIndex().filter { it.value.kind == "user" }.map { (it.index - base) to it.value }
         var after = Int.MIN_VALUE
         val left = mutableListOf<Pending>()
-        for (p in pending) {
+        // Fewer rows than when it was sent: a new log (`/clear`), its row is near the start.
+        val count = rows.size - base
+        for (p in pending.map { if (it.at > count) it.copy(at = 0) else it }) {
             val from = maxOf(p.at, after)
-            // A `!` command can land in the folded tool row that was last when it was sent.
-            val hit = if (left.isEmpty()) users.firstOrNull { (at, row) -> (at >= from || (p.bang && row.kind == "tools" && at == from - 1)) && p.matches(row) }?.first else null
+            val hit = if (left.isEmpty()) users.firstOrNull { (at, row) -> at >= from && p.matches(row) }?.first else null
             if (hit != null) after = hit + 1 else left += if (after > p.at) p.copy(at = after) else p
         }
         if (left != pending) pending = left
@@ -174,7 +184,7 @@ fun ChatSpikeScreen(
                 when {
                     poll == null -> Centered("Reading the session…")
                     poll.state != "ready" -> Fallback(poll.reason, onTerminal)
-                    else -> Messages(poll, state, images, onOlder)
+                    else -> Messages(poll, state, images, onOlder, onTerminal)
                 }
             }
             if (poll?.state == "ready") MessageBox(state, poll.canSend, onPick, onSend)
@@ -215,7 +225,7 @@ private fun Fallback(reason: String, onTerminal: () -> Unit) {
 }
 
 @Composable
-private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSource, onOlder: () -> Unit) {
+private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSource, onOlder: () -> Unit, onTerminal: () -> Unit) {
     val list = rememberLazyListState()
     val rows = poll.rows
     val pending = state.pending
@@ -261,7 +271,7 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
                     else -> Note(row.text)
                 }
             }
-            itemsIndexed(pending, key = { i, p -> "pending ${p.at} $i" }) { _, p -> PendingBubble(p) }
+            itemsIndexed(pending, key = { i, p -> "pending ${p.at} $i" }) { _, p -> PendingBubble(p, onTerminal) }
         }
         if (poll.reason.isNotEmpty()) {
             BasicText(
@@ -284,7 +294,7 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
 
 /** A message on its way: dimmed until the log holds it. */
 @Composable
-private fun PendingBubble(p: Pending) {
+private fun PendingBubble(p: Pending, onTerminal: () -> Unit) {
     val c = HerdrTheme.colors
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val text = listOfNotNull(
@@ -295,7 +305,19 @@ private fun PendingBubble(p: Pending) {
             text, style = HerdrType.body.copy(color = c.dimText),
             modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
         )
-        BasicText("Sending…", style = HerdrType.secondary.copy(color = c.dimText))
+        var now by remember(p) { mutableStateOf(android.os.SystemClock.uptimeMillis()) }
+        LaunchedEffect(p) {
+            while (!p.waiting(now)) {
+                kotlinx.coroutines.delay(250)
+                now = android.os.SystemClock.uptimeMillis()
+            }
+        }
+        if (p.waiting(now)) {
+            BasicText(p.waitingText, style = HerdrType.secondary.copy(color = c.dimText, textAlign = androidx.compose.ui.text.style.TextAlign.End), modifier = Modifier.widthIn(max = 320.dp))
+            ViewSwitch("Show the terminal", onTerminal)
+        } else {
+            BasicText("Sending…", style = HerdrType.secondary.copy(color = c.dimText))
+        }
     }
 }
 

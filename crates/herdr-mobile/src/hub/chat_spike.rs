@@ -113,6 +113,9 @@ pub struct ChatSpike {
     images: Mutex<HashMap<String, Vec<u8>>>,
     /// This terminal's events, subscribed on the first wait.
     events: tokio::sync::Mutex<Option<Stream>>,
+    /// Until then every poll looks the log up again: a slash command was just
+    /// sent, and `/clear` starts a new log in the same process.
+    relook_until: Mutex<Option<Instant>>,
 }
 
 impl ChatSpike {
@@ -124,6 +127,7 @@ impl ChatSpike {
             open: Mutex::new(None),
             images: Mutex::new(HashMap::new()),
             events: tokio::sync::Mutex::new(None),
+            relook_until: Mutex::new(None),
         }
     }
 }
@@ -232,6 +236,12 @@ fn rows(items: &[Item], session: &str) -> Vec<ChatRow> {
 
 /// The message text for images put at `paths`: each path on a line of its
 /// own, then the text.
+/// How long to look the log up on every poll after sending `message`: a
+/// slash command may start a new log (`/clear`) in the same process.
+fn relook_after(message: &str) -> Option<Duration> {
+    message.trim_start().starts_with('/').then_some(Duration::from_secs(3))
+}
+
 fn with_images(paths: &[String], text: &str) -> String {
     let mut lines = paths.to_vec();
     lines.push(text.to_owned());
@@ -433,7 +443,12 @@ impl ChatSpike {
             }
             match c.call("terminal.send", params).await
             {
-                Ok(_) => None,
+                Ok(_) => {
+                    if let Some(w) = relook_after(&message) {
+                        *self.relook_until.lock().unwrap() = Some(Instant::now() + w);
+                    }
+                    None
+                }
                 Err(e) => Some(format!("{e}")),
             }
         })
@@ -509,7 +524,8 @@ impl ChatSpike {
         // While the log is still empty (a new session), look every time: its
         // first message creates the file.
         let fresh = |o: &Open| Some(o.pid) == pid && o.path.is_some() && o.located.elapsed() < RELOCATE;
-        let known = self.open.lock().unwrap().as_ref().is_some_and(fresh);
+        let relook = self.relook_until.lock().unwrap().is_some_and(|u| Instant::now() < u);
+        let known = !relook && self.open.lock().unwrap().as_ref().is_some_and(fresh);
         let front = agent_in_front(&t);
         if let (Some(pid), Some(agent), false) = (pid, front, known) {
             let at = Instant::now();
@@ -825,6 +841,13 @@ mod tests {
             older_outcome(&Err("Couldn't read the log: it took too long".into()), 100),
             Older::Failed("Couldn't read the log: it took too long".into())
         );
+    }
+
+    #[test]
+    fn a_slash_command_looks_the_log_up_again_for_a_moment() {
+        assert_eq!(relook_after("/clear"), Some(Duration::from_secs(3)));
+        assert_eq!(relook_after("Fix the /api route"), None);
+        assert_eq!(relook_after("!ls"), None);
     }
 
     #[test]

@@ -25,7 +25,8 @@ fn said(text: &str) -> Item {
 fn claude_session_becomes_messages_with_folded_tool_calls() {
     let p = parse(Agent::Claude, CLAUDE);
     let items = p.items();
-    assert_eq!(items[0], Item::Note { text: "/model".into() });
+    // A slash command is the person's own message.
+    assert_eq!(items[0], user("/model"));
     assert_eq!(items[1], user("Fix the **retry** in the upload job"));
     assert_eq!(items[2], said("Looking at the job first."));
     // Three tool calls in a row, across assistant messages, fold into one item.
@@ -312,19 +313,68 @@ fn a_subagents_report_is_its_own_item_named_after_its_task() {
 }
 
 #[test]
-fn a_shell_command_the_person_ran_shows_as_a_tool_call() {
+fn a_shell_command_the_person_ran_is_their_message_and_a_tool_call() {
     let p = parse(Agent::Claude, AGENTS);
-    let Item::Tools { calls } = &p.items()[5] else {
+    let items = &p.items()[5..];
+    assert_eq!(items[0], user("!ls src"));
+    let Item::Tools { calls } = &items[1] else {
         panic!("{:?}", p.items())
     };
-    assert_eq!(calls.len(), 2, "two commands in a row fold together");
     assert_eq!((calls[0].name.as_str(), calls[0].title.as_str()), ("Shell", "! ls src"));
     assert_eq!(calls[0].output, "main.rs\nupload.rs");
     assert!(calls[0].done && !calls[0].failed);
-    assert_eq!(calls[1].output, "cat: nope: No such file");
-    assert!(calls[1].failed, "only stderr: shown as failed");
-    assert_eq!(p.items().len(), 6, "{:#?}", p.items());
+    assert_eq!(items[2], user("!cat nope"));
+    let Item::Tools { calls } = &items[3] else {
+        panic!("{:?}", p.items())
+    };
+    assert_eq!(calls[0].output, "cat: nope: No such file");
+    assert!(calls[0].failed, "only stderr: shown as failed");
+    assert_eq!(p.items().len(), 9, "{:#?}", p.items());
     assert!(!format!("{:?}", p.items()).contains("<bash-"));
+}
+
+fn claude_line(kind: &str, extra: &str, content: &str) -> String {
+    let content = serde_json::to_string(content).unwrap();
+    let body = if kind == "system" { format!("\"content\":{content}") } else { format!("\"message\":{{\"role\":\"user\",\"content\":{content}}}") };
+    format!("{{\"type\":\"{kind}\",{extra}\"isSidechain\":false,\"sessionId\":\"s\",{body}}}\n")
+}
+
+#[test]
+fn a_slash_command_is_the_persons_message_with_its_output_as_a_note() {
+    let mut p = Parser::new(Agent::Claude);
+    // `/clear` opens its new log with the command as a user record; `/usage`
+    // writes both records as `system` / `local_command`, once its dialog closes.
+    p.feed(&claude_line("user", "", "<local-command-caveat>The command below was run directly.</local-command-caveat>"));
+    p.feed(&claude_line("user", "", "<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>"));
+    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<local-command-stdout></local-command-stdout>"));
+    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<command-name>/usage</command-name>\n<command-message>usage</command-message>\n<command-args></command-args>"));
+    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<local-command-stdout>Settings dialog dismissed</local-command-stdout>"));
+    p.feed(&claude_line("user", "", "<command-name>/model</command-name>\n<command-message>model</command-message>\n<command-args>haiku</command-args>"));
+    assert_eq!(
+        p.items(),
+        &[
+            user("/clear"),
+            user("/usage"),
+            Item::Note { text: "Settings dialog dismissed".into() },
+            user("/model haiku"),
+        ]
+    );
+}
+
+#[test]
+fn a_codex_shell_command_the_person_ran_is_their_message() {
+    let mut p = Parser::new(Agent::Codex);
+    let item = |id: &str, cmd: &str, source: &str| {
+        format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"item\":{{\"type\":\"CommandExecution\",\"id\":\"{id}\",\"command\":[\"/bin/bash\",\"-lc\",\"{cmd}\"],\"parsed_cmd\":[{{\"type\":\"unknown\",\"cmd\":\"{cmd}\"}}],\"aggregated_output\":\"hi\\n\",\"exit_code\":0{source}}}}}}}\n")
+    };
+    p.feed(&item("a", "echo hi", ",\"source\":\"user_shell\""));
+    p.feed(&item("b", "ls", ""));
+    let items = p.items();
+    assert_eq!(items[0], user("!echo hi"));
+    let Item::Tools { calls } = &items[1] else { panic!("{items:?}") };
+    assert_eq!(calls.len(), 2, "the agent's own command folds in after it");
+    assert_eq!(calls[0].title, "echo hi");
+    assert_eq!(items.len(), 2, "{items:#?}");
 }
 
 #[test]

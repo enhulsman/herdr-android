@@ -388,6 +388,23 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   should not keep a live terminal's keys under another screen. (A
   Robolectric test of the touch cover failed it before the fix but left
   later Compose tests failing, depending on test order; it was not kept.)
+- **Commands as the person's messages** (the owner's request after
+  trying it): `!` and `/` commands show as the person's bubble, the output
+  below (a `!` command's as a tool line, a slash command's as a note). Claude
+  Code logs `/clear` as a user record in the new log and `/usage` as two
+  `system` / `local_command` records, written only once its dialog closes;
+  while the dialog is open the status stays `done`, so there is no
+  `blocked` to go by. A slash command with no row after 3 s shows "Waiting
+  for the terminal: /usage may have opened a dialog there." and a button to
+  the terminal (the owner's default: when the chat cannot follow, send the
+  person to the terminal). After a slash command the log is looked up on
+  every poll for 3 s; on the phone `/clear` showed the new, empty
+  conversation with its bubble within a few seconds. Not yet right: the
+  list does not scroll to the waiting line, so its button can be below the
+  fold. Idea for the spec: show the terminal's bottom rows in the chat
+  while a command waits, instead of only a button. The Codex part was
+  tested in unit tests only, and the real-log check of Codex rollouts did
+  not run (the read script cannot open them on the Windows drive).
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.

@@ -122,7 +122,8 @@ documents after `missed` or a reconnect. Data shown while disconnected SHALL car
 - **THEN** the terminal shows "reconnecting", then the current screen, with no stale content and no size change
 
 ### Requirement: Connections end in the background
-The app SHALL close its connections 60 s after it leaves the foreground.
+The app SHALL close its connections 60 s after it leaves the foreground,
+unless Stay connected is on (status-notification change).
 
 #### Scenario: Pocketed phone
 - **WHEN** the app has been in the background for 60 s

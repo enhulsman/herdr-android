@@ -29,6 +29,11 @@ changes between releases.
   when a machine has gone silent for 13 hours. Alerts name the session and
   where it sits. Tap an alert to open that agent's terminal. Mute per machine, and a test alert that checks the whole
   path.
+- **Stay connected** (optional): keeps the connection open in the background,
+  with a quiet notification that counts the agents that need you, have
+  finished or are working, so the app opens at once. It uses more battery; how
+  much depends on the phone and how busy your agents are. On GrapheneOS, the
+  counts show on the lock screen only if it shows silent notifications.
 - **Security:** the SSH key is made in the phone's secure hardware and never
   leaves it. It works for 30 minutes after you unlock the phone or use your
   fingerprint. You confirm each machine's host key once,
@@ -63,7 +68,7 @@ go to the app's notifications, open "Finished", and set it to alerting.
 ## Roadmap
 
 Version 1.0 completes the loop: a chat view beside the terminal that you
-can also answer from, Stay connected, muting a session, and a view of an
+can also answer from, muting a session, and a view of an
 agent's git changes, plus the work that lets someone else set the app up
 without help.
 

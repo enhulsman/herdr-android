@@ -6,13 +6,31 @@
 
 use super::HubCore;
 use base64::Engine;
-use herdr_chat::{Agent, Health, Item, Parser, locate, tail};
+use herdr_chat::{Agent, Health, Image, Item, Parser, image, locate, tail};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// The first open reads at most this much of the log's end.
 const FIRST_BUDGET: u64 = 2_000_000;
+/// Fetched images kept for scrolling back and forth; dropped all at once past this.
+const IMAGE_CACHE: usize = 48_000_000;
+
+/// An image in the conversation, fetched with [`ChatSpike::image`] when shown.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ChatImage {
+    /// `log:<line>:<n>`, `file:<path>`, `inline:<base64>` or `missing`.
+    pub key: String,
+    pub media_type: String,
+}
+
+/// An image the person attaches from the phone.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ChatUpload {
+    pub name: String,
+    pub data: Vec<u8>,
+}
 
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ChatCall {
@@ -22,6 +40,7 @@ pub struct ChatCall {
     pub output: String,
     pub done: bool,
     pub failed: bool,
+    pub images: Vec<ChatImage>,
 }
 
 #[derive(Clone, Debug, uniffi::Record)]
@@ -29,7 +48,7 @@ pub struct ChatRow {
     /// "user", "said", "tools" or "note".
     pub kind: String,
     pub text: String,
-    pub images: u32,
+    pub images: Vec<ChatImage>,
     pub calls: Vec<ChatCall>,
 }
 
@@ -63,6 +82,7 @@ pub struct ChatSpike {
     machine: String,
     address: String,
     open: Mutex<Option<Open>>,
+    images: Mutex<HashMap<String, Vec<u8>>>,
 }
 
 impl ChatSpike {
@@ -72,6 +92,7 @@ impl ChatSpike {
             machine,
             address,
             open: Mutex::new(None),
+            images: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -96,6 +117,30 @@ fn fallback(reason: &str, agent: &str) -> ChatPoll {
     }
 }
 
+fn chat_images(images: &[Image]) -> Vec<ChatImage> {
+    images
+        .iter()
+        .map(|m| match m {
+            Image::InLog { line, n, media_type } => ChatImage {
+                key: format!("log:{line}:{n}"),
+                media_type: media_type.clone(),
+            },
+            Image::Inline { media_type, data } => ChatImage {
+                key: format!("inline:{data}"),
+                media_type: media_type.clone(),
+            },
+            Image::File { path } => ChatImage {
+                key: format!("file:{path}"),
+                media_type: String::new(),
+            },
+            Image::Missing => ChatImage {
+                key: "missing".into(),
+                media_type: String::new(),
+            },
+        })
+        .collect()
+}
+
 fn rows(items: &[Item]) -> Vec<ChatRow> {
     items
         .iter()
@@ -103,25 +148,25 @@ fn rows(items: &[Item]) -> Vec<ChatRow> {
             Item::User { text, images } => ChatRow {
                 kind: "user".into(),
                 text: text.clone(),
-                images: *images,
+                images: chat_images(images),
                 calls: vec![],
             },
             Item::Assistant { text } => ChatRow {
                 kind: "said".into(),
                 text: text.clone(),
-                images: 0,
+                images: vec![],
                 calls: vec![],
             },
             Item::Note { text } => ChatRow {
                 kind: "note".into(),
                 text: text.clone(),
-                images: 0,
+                images: vec![],
                 calls: vec![],
             },
             Item::Tools { calls } => ChatRow {
                 kind: "tools".into(),
                 text: String::new(),
-                images: 0,
+                images: vec![],
                 calls: calls
                     .iter()
                     .map(|c| ChatCall {
@@ -131,11 +176,31 @@ fn rows(items: &[Item]) -> Vec<ChatRow> {
                         output: c.output.clone(),
                         done: c.done,
                         failed: c.failed,
+                        images: chat_images(&c.images),
                     })
                     .collect(),
             },
         })
         .collect()
+}
+
+/// The message text for images put at `paths`: each path on a line of its
+/// own, then the text.
+fn with_images(paths: &[String], text: &str) -> String {
+    let mut lines = paths.to_vec();
+    lines.push(text.to_owned());
+    lines.join("\n").trim().to_owned()
+}
+
+/// The `machine.exec` argv that prints the image behind `key`.
+fn image_argv(key: &str, log: Option<&str>) -> Option<Value> {
+    if let Some(r) = key.strip_prefix("log:") {
+        let (line, n) = r.split_once(':')?;
+        Some(json!(["sh", "-c", image::LOG_SCRIPT, "sh", log?, line, n]))
+    } else {
+        let path = key.strip_prefix("file:")?;
+        Some(json!(["sh", "-c", image::FILE_SCRIPT, "sh", path]))
+    }
 }
 
 /// An agent in front whose status lets a message in: idle, done, or working
@@ -157,6 +222,14 @@ impl ChatSpike {
 
     /// Sends `text` as the person's message; the error is for a toast.
     pub fn send(&self, text: String) -> Option<String> {
+        self.send_with_images(text, vec![])
+    }
+
+    /// Puts each image beside the terminal (`terminal.put`), then sends the
+    /// message with their paths first, one per line: Claude Code attaches a
+    /// pasted line that is an image path as the image itself (tested on
+    /// 2.1.323). The error is for a toast.
+    pub fn send_with_images(&self, text: String, images: Vec<ChatUpload>) -> Option<String> {
         let core = self.core.clone();
         core.runtime().block_on(async {
             let conn = self.core.live_conn(&self.machine)?;
@@ -168,8 +241,24 @@ impl ChatSpike {
             if !may_send(&t) {
                 return Some("The agent can't take a message right now".into());
             }
+            let mut lines = Vec::new();
+            for up in images {
+                let data = base64::engine::general_purpose::STANDARD.encode(&up.data);
+                let put = c
+                    .call_timeout(
+                        "terminal.put",
+                        json!({"terminal": self.address, "name": up.name, "data": data}),
+                        Duration::from_secs(60),
+                    )
+                    .await;
+                match put.as_ref().ok().and_then(|r| r["path"].as_str()) {
+                    Some(p) => lines.push(p.to_owned()),
+                    None => return Some(format!("Couldn't send the image: {}", put.err().map(|e| e.to_string()).unwrap_or_default())),
+                }
+            }
+            let message = with_images(&lines, &text);
             match c
-                .call("terminal.send", json!({"terminal": self.address, "text": text}))
+                .call("terminal.send", json!({"terminal": self.address, "text": message}))
                 .await
             {
                 Ok(_) => None,
@@ -177,9 +266,48 @@ impl ChatSpike {
             }
         })
     }
+
+    /// The bytes of one image from [`ChatImage::key`], fetched from the desk
+    /// the first time; `None` when it is gone or cannot be read. Blocks.
+    pub fn image(&self, key: String) -> Option<Vec<u8>> {
+        if let Some(b) = self.images.lock().unwrap().get(&key) {
+            return Some(b.clone());
+        }
+        let core = self.core.clone();
+        let got = core.runtime().block_on(self.fetch_image(&key))?;
+        let mut cache = self.images.lock().unwrap();
+        if cache.values().map(Vec::len).sum::<usize>() + got.len() > IMAGE_CACHE {
+            cache.clear();
+        }
+        cache.insert(key, got.clone());
+        Some(got)
+    }
 }
 
 impl ChatSpike {
+    async fn fetch_image(&self, key: &str) -> Option<Vec<u8>> {
+        let b64 = base64::engine::general_purpose::STANDARD;
+        if let Some(data) = key.strip_prefix("inline:") {
+            return b64.decode(data).ok();
+        }
+        let log = self.open.lock().unwrap().as_ref().and_then(|o| o.path.clone());
+        let argv = image_argv(key, log.as_deref())?;
+        let c = self.core.live_conn(&self.machine)?.client;
+        let got = c
+            .call_timeout("machine.exec", json!({"argv": argv, "timeout": 30}), Duration::from_secs(40))
+            .await
+            .ok()?;
+        if got["truncated"] == true {
+            return None;
+        }
+        let out = b64.decode(got["stdout"].as_str()?).ok()?;
+        if key.starts_with("log:") {
+            image::decode(&out)
+        } else {
+            Some(out).filter(|b| !b.is_empty())
+        }
+    }
+
     async fn poll_async(&self) -> ChatPoll {
         let Some(conn) = self.core.live_conn(&self.machine) else {
             return fallback("not connected", "");
@@ -283,5 +411,36 @@ impl ChatSpike {
             cut: o.cut,
             rows: rows(o.parser.items()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_paths_go_first_one_per_line() {
+        let p = vec!["/f/t1/a.png".to_owned(), "/f/t1/b.png".to_owned()];
+        assert_eq!(with_images(&p, "What is this?"), "/f/t1/a.png\n/f/t1/b.png\nWhat is this?");
+        assert_eq!(with_images(&p[..1], ""), "/f/t1/a.png", "an image alone");
+        assert_eq!(with_images(&[], "hi"), "hi");
+    }
+
+    #[test]
+    fn an_image_key_names_what_to_run() {
+        let a = image_argv("log:2048:1", Some("/logs/s.jsonl")).unwrap();
+        assert_eq!(a[4], "/logs/s.jsonl");
+        assert_eq!((a[5].as_str(), a[6].as_str()), (Some("2048"), Some("1")));
+        assert_eq!(a[2], image::LOG_SCRIPT);
+        let f = image_argv("file:/work/a b.png", None).unwrap();
+        assert_eq!((f[2].as_str(), f[4].as_str()), (Some(image::FILE_SCRIPT), Some("/work/a b.png")));
+        assert!(image_argv("log:2048:1", None).is_none(), "no log open yet");
+        assert!(image_argv("missing", None).is_none());
+        // Keys made from the parser's images round-trip.
+        let keys = chat_images(&[
+            Image::InLog { line: 9, n: 0, media_type: "image/png".into() },
+            Image::File { path: "/x.png".into() },
+        ]);
+        assert!(image_argv(&keys[0].key, Some("/l")).is_some() && image_argv(&keys[1].key, None).is_some());
     }
 }

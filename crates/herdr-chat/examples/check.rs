@@ -25,13 +25,14 @@ fn main() {
         match i {
             Item::User { images, .. } => {
                 u += 1;
-                img += images
+                img += images.len()
             }
             Item::Assistant { .. } => s += 1,
             Item::Tools { calls: c } => {
                 tools += 1;
                 calls += c.len();
-                running += c.iter().filter(|c| !c.done).count()
+                running += c.iter().filter(|c| !c.done).count();
+                img += c.iter().map(|c| c.images.len()).sum::<usize>()
             }
             Item::Note { .. } => notes += 1,
         }

@@ -1,6 +1,6 @@
 //! The conversation the chat view shows, from each agent's log format.
 
-use herdr_chat::{Agent, Health, Item, Parser, ToolCall};
+use herdr_chat::{Agent, Health, Image, Item, Parser, ToolCall};
 
 const CLAUDE: &str = include_str!("fixtures/claude.jsonl");
 const CODEX: &str = include_str!("fixtures/codex.jsonl");
@@ -14,7 +14,7 @@ fn parse(agent: Agent, text: &str) -> Parser {
 fn user(text: &str) -> Item {
     Item::User {
         text: text.into(),
-        images: 0,
+        images: vec![],
     }
 }
 fn said(text: &str) -> Item {
@@ -42,10 +42,21 @@ fn claude_session_becomes_messages_with_folded_tool_calls() {
             output: "12: retry(3)".into(),
             done: true,
             failed: false,
+            images: vec![],
         }
     );
     assert_eq!(calls[1].title, "Read src/upload.rs");
-    assert_eq!(calls[1].output, "fn upload() {}\n[image]");
+    // An image the agent read: its bytes stayed on the desk, the tail script
+    // left where they are (the line's byte offset, the field's index on it).
+    assert_eq!(calls[1].output, "fn upload() {}");
+    assert_eq!(
+        calls[1].images,
+        vec![Image::InLog {
+            line: 2048,
+            n: 0,
+            media_type: "image/png".into()
+        }]
+    );
     assert_eq!(calls[2].title, "cargo test");
     assert!(calls[2].failed && calls[2].done);
     assert_eq!(
@@ -57,8 +68,20 @@ fn claude_session_becomes_messages_with_folded_tool_calls() {
     assert_eq!(
         items[6],
         Item::User {
-            text: "What is in this screenshot?".into(),
-            images: 1
+            // Claude Code's "[Image #1]" placeholders are taken out of the text.
+            text: "What is in these screenshots?".into(),
+            images: vec![
+                Image::InLog {
+                    line: 4096,
+                    n: 0,
+                    media_type: "image/jpeg".into()
+                },
+                // Short enough that the tail script kept it.
+                Image::Inline {
+                    media_type: "image/png".into(),
+                    data: "iVBORw0KGgo=".into()
+                },
+            ]
         }
     );
     assert_eq!(
@@ -125,7 +148,18 @@ fn codex_session_uses_its_completed_items() {
     assert_eq!(calls[1].title, "Edit src/main.rs");
     assert!(calls[2].failed);
     assert_eq!(items[3], said("Added `/health`."));
-    assert_eq!(items.len(), 4, "{items:#?}");
+    // An image Codex viewed: a file URL, kept as the file's path.
+    let Item::Tools { calls } = &items[4] else {
+        panic!("{:?}", items[4])
+    };
+    assert_eq!(calls[0].title, "View shots/home page.png");
+    assert_eq!(
+        calls[0].images,
+        vec![Image::File {
+            path: "/work/api/shots/home page.png".into()
+        }]
+    );
+    assert_eq!(items.len(), 5, "{items:#?}");
     // The injected AGENTS.md "user" message is not the person's.
     assert!(!format!("{items:?}").contains("AGENTS.md"));
     assert_eq!(p.version(), Some("0.169.0"));
@@ -168,4 +202,17 @@ fn an_empty_log_is_fine_and_empty() {
     let p = parse(Agent::Claude, "");
     assert!(p.items().is_empty());
     assert_eq!(p.health(), Health::Ok);
+}
+
+#[test]
+fn image_data_emptied_without_a_reference_is_missing() {
+    let mut p = Parser::new(Agent::Claude);
+    p.feed("{\"type\":\"user\",\"uuid\":\"u\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/png\",\"data\":\"\"}}]}}\n");
+    assert_eq!(
+        p.items(),
+        &[Item::User {
+            text: String::new(),
+            images: vec![Image::Missing]
+        }]
+    );
 }

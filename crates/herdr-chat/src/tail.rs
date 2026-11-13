@@ -7,6 +7,10 @@
 //! [`Chunk::next`], or `-N` for "the last N bytes, from a line start" on the
 //! first open. Prints `size S`, the kept lines, then `next N`: the byte after
 //! the last whole line read. A partial last line (the agent mid-write) waits.
+//!
+//! A base64 `data` or `base64` field over 300 characters (an image) is
+//! replaced by `"@<line>:<k>"`: the byte offset of its line and its index among
+//! that line's base64 fields, which [`crate::image::LOG_SCRIPT`] fetches.
 
 pub const SCRIPT: &str = r#"f=$1; o=$2
 [ -r "$f" ] || { echo missing; exit 0; }
@@ -20,16 +24,18 @@ tail -c +$((o + 1)) "$f" | head -c "$n" | LC_ALL=C awk -v start="$o" -v skip="$s
 {
   len = length($0) + 1
   if (used + len > total) exit
+  at = start + used
   used += len
   if (skip && NR == 1) next
   if (index($0, "{\"type\":\"api-request") == 1) next
   head = substr($0, 1, 100)
   if (index(head, "\"type\":\"response_item\"") || index(head, "\"type\":\"world_state\"") || index(head, "\"type\":\"token_usage_record\"")) next
-  line = $0; out = ""
-  while (match(line, /"data":"[A-Za-z0-9+\/=]+"/)) {
-    if (RLENGTH > 300) out = out substr(line, 1, RSTART - 1) "\"data\":\"\""
+  line = $0; out = ""; k = 0
+  while (match(line, /"(data|base64)":"[A-Za-z0-9+\/=]+"/)) {
+    key = substr(line, RSTART + 1, 4) == "data" ? "data" : "base64"
+    if (RLENGTH > 300) out = out substr(line, 1, RSTART - 1) "\"" key "\":\"@" at ":" k "\""
     else out = out substr(line, 1, RSTART + RLENGTH - 1)
-    line = substr(line, RSTART + RLENGTH)
+    line = substr(line, RSTART + RLENGTH); k++
   }
   print out line
 }

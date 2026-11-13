@@ -59,6 +59,9 @@ class ChatSpikeState {
     var draft by mutableStateOf("")
     var sheet by mutableStateOf<List<ChatCall>?>(null)
     var detail by mutableStateOf<ChatCall?>(null)
+    /** The image shown full screen, by key. */
+    var viewer by mutableStateOf<String?>(null)
+    var attached by mutableStateOf<List<Attachment>>(emptyList())
 }
 
 @Composable
@@ -66,8 +69,10 @@ fun ChatSpikeScreen(
     header: TerminalHeader,
     poll: ChatPoll?,
     state: ChatSpikeState,
+    images: ChatImageSource,
     onBack: () -> Unit,
     onTerminal: () -> Unit,
+    onPick: () -> Unit,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -79,12 +84,13 @@ fun ChatSpikeScreen(
                 when {
                     poll == null -> Centered("Reading the session…")
                     poll.state != "ready" -> Fallback(poll.reason, onTerminal)
-                    else -> Messages(poll, state)
+                    else -> Messages(poll, state, images)
                 }
             }
-            if (poll?.state == "ready") MessageBox(state, poll.canSend, onSend)
+            if (poll?.state == "ready") MessageBox(state, poll.canSend, onPick, onSend)
         }
-        state.sheet?.let { calls -> ToolSheet(calls, state) }
+        state.sheet?.let { calls -> ToolSheet(calls, state, images) }
+        state.viewer?.let { key -> ImageViewer(key, images) { state.viewer = null } }
     }
 }
 
@@ -139,7 +145,7 @@ private fun Fallback(reason: String, onTerminal: () -> Unit) {
 }
 
 @Composable
-private fun Messages(poll: ChatPoll, state: ChatSpikeState) {
+private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSource) {
     val list = rememberLazyListState()
     val rows = poll.rows
     LaunchedEffect(rows.size) { if (rows.isNotEmpty()) list.scrollToItem(rows.size - 1 + if (poll.cut) 1 else 0) }
@@ -148,9 +154,13 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState) {
         if (poll.cut) item { Note("Earlier messages are not loaded") }
         itemsIndexed(rows) { _, row ->
             when (row.kind) {
-                "user" -> UserBubble(row)
+                "user" -> UserBubble(row, images) { state.viewer = it }
                 "said" -> Said(row.text)
-                "tools" -> ToolLine(row.calls) { state.sheet = row.calls }
+                "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ToolLine(row.calls) { state.sheet = row.calls }
+                    val shots = row.calls.flatMap { it.images }
+                    if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { state.viewer = it }
+                }
                 else -> Note(row.text)
             }
         }
@@ -158,14 +168,15 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState) {
 }
 
 @Composable
-private fun UserBubble(row: ChatRow) {
+private fun UserBubble(row: ChatRow, images: ChatImageSource, onOpen: (String) -> Unit) {
     val c = HerdrTheme.colors
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Column(
-            Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            if (row.text.isNotEmpty()) BasicText(row.text, style = HerdrType.body.copy(color = c.fg))
-            if (row.images > 0u) BasicText(if (row.images == 1u) "1 image" else "${row.images} images", style = HerdrType.secondary.copy(color = c.dimText))
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (row.images.isNotEmpty()) Thumbs(row.images, images, end = true, onOpen)
+        if (row.text.isNotEmpty()) {
+            BasicText(
+                row.text, style = HerdrType.body.copy(color = c.fg),
+                modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
+            )
         }
     }
 }
@@ -221,13 +232,19 @@ private fun Note(text: String) {
 }
 
 @Composable
-private fun MessageBox(state: ChatSpikeState, canSend: Boolean, onSend: (String) -> Unit) {
+private fun MessageBox(state: ChatSpikeState, canSend: Boolean, onPick: () -> Unit, onSend: (String) -> Unit) {
     val c = HerdrTheme.colors
+    if (state.attached.isNotEmpty()) {
+        Box(Modifier.padding(top = 8.dp)) { AttachedRow(state.attached) { a -> state.attached = state.attached - a } }
+    }
     Row(
-        Modifier.fillMaxWidth().padding(12.dp).clip(RoundedCornerShape(24.dp)).background(c.raised).padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        Modifier.fillMaxWidth().padding(12.dp).clip(RoundedCornerShape(24.dp)).background(c.raised).padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f).padding(vertical = 8.dp)) {
+        Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onPick), contentAlignment = Alignment.Center) {
+            BasicText("+", style = HerdrType.terminalTitle.copy(color = c.fg))
+        }
+        Box(Modifier.weight(1f).padding(start = 6.dp, top = 8.dp, bottom = 8.dp)) {
             if (state.draft.isEmpty()) {
                 BasicText(if (canSend) "Message" else "The agent can't take a message now", style = HerdrType.body.copy(color = c.dimText))
             }
@@ -239,7 +256,7 @@ private fun MessageBox(state: ChatSpikeState, canSend: Boolean, onSend: (String)
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        val ready = canSend && state.draft.isNotBlank()
+        val ready = canSend && (state.draft.isNotBlank() || state.attached.isNotEmpty())
         Box(
             Modifier.size(40.dp).clip(CircleShape).background(if (ready) c.solid else c.hover)
                 .clickable(enabled = ready) { onSend(state.draft) },
@@ -251,7 +268,7 @@ private fun MessageBox(state: ChatSpikeState, canSend: Boolean, onSend: (String)
 }
 
 @Composable
-private fun ToolSheet(calls: List<ChatCall>, state: ChatSpikeState) {
+private fun ToolSheet(calls: List<ChatCall>, state: ChatSpikeState, images: ChatImageSource) {
     val c = HerdrTheme.colors
     Box(Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.6f)).clickable { state.sheet = null; state.detail = null }, contentAlignment = Alignment.BottomCenter) {
         Column(
@@ -275,6 +292,7 @@ private fun ToolSheet(calls: List<ChatCall>, state: ChatSpikeState) {
                 }
                 BasicText(d.title, style = HerdrType.secondary.copy(color = c.dimText))
                 CodeBox(d.input)
+                if (d.images.isNotEmpty()) Thumbs(d.images, images, end = false) { state.viewer = it }
                 if (d.output.isNotEmpty()) CodeBox(d.output.take(4000) + if (d.output.length > 4000) "\n…" else "")
             }
         }

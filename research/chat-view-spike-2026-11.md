@@ -113,8 +113,9 @@ characters. It prints the size and the next offset. First open reads the last
 | Claude Code, 84 MB, first open | 84 MB | 0.25 MB (last 2 MB) | 9 ms |
 | Codex rollouts | 3.6-40 MB | 0.04-0.46 MB (whole) | 72-701 ms |
 
-Claude Code stays at 30-58% of raw because each tool result is stored twice
-(`toolUseResult`, a structured copy); awk cannot drop a nested field safely.
+Claude Code stayed at 30-58% of raw because each tool result is stored twice
+(`toolUseResult`, a structured copy). Most of that copy was image base64,
+which the tail now empties too: see section 5.
 The spike polls every 2 s while the chat is open; the feature should read on
 `turn`, `title` and `status` events and while the agent is working.
 
@@ -140,12 +141,56 @@ agent is blocked) is enough for both agents, multi-line included:
 
 ## 5. Images
 
-Claude Code stores images inline as base64: in the person's messages and in
-tool results (a screenshot read by the agent). One session with seven phone
-screenshots grew to 10.7 MB, with a single 1.6 MB line. Codex records an image
-the agent viewed as a path (`ImageView`) and keeps images elsewhere. The spike
-drops image bytes on the desk and shows "1 image"; showing them would need a
-second read of that one record.
+Viewing images is, by the owner's account, the main reason to use the app
+over the terminal, so the spike shows them: thumbnails in the person's
+bubble and under the tool line that read them, full screen with pinch zoom on
+tap, and photos attached from the phone.
+
+**Where they are.**
+- Claude Code keeps images as base64 in the log: in the person's message
+  (`image` blocks, with `[Image #1]` placeholders in the text, taken out by
+  the parser) and in tool results (a screenshot the agent read). A Read
+  result stores the image twice: once in the message, once in its
+  structured copy (`toolUseResult.file.base64`, with the image's size).
+- Codex 0.169 records an image it viewed as an `ImageView` item holding a
+  `file://` URL. Of the desk's 276, 127 still existed; 149 pointed into
+  `/tmp` and were gone. The log also keeps a copy as a data URL in the
+  tool output (`custom_tool_call_output`, a `response_item` the tail
+  drops); the feature can fall back to it. No image a person attached to
+  Codex appears in the month's logs.
+
+**Fetching one image.** The tail script now empties every base64 `data` or
+`base64` field over 300 characters and leaves `"@<line>:<k>"`: the byte
+offset of its line and its index on that line. `herdr_chat::image::LOG_SCRIPT`
+(`tail -c`, `head -n 1`, awk) prints that one field; the phone decodes it.
+A Codex image is read as a file (`FILE_SCRIPT`, at most 8 MB). Both go
+through `machine.exec`; the phone caches what it fetched.
+
+- Against ten real Claude Code logs (0.6-49 MB): all 307 images came back
+  as valid PNG, JPEG or WebP (average 12-325 KB), each in 5-94 ms on the
+  desk.
+- Emptying the structured copies too shrank the tail of the eight largest
+  logs from 4.7-26.4 MB to 2.4-9.8 MB (section 3's table is before this).
+
+**Sending from the phone.** The photo picker, then `terminal.put` (the bytes
+land in a folder beside the terminal, removed with it), then the message
+with each path on a line of its own before the text. Tested in a throwaway
+Claude Code 2.1.323 terminal through the API: a pasted line that is an image
+path becomes an attached image (`[Image #1]`), two paths give two images, and
+the log stores them as normal image blocks, so the chat shows them like any
+other. A path inside a sentence also works, but the agent then opens it with
+its Read tool. The phone scales a photo over 2000 px or 3.5 MB down and
+re-encodes types agents do not take (HEIC) as JPEG.
+
+**Not tested:** Codex with an image from the phone. Codex would not start on
+the desk at the time (its local state database refused to open), so how its
+TUI takes a pasted image path, and how its log records it, is open.
+
+**On the phone** (test phone, debug build, the throwaway Claude Code
+session): thumbnails and the full-screen view loaded for images the agent
+read and images sent; a synthetic photo picked in the system photo picker
+was sent with a question, the agent answered from it, and the chat showed it
+in the person's bubble.
 
 ## Go or no-go
 
@@ -173,4 +218,6 @@ second read of that one record.
    fixtures stay synthetic.
 5. Send with `terminal.send` from the API, gated on foreground and status as
    in section 4; no slash commands from the chat in the first version.
-6. Images: a count in v1; viewing them is a follow-up.
+6. Images in v1: fetched one at a time by the reference the tail leaves,
+   shown as thumbnails and full screen; attached from the phone through
+   `terminal.put` and a path line. Codex sending needs its own test first.

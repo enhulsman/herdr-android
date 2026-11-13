@@ -4,6 +4,7 @@
 //! Both formats are private and change; [`Parser::health`] is the guard the
 //! view uses to fall back to the terminal.
 
+pub mod image;
 pub mod locate;
 pub mod tail;
 
@@ -18,7 +19,7 @@ pub enum Agent {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Item {
-    User { text: String, images: u32 },
+    User { text: String, images: Vec<Image> },
     /// Markdown as the agent wrote it.
     Assistant { text: String },
     /// Tool calls in a row, shown folded as one line.
@@ -34,6 +35,22 @@ pub struct ToolCall {
     pub output: String,
     pub done: bool,
     pub failed: bool,
+    /// Images in the result (a screenshot the agent read or viewed).
+    pub images: Vec<Image>,
+}
+
+/// Where an image's bytes are; fetched only when the view shows it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Image {
+    /// Base64 in the log, left on the desk by the tail script: the line that
+    /// starts at byte `line`, its `n`th base64 field ([`image::LOG_SCRIPT`]).
+    InLog { line: u64, n: u32, media_type: String },
+    /// Short enough that the tail script kept the base64.
+    Inline { media_type: String, data: String },
+    /// A file on the agent's machine ([`image::FILE_SCRIPT`]).
+    File { path: String },
+    /// Emptied with no way back, or a shape this parser does not know.
+    Missing,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -255,6 +272,7 @@ impl Parser {
                             output: String::new(),
                             done: false,
                             failed: false,
+                            images: vec![],
                         },
                     );
                 }
@@ -289,30 +307,43 @@ impl Parser {
             } else if !t.starts_with("<local-command") {
                 self.push(Item::User {
                     text: unwrap_sent(s),
-                    images: 0,
+                    images: vec![],
                 });
             }
             return;
         }
         let mut texts = Vec::new();
-        let mut images = 0;
+        let mut images = Vec::new();
         for b in content.as_array().into_iter().flatten() {
             match b["type"].as_str().unwrap_or("") {
-                "text" => texts.push(unwrap_sent(b["text"].as_str().unwrap_or(""))),
-                "image" => images += 1,
+                "text" => {
+                    let t = strip_image_marks(&unwrap_sent(b["text"].as_str().unwrap_or("")));
+                    if !t.is_empty() {
+                        texts.push(t);
+                    }
+                }
+                "image" => images.push(claude_image(b)),
                 "tool_result" => {
                     let out = tool_output(&b["content"]);
+                    let shots = b["content"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|x| x["type"] == "image")
+                        .map(claude_image)
+                        .collect();
                     let failed = b["is_error"] == true;
                     if let Some(call) = b["tool_use_id"].as_str().and_then(|id| self.call_mut(id)) {
                         call.output = out;
                         call.failed = failed;
                         call.done = true;
+                        call.images = shots;
                     }
                 }
                 _ => self.unknown += 1,
             }
         }
-        if !texts.is_empty() || images > 0 {
+        if !texts.is_empty() || !images.is_empty() {
             self.push(Item::User {
                 text: texts.join("\n\n"),
                 images,
@@ -364,12 +395,14 @@ impl Parser {
         };
         match t {
             "UserMessage" => {
+                // Not seen in a log yet: shown as an image that cannot be fetched.
                 let images = item["content"]
                     .as_array()
                     .into_iter()
                     .flatten()
                     .filter(|c| c["type"].as_str().is_some_and(|k| k.contains("image")))
-                    .count() as u32;
+                    .map(|_| Image::Missing)
+                    .collect();
                 self.push(Item::User {
                     text: text(),
                     images,
@@ -398,6 +431,7 @@ impl Parser {
                         output: item["aggregated_output"].as_str().unwrap_or("").to_owned(),
                         done: true,
                         failed: item["exit_code"].as_i64().is_some_and(|c| c != 0),
+                        images: vec![],
                     },
                 );
             }
@@ -415,20 +449,25 @@ impl Parser {
                         output: item["stdout"].as_str().unwrap_or("").to_owned(),
                         done: true,
                         failed: item["status"].as_str().is_some_and(|s| s != "completed"),
+                        images: vec![],
                     },
                 );
             }
             "ImageView" => {
-                let path = self.relative(item["path"].as_str().unwrap_or(""));
+                // A path, or (0.169) a file URL.
+                let raw = item["path"].as_str().unwrap_or("");
+                let path = raw.strip_prefix("file://").map(percent_decode).unwrap_or_else(|| raw.to_owned());
+                let shown = self.relative(&path);
                 self.add_call(
                     None,
                     ToolCall {
                         name: "View image".into(),
-                        title: format!("View {path}"),
-                        input: path,
-                        output: "[image]".into(),
+                        title: format!("View {shown}"),
+                        input: shown,
+                        output: String::new(),
                         done: true,
                         failed: false,
+                        images: vec![Image::File { path }],
                     },
                 );
             }
@@ -443,6 +482,7 @@ impl Parser {
                         output: String::new(),
                         done: true,
                         failed: false,
+                        images: vec![],
                     },
                 );
             }
@@ -451,7 +491,7 @@ impl Parser {
     }
 }
 
-/// A tool result's text; images become `[image]`.
+/// A tool result's text (its images are taken separately).
 fn tool_output(c: &Value) -> String {
     if let Some(s) = c.as_str() {
         return s.to_owned();
@@ -459,13 +499,68 @@ fn tool_output(c: &Value) -> String {
     c.as_array()
         .into_iter()
         .flatten()
-        .map(|b| match b["type"].as_str() {
-            Some("text") => b["text"].as_str().unwrap_or("").to_owned(),
-            Some("image") => "[image]".to_owned(),
-            _ => String::new(),
-        })
+        .filter_map(|b| (b["type"] == "text").then(|| b["text"].as_str().unwrap_or("")))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// A Claude Code `image` block: base64 kept inline, or the tail's reference.
+fn claude_image(b: &Value) -> Image {
+    let src = &b["source"];
+    let media_type = src["media_type"].as_str().unwrap_or("image/png").to_owned();
+    let data = src["data"].as_str().unwrap_or("");
+    if let Some((line, n)) = data.strip_prefix('@').and_then(|r| r.split_once(':')) {
+        if let (Ok(line), Ok(n)) = (line.parse(), n.parse()) {
+            return Image::InLog { line, n, media_type };
+        }
+    }
+    if data.is_empty() || src["type"] != "base64" {
+        return Image::Missing;
+    }
+    Image::Inline {
+        media_type,
+        data: data.to_owned(),
+    }
+}
+
+/// Claude Code's `[Image #3]` placeholders, which stand for the images shown
+/// beside the text.
+fn strip_image_marks(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(i) = rest.find("[Image #") {
+        let after = &rest[i + 8..];
+        let digits = after.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0 && after[digits..].starts_with(']') {
+            out.push_str(&rest[..i]);
+            rest = &after[digits + 1..];
+        } else {
+            out.push_str(&rest[..i + 8]);
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out.trim().to_owned()
+}
+
+/// `%20` and friends in a file URL's path.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = |c: u8| (c as char).to_digit(16);
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2])) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The person's own text from a sent message: herdr-core's `<hc from=..>`

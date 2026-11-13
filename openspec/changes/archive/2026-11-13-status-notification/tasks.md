@@ -47,4 +47,4 @@
 
 - [x] 5.1 The battery notice with the 4.6 estimate, worded as an estimate for one phone (placement per Ezra); android-client-v1 machine-connection "Connections end in the background": add "unless Stay connected is on"; decisions.md entry; `design-tokens.json` wording for the Status notification and the row (approved 2026-11-08)
   - 2026-11-13: no figure (Ezra): the row's second line says "Shows a notification, uses more battery", and the README's Stay connected entry says the cost depends on the phone and on how busy the agents are, and that GrapheneOS shows the counts on the lock screen only with silent notifications shown. Both setting rows became switches (Ezra), with the stay-connected spec's row wording updated to match. machine-connection "Connections end in the background" now ends "unless Stay connected is on"; decisions.md entry; `design-tokens.json` has the Status channel and notification wording and the This phone card's rows.
-- [ ] 5.2 Archive on the branch before any version bump
+- [x] 5.2 Archive on the branch before any version bump

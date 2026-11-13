@@ -6,7 +6,7 @@ herdr-core 0.1.20) with Claude Code 2.1.322-2.1.323 and Codex 0.166.0 and
 0.169.0, in throwaway terminals in a scratch folder with one-line prompts, and
 read-only against the desk's existing logs (counts and record shapes only).
 Spike code: branch `spike/chat-view`, never merged: the `herdr-chat` crate
-(parsers, matching, desk scripts, 23 tests on synthetic fixtures), a
+(parsers, matching, desk scripts, 37 tests on synthetic fixtures), a
 `ChatSpike` object in the hub, and a debug-only chat screen.
 
 **Result: go for both agents**, with the conditions in "Recommended approach".
@@ -14,7 +14,10 @@ Spike code: branch `spike/chat-view`, never merged: the `herdr-chat` crate
 ## 1. Which log belongs to which terminal
 
 `terminal.get` gives the terminal's foreground process (`foreground.pid`,
-`foreground.name`). Everything else is read with one `machine.exec` of a
+`foreground.name`, `foreground.argv`). The agent in front is a process named
+`claude` or `codex`, or `node` with the agent's script in its argv (an npm
+install; unit-tested, not run on the desk, where both run as their own
+binaries); `status.app` also names the agent once it reports. Everything else is read with one `machine.exec` of a
 small POSIX sh script (`herdr_chat::locate::SCRIPT`, 40-120 ms on the desk).
 
 | Method | Claude Code | Codex |
@@ -24,7 +27,7 @@ small POSIX sh script (`herdr_chat::locate::SCRIPT`, 40-120 ms on the desk).
 | `--resume <id>` on the command line | partial: wrong after /clear or a fork, absent for `--continue` | same |
 | Terminal title (the session's AI title) | weak: only a name, not unique, cleared on exit | weak, same |
 | Newest log in the folder | fails with two agents in one folder | fails, same |
-| Start hook writing the session id into a terminal label | **holds**, also after exit (tested per run, not installed) | expected to hold (Codex has a stable `SessionStart` hook with `session_id`; not run) |
+| Start hook writing the session id into a terminal label | **holds**, also after exit (tested per run, not installed, no code on the branch) | not tested: Codex documents a `SessionStart` hook with `session_id`, never run here |
 
 Evidence per case (all observed, high confidence for the versions above):
 
@@ -42,13 +45,18 @@ Evidence per case (all observed, high confidence for the versions above):
 - **Codex /new.** The old rollout and its lock stay open and a lock for the new
   thread appears; its rollout appears with the first message. Rule (tested):
   a held lock newer than every open rollout is a new, empty thread; otherwise
-  the open rollout written last. Thread ids are time-ordered.
+  the open rollout written last. Thread ids are time-ordered. Exact with one
+  rollout open; with several it is a heuristic on whole-second times, so two
+  written in the same second give no chat rather than a guess. A resume or
+  fork inside the Codex TUI (an older rollout reopened beside the current
+  one) was not tested.
 - **Exited into the kept shell.** The foreground becomes the shell; title and
   status are cleared; Claude Code removes its session file on a clean exit
   (stale files stay after a crash: the desk had 164); Codex closes its files.
   Nothing on the desk then links the terminal to the log, except a label a
   start hook wrote. The spike keeps showing what it already read, without the
-  message box.
+  message box; opened fresh after the exit, the terminal has no chat (the
+  terminal shows). Without the hook that is what the feature can promise.
 - **Stale and reused pids.** The session file's `procStart` equals field 22 of
   `/proc/<pid>/stat`; a mismatch is refused. Claude Code writes it as a JSON
   string, not a number (the first phone try failed on that).
@@ -99,9 +107,15 @@ and notes (a slash command, "Conversation compacted").
   both.
 - **Format guard** (`Parser::health`): a line that is not JSON, or a message
   record without role and content, is Broken; fewer than half the lines in a
-  known shape is Broken (catches the other agent's format); unknown content
-  blocks or item types are counted and left out (Degraded). Broken hides the
-  chat and shows the terminal.
+  known shape is Broken (catches the other agent's format); 30 lines or more
+  with no message at all is Broken (catches a renamed message record or
+  Codex `item_completed`). Inside known records, unknown content blocks or
+  item types are counted and left out (Degraded; the chat says some parts
+  are not shown). Unknown record types are ignored by design: the desk's
+  Claude Code logs carry some 20 bookkeeping types and new ones appear with
+  releases. Broken hides the chat and shows the terminal. All 37 real logs
+  still parse Ok under this guard. Not caught: a renamed field inside a known
+  record that leaves messages empty but present.
 - **Against real logs**: twelve Claude Code logs from 2.1.292 to 2.1.323 (up
   to 49 MB) and all 25 Codex rollouts of the month (0.166.0 and 0.169.0) parse with health Ok;
   a synthetic unknown Codex item gives Degraded, as tested.
@@ -121,7 +135,7 @@ writing waits), dropping request records, Codex `response_item`,
 characters. It prints the size and the next offset. First open reads the last
 2 MB from a line start; later reads only the new bytes.
 
-| Log | Raw | Sent to the phone | Time on the desk |
+| Log | Raw | Script output on the desk | Time on the desk |
 |---|---|---|---|
 | Claude Code, eight largest under 64 MB | 30-49 MB | 4.7-26 MB (whole) | 53-174 ms |
 | Claude Code, 84 MB, first open | 84 MB | 0.25 MB (last 2 MB) | 9 ms |
@@ -131,13 +145,23 @@ Claude Code stayed at 30-58% of raw because each tool result is stored twice
 (`toolUseResult`, a structured copy). Most of that copy was image base64,
 which the tail now empties too: see section 5.
 
+**Bounded reads.** `machine.exec` keeps only the first 8 MB of output. A
+read now spans at most 7.5 MB of the log (the script prints no more than it
+reads), so a big backlog comes over several polls. A read that fails (cut
+output, timeout, the log gone, unexpected output) or a window holding no
+whole line (one record over 7.5 MB) keeps the chat and says so over it
+instead of stalling silently; reading back stops at such a record with a
+note. Not tested: a log truncated or replaced while open.
+
 **Reading back.** The script takes an end bound too (`sh SCRIPT path start
 end`) and leaves out a first line cut by `start` (the byte before it is not a
 newline); it reports where its first whole line starts. Scrolling up reads
 the 2 MB before the oldest line held, doubled while one line is longer, puts
 that text in front of what is held and parses it all again in one parser, so
 tool results still meet their calls. Desk tests read a log back in pieces and
-get every line exactly once.
+get every line exactly once. Each step parses everything held again: 1-62 ms
+on the test phone for the small test log; not measured on a large one. If
+the recent part holds no message, the screen reads further back by itself.
 
 **Latency.** First measured with the 2 s poll: a message reached the log
 0.33 s after `terminal.send`, but new content showed after about 1.3 s on
@@ -148,9 +172,13 @@ the agent works or a sent message waits, and every 5 s otherwise; it looks the
 log up again only when the process in front changes or 10 s have passed (a
 `/clear` keeps the process but starts a new log). On the test phone over
 Wi-Fi: a poll takes 110-420 ms (`terminal.get` 50-600 ms with Wi-Fi jitter,
-the tail 60 ms, the lookup 100-200 ms when due); the sent message shows at
+the tail 60 ms, the lookup 100-200 ms when due, and every poll while a new
+session's log does not exist yet); the sent message shows at
 once, dimmed, until its row is in the log (0.9 s after the tap); a short
-answer showed 0.3 s after the agent's `done` event.
+answer showed 0.3 s after the agent's `done` event. A pending message is
+taken as arrived when any new message of the person appears (no text
+match), and the battery and desk cost of polling every 0.5 s were not
+measured.
 
 **No streaming.** The logs hold finished blocks only: an answer appears
 whole when the agent ends that block, not word by word as in the agents' own
@@ -173,8 +201,16 @@ agent is blocked) is enough for both agents, multi-line included:
   text as a shell command. And one pasted `/exit` opened a different
   command's dialog in Claude Code, which then took the next sends. So the
   phone sends only when the foreground is the agent and its status is idle,
-  done or working (it queues), never with no status or blocked; slash
-  commands are not offered from the chat.
+  done or working, never with no status or blocked. It checks before the
+  image uploads and again right before typing, and passes `terminal.send`'s
+  own guard (`if`: only idle or working; a mismatch types nothing, tested),
+  so a status change in between is refused by the core. `done` has no such
+  guard, a small window left. Text starting with `/` is refused.
+- **A message sent while the agent works steers the running turn**, in both
+  agents (tested in throwaway terminals: "sleep 8, then say FIRST", then
+  "Say SECOND" while working): each took the second message into the turn
+  and answered only it; neither said FIRST. So "working" is not a queue; the
+  spec has to decide whether the chat offers that (as a steer) or waits.
 
 ## 5. Images
 
@@ -193,13 +229,18 @@ tap, and photos attached from the phone.
   `file://` URL. Of the desk's 276, 127 still existed; 149 pointed into
   `/tmp` and were gone. The log also keeps a copy as a data URL in the
   tool output (`custom_tool_call_output`, a `response_item` the tail
-  drops); the feature can fall back to it. No image a person attached to
-  Codex appears in the month's logs.
+  drops); the feature could fall back to it (not built or tested). No image
+  a person attached to Codex appears in the month's logs, so that shape is
+  unknown and shown as a missing image.
 
 **Fetching one image.** The tail script now empties every base64 `data` or
 `base64` field over 300 characters and leaves `"@<line>:<k>"`: the byte
 offset of its line and its index on that line. `herdr_chat::image::LOG_SCRIPT`
 (`tail -c`, `head -n 1`, awk) prints that one field; the phone decodes it.
+The phone's key names the session too, so after `/clear` an image of the
+earlier log is never read from the new one. The emptying goes by field name
+and length, so a long non-image `data` value would become a reference
+(none seen).
 A Codex image is read as a file (`FILE_SCRIPT`, at most 8 MB). Both go
 through `machine.exec`; the phone caches what it fetched.
 
@@ -210,7 +251,8 @@ through `machine.exec`; the phone caches what it fetched.
   logs from 4.7-26.4 MB to 2.4-9.8 MB (section 3's table is before this).
 
 **Sending from the phone.** The photo picker, then `terminal.put` (the bytes
-land in a folder beside the terminal, removed with it), then the message
+land in a folder beside the terminal, removed with it, so a sent photo's
+bubble loses its image once the terminal is removed), then the message
 with each path on a line of its own before the text. Tested in a throwaway
 Claude Code 2.1.323 terminal through the API: a pasted line that is an image
 path becomes an attached image (`[Image #1]`), two paths give two images, and
@@ -221,8 +263,8 @@ re-encodes types agents do not take (HEIC) as JPEG.
 
 **Codex** (0.169, throwaway terminal): a pasted image path stays text in
 the person's message, and Codex opens the file with its own viewer (an
-`ImageView` item), then answers from it. So the same send works for both
-agents; the parser turns leading lines that are image paths back into the
+`ImageView` item), then answers from it (one trial: the model chose to
+open it). So the same send works for both agents; the parser turns leading lines that are image paths back into the
 images, so the bubble shows the photo, not the path. (A first Codex try
 failed to start because the test launch lacked the desk's per-OS setting
 for Codex's state database; not a Codex fault.)
@@ -269,9 +311,11 @@ labelled Terminal or Chat.
    (with the `procStart` check) and Codex's open rollout, through one
    `machine.exec` script. Hide the chat switch when it finds nothing.
 2. After the agent exits, keep showing what was read, read-only, until the
-   terminal starts another agent. An optional start hook that labels the
-   terminal (`agent.session=<id>`) makes this exact across app restarts; it is
-   a desk setting, so the spec offers it rather than requiring it.
+   terminal starts another agent; a fresh open after the exit shows the
+   terminal. An optional start hook that labels the terminal
+   (`agent.session=<id>`) would make this exact across app restarts; it is a
+   desk setting, tested for Claude Code only, so the spec offers it rather
+   than requiring it, and Codex's needs a test first.
 3. Read through `machine.exec` and the tail script, never `file.read`; first
    open from the end with a budget, older messages on scroll back, new bytes
    after the terminal's events and every 0.5 s while it works; show a sent
@@ -279,7 +323,10 @@ labelled Terminal or Chat.
 4. Parse in Rust (`herdr-chat`), one module per agent, with the health guard;
    fixtures stay synthetic.
 5. Send with `terminal.send` from the API, gated on foreground and status as
-   in section 4; no slash commands from the chat in the first version.
+   in section 4, checked again right before typing and passed as its `if`
+   guard; no slash commands from the chat in the first version. Decide
+   whether a message while the agent works is offered as a steer of the
+   running turn (what both agents do with it) or held until it is idle.
 6. Images in v1: fetched one at a time by the reference the tail leaves,
    shown as thumbnails and full screen; attached from the phone through
    `terminal.put` and a path line, for both agents.

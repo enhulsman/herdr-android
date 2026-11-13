@@ -190,7 +190,11 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
     val list = rememberLazyListState()
     val rows = poll.rows
     val pending = state.pending
-    if (rows.isEmpty() && pending.isEmpty()) return Centered("No messages yet.")
+    if (rows.isEmpty() && pending.isEmpty()) {
+        // The recent part may hold no message (one huge record): read further back.
+        LaunchedEffect(poll.cut, state.olderLoads) { if (poll.cut && !state.loadingOlder) onOlder() }
+        return Centered(if (poll.cut) "Loading earlier messages…" else "No messages yet.")
+    }
     // Follow the bottom unless the person scrolled up; back at the bottom, follow again.
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress to list.canScrollForward }.collect { (moving, more) -> if (moving) state.stick = !more }
@@ -229,6 +233,14 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
                 }
             }
             itemsIndexed(pending, key = { i, p -> "pending ${p.at} $i" }) { _, p -> PendingBubble(p) }
+        }
+        if (poll.reason.isNotEmpty()) {
+            BasicText(
+                poll.reason,
+                style = HerdrType.secondary.copy(color = HerdrTheme.colors.fg),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).clip(RoundedCornerShape(HerdrRadius.chip))
+                    .background(HerdrTheme.colors.raised).padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
         if (state.loadingOlder) {
             BasicText(

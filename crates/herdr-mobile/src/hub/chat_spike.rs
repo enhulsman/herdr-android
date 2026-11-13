@@ -19,7 +19,9 @@ const FIRST_BUDGET: u64 = 2_000_000;
 /// Each read back on scrolling up starts this far before the oldest line held,
 /// doubled while a single line is longer.
 const OLDER_BUDGET: u64 = 2_000_000;
-const OLDER_MAX: u64 = 32_000_000;
+/// `machine.exec` keeps the first 8 MB of output; the script prints at most
+/// the bytes it reads, so no read spans more than this.
+const READ_MAX: u64 = 7_500_000;
 /// With the same agent process in front, the log is looked up again only this
 /// often (a `/clear` or `/resume` keeps the process but changes the log).
 const RELOCATE: Duration = Duration::from_secs(10);
@@ -96,6 +98,10 @@ struct Open {
     /// The agent process the log was found for, and when.
     pid: i64,
     located: Instant,
+    /// Why the last read failed, shown over the chat; empty when it worked.
+    problem: String,
+    /// Reading back stopped at a record too large to read.
+    older_blocked: bool,
 }
 
 #[derive(uniffi::Object)]
@@ -144,12 +150,14 @@ fn fallback(reason: &str, agent: &str) -> ChatPoll {
     }
 }
 
-fn chat_images(images: &[Image]) -> Vec<ChatImage> {
+/// `session` is the log's: a `log:` key names its session, so an image of an
+/// earlier session (after `/clear`) is never fetched from the current log.
+fn chat_images(images: &[Image], session: &str) -> Vec<ChatImage> {
     images
         .iter()
         .map(|m| match m {
             Image::InLog { line, n, media_type } => ChatImage {
-                key: format!("log:{line}:{n}"),
+                key: format!("log:{session}:{line}:{n}"),
                 media_type: media_type.clone(),
             },
             Image::Inline { media_type, data } => ChatImage {
@@ -168,7 +176,7 @@ fn chat_images(images: &[Image]) -> Vec<ChatImage> {
         .collect()
 }
 
-fn rows(items: &[Item]) -> Vec<ChatRow> {
+fn rows(items: &[Item], session: &str) -> Vec<ChatRow> {
     items
         .iter()
         .map(|i| match i {
@@ -176,7 +184,7 @@ fn rows(items: &[Item]) -> Vec<ChatRow> {
                 kind: "user".into(),
                 text: text.clone(),
                 from: String::new(),
-                images: chat_images(images),
+                images: chat_images(images, session),
                 calls: vec![],
             },
             Item::Assistant { text } => ChatRow {
@@ -214,7 +222,7 @@ fn rows(items: &[Item]) -> Vec<ChatRow> {
                         output: c.output.clone(),
                         done: c.done,
                         failed: c.failed,
-                        images: chat_images(&c.images),
+                        images: chat_images(&c.images, session),
                     })
                     .collect(),
             },
@@ -230,11 +238,17 @@ fn with_images(paths: &[String], text: &str) -> String {
     lines.join("\n").trim().to_owned()
 }
 
-/// The `machine.exec` argv that prints the image behind `key`.
-fn image_argv(key: &str, log: Option<&str>) -> Option<Value> {
+/// The `machine.exec` argv that prints the image behind `key`; a `log:` key
+/// only for the open log (`session`, `path`).
+fn image_argv(key: &str, log: Option<(&str, &str)>) -> Option<Value> {
     if let Some(r) = key.strip_prefix("log:") {
-        let (line, n) = r.split_once(':')?;
-        Some(json!(["sh", "-c", image::LOG_SCRIPT, "sh", log?, line, n]))
+        let mut parts = r.rsplitn(3, ':');
+        let (n, line, session) = (parts.next()?, parts.next()?, parts.next()?);
+        let (open, path) = log?;
+        if session != open {
+            return None;
+        }
+        Some(json!(["sh", "-c", image::LOG_SCRIPT, "sh", path, line, n]))
     } else {
         let path = key.strip_prefix("file:")?;
         Some(json!(["sh", "-c", image::FILE_SCRIPT, "sh", path]))
@@ -245,9 +259,35 @@ fn image_argv(key: &str, log: Option<&str>) -> Option<Value> {
 /// (it queues). Not blocked (a dialog), not unreported (a start-up prompt
 /// took the Enter in the spike), not a shell (it would run the text).
 fn may_send(t: &Value) -> bool {
-    let name = t["foreground"]["name"].as_str().unwrap_or("");
     let state = t["status"]["state"].as_str().unwrap_or("");
-    matches!(name, "claude" | "codex") && matches!(state, "idle" | "done" | "working")
+    agent_in_front(t).is_some() && matches!(state, "idle" | "done" | "working")
+}
+
+/// The agent running in front, by process name, or for a launcher-wrapped
+/// install (`node .../claude`, `node .../codex`) by its argv. None for a shell.
+fn agent_in_front(t: &Value) -> Option<Agent> {
+    let fg = &t["foreground"];
+    let by_name = |name: &str| match name {
+        "claude" => Some(Agent::Claude),
+        "codex" => Some(Agent::Codex),
+        _ => None,
+    };
+    if let Some(a) = by_name(fg["name"].as_str().unwrap_or("")) {
+        return Some(a);
+    }
+    if fg["name"] != "node" {
+        return None;
+    }
+    fg["argv"].as_array()?.iter().skip(1).take(2).filter_map(Value::as_str).find_map(|arg| {
+        let base = arg.rsplit('/').next().unwrap_or(arg);
+        by_name(base.trim_end_matches(".js")).or_else(|| arg.contains("claude-code").then_some(Agent::Claude))
+    })
+}
+
+/// Why the chat does not send `text`, if it does not: slash commands are not
+/// sent from the chat (a pasted one opened another command's dialog).
+fn refuse_text(text: &str) -> Option<&'static str> {
+    text.trim_start().starts_with('/').then_some("Slash commands are not sent from the chat; use the terminal")
 }
 
 #[uniffi::export]
@@ -318,8 +358,13 @@ impl ChatSpike {
     /// 2.1.323). The error is for a toast.
     pub fn send_with_images(&self, text: String, images: Vec<ChatUpload>) -> Option<String> {
         let core = self.core.clone();
+        if let Some(why) = refuse_text(&text) {
+            return Some(why.into());
+        }
         core.runtime().block_on(async {
-            let conn = self.core.live_conn(&self.machine)?;
+            let Some(conn) = self.core.live_conn(&self.machine) else {
+                return Some("Not connected".into());
+            };
             let c = conn.client;
             let t = match c.call("terminal.get", json!({"terminal": self.address})).await {
                 Ok(t) => t,
@@ -344,9 +389,21 @@ impl ChatSpike {
                 }
             }
             let message = with_images(&lines, &text);
-            match c
-                .call("terminal.send", json!({"terminal": self.address, "text": message}))
-                .await
+            // Uploads take time: look again right before typing, and let the
+            // core refuse if the status changed since (its `if`, idle or
+            // working only; done has no such guard).
+            let t = match c.call("terminal.get", json!({"terminal": self.address})).await {
+                Ok(t) => t,
+                Err(e) => return Some(format!("{e}")),
+            };
+            if !may_send(&t) {
+                return Some("The agent can't take a message right now".into());
+            }
+            let mut params = json!({"terminal": self.address, "text": message});
+            if let Some(st) = t["status"]["state"].as_str().filter(|s| matches!(*s, "idle" | "working")) {
+                params["if"] = json!(st);
+            }
+            match c.call("terminal.send", params).await
             {
                 Ok(_) => None,
                 Err(e) => Some(format!("{e}")),
@@ -377,8 +434,13 @@ impl ChatSpike {
         if let Some(data) = key.strip_prefix("inline:") {
             return b64.decode(data).ok();
         }
-        let log = self.open.lock().unwrap().as_ref().and_then(|o| o.path.clone());
-        let argv = image_argv(key, log.as_deref())?;
+        let log = self
+            .open
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|o| Some((o.session.clone(), o.path.clone()?)));
+        let argv = image_argv(key, log.as_ref().map(|(s, p)| (s.as_str(), p.as_str())))?;
         let c = self.core.live_conn(&self.machine)?.client;
         let got = c
             .call_timeout("machine.exec", json!({"argv": argv, "timeout": 30}), Duration::from_secs(40))
@@ -416,9 +478,12 @@ impl ChatSpike {
         // Locate: the agent in front, if any; skipped while the same process
         // stays in front and was looked up lately. A shell in front keeps what
         // was read (the agent exited into its shell): readable, not answerable.
-        let fresh = |o: &Open| Some(o.pid) == pid && o.located.elapsed() < RELOCATE;
+        // While the log is still empty (a new session), look every time: its
+        // first message creates the file.
+        let fresh = |o: &Open| Some(o.pid) == pid && o.path.is_some() && o.located.elapsed() < RELOCATE;
         let known = self.open.lock().unwrap().as_ref().is_some_and(fresh);
-        if let (Some(pid), true, false) = (pid, matches!(fg.as_str(), "claude" | "codex"), known) {
+        let front = agent_in_front(&t);
+        if let (Some(pid), Some(agent), false) = (pid, front, known) {
             let at = Instant::now();
             let got = c
                 .call_timeout(
@@ -432,7 +497,6 @@ impl ChatSpike {
                 Some(out) => locate::parse_probe(&out),
                 None => return fallback("locating the log failed", &fg),
             };
-            let agent = if fg == "codex" { Agent::Codex } else { Agent::Claude };
             let (session, path) = match locate::decide(&probe) {
                 locate::Found::Log { path, session } => (session, Some(path)),
                 locate::Found::Empty { session } => (session, None),
@@ -451,6 +515,8 @@ impl ChatSpike {
                     parser: Parser::new(agent),
                     pid,
                     located: Instant::now(),
+                    problem: String::new(),
+                    older_blocked: false,
                 });
             }
             if let Some(o) = open.as_mut() {
@@ -462,38 +528,39 @@ impl ChatSpike {
             }
         }
 
-        // Tail what is new.
-        let (path, offset) = {
+        // Tail what is new: at most READ_MAX bytes a poll, the rest next time.
+        let (path, start, end) = {
             let open = self.open.lock().unwrap();
             match open.as_ref() {
                 None => return fallback("no agent in this terminal", &fg),
-                Some(o) => (
-                    o.path.clone(),
-                    o.next.map(|n| n.to_string()).unwrap_or_else(|| format!("-{FIRST_BUDGET}")),
-                ),
+                Some(o) => match o.next {
+                    Some(n) => (o.path.clone(), n.to_string(), Some(n + READ_MAX)),
+                    None => (o.path.clone(), format!("-{FIRST_BUDGET}"), None),
+                },
             }
         };
         if let Some(path) = path {
             let at = Instant::now();
-            let got = c
-                .call_timeout(
-                    "machine.exec",
-                    json!({"argv": ["sh", "-c", tail::SCRIPT, "sh", path, offset], "timeout": 25}),
-                    wait,
-                )
-                .await;
+            let got = read_chunk(&c, &path, &start, end).await;
             times.mark("tail", at);
-            let chunk = got.as_ref().ok().and_then(exec_stdout).and_then(|o| tail::parse_chunk(&o));
             let mut open = self.open.lock().unwrap();
-            if let (Some(o), Some(chunk)) = (open.as_mut(), chunk) {
-                let at = Instant::now();
-                if o.next.is_none() {
-                    o.from = chunk.from;
+            if let Some(o) = open.as_mut() {
+                match got {
+                    Ok(chunk) => {
+                        let at = Instant::now();
+                        if o.next.is_none() {
+                            o.from = chunk.from;
+                        }
+                        // A full window with no whole line: one record longer than it.
+                        let stuck = Some(chunk.next) == o.next && end.is_some_and(|e| chunk.size > e);
+                        o.problem = if stuck { "A log record is too large to read".into() } else { String::new() };
+                        o.parser.feed(&chunk.text);
+                        o.text.push_str(&chunk.text);
+                        o.next = Some(chunk.next);
+                        times.mark("parse", at);
+                    }
+                    Err(why) => o.problem = why,
                 }
-                o.parser.feed(&chunk.text);
-                o.text.push_str(&chunk.text);
-                o.next = Some(chunk.next);
-                times.mark("parse", at);
             }
         }
         self.ready(can_send, &status, &fg, times, began)
@@ -505,14 +572,24 @@ impl ChatSpike {
         let Some(o) = open.as_ref() else {
             return fallback("no agent in this terminal", fg);
         };
-        if let Health::Broken { reason } = o.parser.health() {
+        let health = o.parser.health();
+        if let Health::Broken { reason } = &health {
             return fallback(&format!("unreadable log: {reason}"), fg);
         }
-        let rows = rows(o.parser.items());
+        let mut rows = rows(o.parser.items(), &o.session);
+        if o.older_blocked {
+            rows.insert(0, note_row("Earlier messages could not be loaded"));
+        }
+        // Shown over the chat: a read that failed, or parts left out.
+        let reason = match (&o.problem, &health) {
+            (p, _) if !p.is_empty() => p.clone(),
+            (_, Health::Degraded { .. }) => "Some parts of this session are not shown".into(),
+            _ => String::new(),
+        };
         times.mark("total", began);
         ChatPoll {
             state: "ready".into(),
-            reason: String::new(),
+            reason,
             agent: match o.agent {
                 Agent::Claude => "claude".into(),
                 Agent::Codex => "codex".into(),
@@ -521,7 +598,7 @@ impl ChatSpike {
             version: o.parser.version().unwrap_or("").to_owned(),
             status: status.to_owned(),
             can_send,
-            cut: o.from > 0,
+            cut: o.from > 0 && !o.older_blocked,
             rows,
             timings: times.0,
         }
@@ -542,24 +619,17 @@ impl ChatSpike {
             // A window that holds no whole line (one line longer than it) reads again wider.
             let chunk = loop {
                 let start = from.saturating_sub(budget);
-                let got = conn
-                    .client
-                    .call_timeout(
-                        "machine.exec",
-                        json!({"argv": ["sh", "-c", tail::SCRIPT, "sh", path, start.to_string(), from.to_string()], "timeout": 25}),
-                        Duration::from_secs(30),
-                    )
-                    .await;
-                let chunk = got.as_ref().ok().and_then(exec_stdout).and_then(|o| tail::parse_chunk(&o));
-                match chunk {
-                    Some(c) if c.from == from && start > 0 && budget < OLDER_MAX => budget *= 2,
+                match read_chunk(&conn.client, &path, &start.to_string(), Some(from)).await {
+                    Ok(c) if c.from == from && start > 0 && budget < READ_MAX => budget = (budget * 2).min(READ_MAX),
                     other => break other,
                 }
             };
             times.mark("older", began);
             let mut open = self.open.lock().unwrap();
-            if let (Some(o), Some(chunk)) = (open.as_mut(), chunk) {
-                if o.from == from && o.agent == agent {
+            if let (Some(o), Ok(chunk)) = (open.as_mut(), &chunk) {
+                if o.from == from && o.agent == agent && chunk.from == from {
+                    o.older_blocked = true;
+                } else if o.from == from && o.agent == agent {
                     let at = Instant::now();
                     o.text.insert_str(0, &chunk.text);
                     o.from = chunk.from;
@@ -576,6 +646,40 @@ impl ChatSpike {
         // Status and whether it may send are not looked at here: the screen
         // keeps what the last poll said.
         self.ready(false, "", fg, times, began)
+    }
+}
+
+/// One read of the log through the tail script: an error says why, for the
+/// screen (the output was cut, the read timed out, the file went away).
+async fn read_chunk(c: &herdr_proto::rpc::Client, path: &str, start: &str, end: Option<u64>) -> Result<tail::Chunk, String> {
+    let mut argv = vec![json!("sh"), json!("-c"), json!(tail::SCRIPT), json!("sh"), json!(path), json!(start)];
+    if let Some(e) = end {
+        argv.push(json!(e.to_string()));
+    }
+    let got = c
+        .call_timeout("machine.exec", json!({"argv": argv, "timeout": 25}), Duration::from_secs(30))
+        .await
+        .map_err(|e| format!("Couldn't read the log: {e}"))?;
+    if got["truncated"] == true {
+        return Err("Couldn't read the log: the output was cut".into());
+    }
+    if got["timed_out"] == true {
+        return Err("Couldn't read the log: it took too long".into());
+    }
+    let out = exec_stdout(&got).unwrap_or_default();
+    if out.trim() == "missing" {
+        return Err("The log is gone".into());
+    }
+    tail::parse_chunk(&out).ok_or_else(|| "Couldn't read the log: unexpected output".into())
+}
+
+fn note_row(text: &str) -> ChatRow {
+    ChatRow {
+        kind: "note".into(),
+        text: text.into(),
+        from: String::new(),
+        images: vec![],
+        calls: vec![],
     }
 }
 
@@ -606,19 +710,62 @@ mod tests {
 
     #[test]
     fn an_image_key_names_what_to_run() {
-        let a = image_argv("log:2048:1", Some("/logs/s.jsonl")).unwrap();
+        let open = Some(("s1", "/logs/s.jsonl"));
+        let a = image_argv("log:s1:2048:1", open).unwrap();
         assert_eq!(a[4], "/logs/s.jsonl");
         assert_eq!((a[5].as_str(), a[6].as_str()), (Some("2048"), Some("1")));
         assert_eq!(a[2], image::LOG_SCRIPT);
         let f = image_argv("file:/work/a b.png", None).unwrap();
         assert_eq!((f[2].as_str(), f[4].as_str()), (Some(image::FILE_SCRIPT), Some("/work/a b.png")));
-        assert!(image_argv("log:2048:1", None).is_none(), "no log open yet");
+        assert!(image_argv("log:s1:2048:1", None).is_none(), "no log open yet");
         assert!(image_argv("missing", None).is_none());
         // Keys made from the parser's images round-trip.
-        let keys = chat_images(&[
-            Image::InLog { line: 9, n: 0, media_type: "image/png".into() },
-            Image::File { path: "/x.png".into() },
-        ]);
-        assert!(image_argv(&keys[0].key, Some("/l")).is_some() && image_argv(&keys[1].key, None).is_some());
+        let keys = chat_images(
+            &[
+                Image::InLog { line: 9, n: 0, media_type: "image/png".into() },
+                Image::File { path: "/x.png".into() },
+            ],
+            "s1",
+        );
+        assert!(image_argv(&keys[0].key, open).is_some() && image_argv(&keys[1].key, None).is_some());
+    }
+
+    #[test]
+    fn an_image_of_an_earlier_session_is_not_read_from_the_current_log() {
+        // After /clear the new log can have a line at the same offset.
+        assert!(image_argv("log:s1:2048:1", Some(("s2", "/logs/s2.jsonl"))).is_none());
+    }
+
+    fn term(name: &str, argv: &[&str], state: &str) -> Value {
+        json!({"foreground": {"name": name, "argv": argv, "pid": 7}, "status": {"state": state}})
+    }
+
+    #[test]
+    fn the_agent_in_front_by_name_or_by_its_launcher() {
+        assert_eq!(agent_in_front(&term("claude", &["claude"], "idle")), Some(Agent::Claude));
+        assert_eq!(agent_in_front(&term("codex", &["codex"], "idle")), Some(Agent::Codex));
+        let npm = term("node", &["node", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"], "idle");
+        assert_eq!(agent_in_front(&npm), Some(Agent::Claude));
+        assert_eq!(agent_in_front(&term("node", &["node", "/opt/bin/codex", "--no-daemon"], "idle")), Some(Agent::Codex));
+        assert_eq!(agent_in_front(&term("node", &["node", "server.js"], "idle")), None, "another node program");
+        assert_eq!(agent_in_front(&term("zsh", &["zsh"], "idle")), None);
+    }
+
+    #[test]
+    fn sends_only_to_an_agent_that_can_take_it() {
+        assert!(may_send(&term("claude", &[], "idle")));
+        assert!(may_send(&term("codex", &[], "working")));
+        assert!(may_send(&term("claude", &[], "done")));
+        assert!(!may_send(&term("claude", &[], "blocked")), "a dialog would take the text");
+        assert!(!may_send(&term("claude", &[], "")), "no status yet: a start-up prompt");
+        assert!(!may_send(&term("zsh", &[], "idle")), "a shell would run it");
+    }
+
+    #[test]
+    fn slash_commands_are_not_sent() {
+        assert!(refuse_text("/clear").is_some());
+        assert!(refuse_text("  /exit").is_some());
+        assert!(refuse_text("Fix the /api route").is_none());
+        assert!(refuse_text("!ls").is_none());
     }
 }

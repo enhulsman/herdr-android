@@ -112,6 +112,14 @@ fn after_new_codex_shows_the_new_thread_even_before_its_first_message() {
 }
 
 #[test]
+fn two_codex_rollouts_written_in_the_same_second_are_not_guessed() {
+    // Whole-second times cannot tell which thread is in front (a resumed
+    // older thread beside the current one): say so instead of picking.
+    let got = locate::decide(&codex_probe(&[(L1, 0), (R1, 200), (L2, 0), (R2, 200)]));
+    assert!(matches!(got, Found::Nothing(_)), "{got:?}");
+}
+
+#[test]
 fn a_shell_or_another_program_has_no_log() {
     let mut p = codex_probe(&[]);
     p.name = "zsh".into();

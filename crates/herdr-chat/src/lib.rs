@@ -65,6 +65,9 @@ pub enum Health {
     Broken { reason: String },
 }
 
+/// This many lines with no message means the format changed.
+const NO_MESSAGE_LINES: u32 = 30;
+
 pub struct Parser {
     agent: Agent,
     partial: String,
@@ -135,6 +138,13 @@ impl Parser {
         if self.lines > 0 && self.recognised * 2 < self.lines {
             return Health::Broken {
                 reason: "not this agent's format".into(),
+            };
+        }
+        // A renamed message record leaves lines this agent writes but no
+        // message at all; meta records alone are never a conversation.
+        if self.lines >= NO_MESSAGE_LINES && self.items.is_empty() {
+            return Health::Broken {
+                reason: format!("no messages in {} lines", self.lines),
             };
         }
         if self.unknown > 0 {

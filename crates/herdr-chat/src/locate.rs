@@ -148,6 +148,12 @@ fn codex(p: &Probe) -> Found {
             session: id.to_owned(),
         };
     }
+    // Times are whole seconds: two rollouts written in the same second could be
+    // either thread in front (a resumed older thread beside the current one).
+    let newest = rollouts.iter().map(|r| r.1).max();
+    if rollouts.iter().filter(|r| Some(r.1) == newest).count() > 1 {
+        return Found::Nothing("two Codex sessions open, written in the same second");
+    }
     match rollouts.iter().max_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(b.2))) {
         Some((path, _, id)) => Found::Log {
             path: (*path).to_owned(),

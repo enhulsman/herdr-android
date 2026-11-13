@@ -285,3 +285,26 @@ fn image_paths_sent_before_the_text_show_as_the_images() {
         }]
     );
 }
+
+#[test]
+fn many_lines_without_a_single_message_break_the_view() {
+    // A renamed message record: the lines still look like this agent's, but
+    // nothing becomes a message. Meta records alone are not enough to show.
+    let claude: String = (0..40)
+        .map(|i| format!("{{\"type\":\"chat-turn\",\"sessionId\":\"s\",\"uuid\":\"u{i}\",\"body\":{{}}}}\n"))
+        .collect();
+    let p = parse(Agent::Claude, &claude);
+    assert!(matches!(p.health(), Health::Broken { .. }), "{:?}", p.health());
+    let codex: String = (0..40)
+        .map(|i| format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_done\",\"n\":{i}}}}}\n"))
+        .collect();
+    let p = parse(Agent::Codex, &codex);
+    assert!(matches!(p.health(), Health::Broken { .. }), "{:?}", p.health());
+}
+
+#[test]
+fn a_few_meta_lines_before_the_first_message_are_fine() {
+    // A session just started: settings and snapshots, no message yet.
+    let p = parse(Agent::Claude, "{\"type\":\"permission-mode\",\"sessionId\":\"s\"}\n{\"type\":\"file-history-snapshot\",\"messageId\":\"m\"}\n");
+    assert_eq!(p.health(), Health::Ok);
+}

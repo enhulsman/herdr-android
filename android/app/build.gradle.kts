@@ -36,8 +36,8 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["appLabel"] = "herdr debug"
-            // The system's default icon, so it never passes for the release.
-            manifestPlaceholders["appIcon"] = "@android:drawable/sym_def_app_icon"
+            // The release icon inverted (src/debug/res), so it never passes for the release.
+            manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_debug"
             // -Pherdr.perf: the same app, not debuggable and with optimized Rust, for
             // frame-time and open-time checks; installs over the debug app and keeps its data.
             if (providers.gradleProperty("herdr.perf").isPresent) isDebuggable = false
@@ -52,6 +52,8 @@ android {
             isJniDebuggable = false
             applicationIdSuffix = ".spike"
             manifestPlaceholders["appLabel"] = "herdr spike"
+            // The system's default icon: the debug icon lives in src/debug/res, which spike lacks.
+            manifestPlaceholders["appIcon"] = "@android:drawable/sym_def_app_icon"
             matchingFallbacks += "debug"
         }
     }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The release icon's colours swapped (main/res/values/ic_launcher.xml). -->
+    <color name="ic_launcher_debug_background">#303438</color>
+    <color name="ic_launcher_debug_foreground">#F4F1E9</color>
+</resources>

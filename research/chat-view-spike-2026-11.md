@@ -372,6 +372,22 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   ended, so it shows below the answer (section 2); order by turn, or mark
   it, rather than by log position. A Codex `!` command has no person's
   message, only the command (section 4).
+- **Tried on the test phone after allowing `!`:** a `!echo` sent from the
+  chat ran in both agents. The sent message never matched a person's row
+  (there is none), so it stayed "Sending…"; the spike now matches it to
+  the shell call with the same command, also when Codex adds the call to
+  the folded tool row that was last when it was sent. Codex marks such a
+  command `source: user_shell`; the chat shows it only inside "Ran 4
+  commands", so the spec should show the person's own command as theirs.
+- **Taps went through the chat.** The chat is drawn over the live
+  terminal, and a tap on a spot of the chat that takes no touches (the
+  margin above the message box) reached the terminal's key row below:
+  it pressed up, Claude Code recalled the last `!` command, and the next
+  send was pasted after it. The chat now takes every touch in its
+  bounds, and the covered terminal is left out of accessibility. The spec
+  should not keep a live terminal's keys under another screen. (A
+  Robolectric test of the touch cover failed it before the fix but left
+  later Compose tests failing, depending on test order; it was not kept.)
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.

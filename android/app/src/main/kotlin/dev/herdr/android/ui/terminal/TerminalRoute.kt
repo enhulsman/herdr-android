@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -166,7 +167,11 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     }
     Box {
         val input = TerminalKeyboard(key, sink)
-        TerminalScreen(ui, session, screen, actions, input)
+        // Under the chat the terminal stays live but is not there for
+        // accessibility: its keys are covered.
+        Box(if (chatChosen) Modifier.clearAndSetSemantics {} else Modifier) {
+            TerminalScreen(ui, session, screen, actions, input)
+        }
         if (chatChosen) {
             dev.herdr.android.ui.chat.ChatSpikeRoute(app, key, ui.header, actions, explicit = chatHere, onTerminal = {
                 dev.herdr.android.ui.chat.ChatSpikeChoice.chosen = false

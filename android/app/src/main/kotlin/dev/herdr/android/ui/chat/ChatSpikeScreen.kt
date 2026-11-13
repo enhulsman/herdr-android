@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -72,9 +73,22 @@ import uniffi.herdr_mobile.ChatRow
 
 /** A message sent from the phone that the log does not hold yet; [at] is where its row will be. */
 data class Pending(val text: String, val images: Int, val at: Int) {
-    /** The log's row for this message: the same text, or images and no text for a photo sent alone. */
-    fun matches(row: ChatRow): Boolean =
-        if (text.isBlank()) row.text.isBlank() && row.images.isNotEmpty() else row.text.trim() == text.trim()
+    /**
+     * The log's row for this message: the same text, or images and no text for
+     * a photo sent alone. A `!` message is a shell command: the agent logs it
+     * as a shell call with the command, not as the person's message.
+     */
+    val bang: Boolean get() = text.trim().startsWith("!")
+
+    fun matches(row: ChatRow): Boolean {
+        val bang = text.trim().takeIf { it.startsWith("!") }?.removePrefix("!")?.trim()
+        return when {
+            bang != null -> row.kind == "tools" && row.calls.any { it.name == "Shell" && it.input.trim() == bang }
+            row.kind != "user" -> false
+            text.isBlank() -> row.text.isBlank() && row.images.isNotEmpty()
+            else -> row.text.trim() == text.trim()
+        }
+    }
 }
 
 class ChatSpikeState {
@@ -118,16 +132,26 @@ class ChatSpikeState {
      */
     fun confirm(rows: List<ChatRow>) {
         if (pending.isEmpty()) return
-        val users = rows.withIndex().filter { it.value.kind == "user" }.map { (it.index - base) to it.value }
+        val users = rows.withIndex().filter { it.value.kind == "user" || it.value.kind == "tools" }.map { (it.index - base) to it.value }
         var after = Int.MIN_VALUE
         val left = mutableListOf<Pending>()
         for (p in pending) {
-            val hit = if (left.isEmpty()) users.firstOrNull { (at, row) -> at >= maxOf(p.at, after) && p.matches(row) }?.first else null
+            val from = maxOf(p.at, after)
+            // A `!` command can land in the folded tool row that was last when it was sent.
+            val hit = if (left.isEmpty()) users.firstOrNull { (at, row) -> (at >= from || (p.bang && row.kind == "tools" && at == from - 1)) && p.matches(row) }?.first else null
             if (hit != null) after = hit + 1 else left += if (after > p.at) p.copy(at = after) else p
         }
         if (left != pending) pending = left
     }
 }
+
+/**
+ * Takes every touch in its bounds, so none reaches what is drawn below. The
+ * chat is drawn over the live terminal: without this a tap on an empty spot
+ * reached the terminal's keys (it once pressed up).
+ */
+internal fun Modifier.coversBelow(): Modifier =
+    pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
 
 @Composable
 fun ChatSpikeScreen(
@@ -143,7 +167,7 @@ fun ChatSpikeScreen(
     modifier: Modifier = Modifier,
 ) {
     val c = HerdrTheme.colors
-    Box(modifier.fillMaxSize().background(c.bg)) {
+    Box(modifier.fillMaxSize().background(c.bg).coversBelow()) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
             TitleBar(header, actions, "Terminal", onTerminal)
             Box(Modifier.fillMaxWidth().weight(1f)) {

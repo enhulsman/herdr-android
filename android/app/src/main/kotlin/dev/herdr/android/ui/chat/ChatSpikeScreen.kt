@@ -1,7 +1,14 @@
 package dev.herdr.android.ui.chat
 
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.border
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.width
@@ -197,13 +204,23 @@ private fun Copyable(text: String, end: Boolean = false, content: @Composable ()
     val context = LocalContext.current
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (end) Alignment.End else Alignment.Start) {
         SelectionContainer { content() }
-        BasicText(
-            "Copy", style = HerdrType.secondary.copy(color = c.dimText),
-            modifier = Modifier.clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
-                clipboard.setText(AnnotatedString(text))
-                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-            }.padding(horizontal = 6.dp, vertical = 4.dp),
-        )
+        CopyIcon(Modifier.clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
+            clipboard.setText(AnnotatedString(text))
+            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+        }.padding(8.dp))
+    }
+}
+
+/** Two overlapping rounded squares, the usual copy mark. */
+@Composable
+private fun CopyIcon(modifier: Modifier = Modifier) {
+    val color = HerdrTheme.colors.dimText
+    Canvas(modifier.size(16.dp).semantics { contentDescription = "Copy" }) {
+        val w = 1.4.dp.toPx()
+        val side = size.width * 0.66f
+        val r = CornerRadius(2.5.dp.toPx())
+        drawRoundRect(color, topLeft = Offset(size.width - side, 0f), size = Size(side, side), cornerRadius = r, style = Stroke(w))
+        drawRoundRect(color, topLeft = Offset(0f, size.height - side), size = Size(side, side), cornerRadius = r, style = Stroke(w))
     }
 }
 
@@ -346,14 +363,11 @@ private fun CodeBlock(text: String) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(HerdrRadius.row)).background(c.canvas)) {
-        BasicText(text, style = HerdrType.cardMsg.copy(color = c.termFg), modifier = Modifier.fillMaxWidth().padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = 56.dp))
-        BasicText(
-            "Copy", style = HerdrType.secondary.copy(color = c.dimText),
-            modifier = Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
-                clipboard.setText(AnnotatedString(text))
-                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-            }.padding(horizontal = 10.dp, vertical = 8.dp),
-        )
+        BasicText(text, style = HerdrType.cardMsg.copy(color = c.termFg), modifier = Modifier.fillMaxWidth().padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = 40.dp))
+        CopyIcon(Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
+            clipboard.setText(AnnotatedString(text))
+            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+        }.padding(10.dp))
     }
 }
 

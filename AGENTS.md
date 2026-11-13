@@ -35,3 +35,7 @@ release is cut only for a planned batch of fixes.
    `pm uninstall --user <n> dev.herdr.android.debug` where it should not be.
 5. Launch with `adb shell monkey -p dev.herdr.android.debug -c android.intent.category.LAUNCHER 1`,
    never `am start`.
+
+Phone checks an agent runs alone (test phone, fake agent, measuring on the
+desk): `docs/phone-testing.md`, with `scripts/phone.sh` and
+`scripts/fake-agent.sh`.

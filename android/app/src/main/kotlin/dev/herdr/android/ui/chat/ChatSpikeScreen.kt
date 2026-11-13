@@ -1,10 +1,9 @@
 package dev.herdr.android.ui.chat
 
 import android.widget.Toast
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -181,7 +180,7 @@ private fun UserBubble(row: ChatRow, images: ChatImageSource, onOpen: (String) -
     val c = HerdrTheme.colors
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (row.images.isNotEmpty()) Thumbs(row.images, images, end = true, onOpen)
-        if (row.text.isNotEmpty()) Copyable(row.text) {
+        if (row.text.isNotEmpty()) Copyable(row.text, end = true) {
             BasicText(
                 row.text, style = HerdrType.body.copy(color = c.fg),
                 modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
@@ -190,16 +189,22 @@ private fun UserBubble(row: ChatRow, images: ChatImageSource, onOpen: (String) -
     }
 }
 
-/** Long press copies the message's text. */
-@OptIn(ExperimentalFoundationApi::class)
+/** The message's text is selectable as usual; a small Copy under it copies all of it. */
 @Composable
-private fun Copyable(text: String, content: @Composable () -> Unit) {
+private fun Copyable(text: String, end: Boolean = false, content: @Composable () -> Unit) {
+    val c = HerdrTheme.colors
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    Box(Modifier.combinedClickable(onClick = {}, onLongClick = {
-        clipboard.setText(AnnotatedString(text))
-        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-    })) { content() }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = if (end) Alignment.End else Alignment.Start) {
+        SelectionContainer { content() }
+        BasicText(
+            "Copy", style = HerdrType.secondary.copy(color = c.dimText),
+            modifier = Modifier.clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
+                clipboard.setText(AnnotatedString(text))
+                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+            }.padding(horizontal = 6.dp, vertical = 4.dp),
+        )
+    }
 }
 
 /** A subagent's report or another session's message, folded after a few blocks. */

@@ -196,9 +196,13 @@ other. A path inside a sentence also works, but the agent then opens it with
 its Read tool. The phone scales a photo over 2000 px or 3.5 MB down and
 re-encodes types agents do not take (HEIC) as JPEG.
 
-**Not tested:** Codex with an image from the phone. Codex would not start on
-the desk at the time (its local state database refused to open), so how its
-TUI takes a pasted image path, and how its log records it, is open.
+**Codex** (0.169, throwaway terminal): a pasted image path stays text in
+the person's message, and Codex opens the file with its own viewer (an
+`ImageView` item), then answers from it. So the same send works for both
+agents; the parser turns leading lines that are image paths back into the
+images, so the bubble shows the photo, not the path. (A first Codex try
+failed to start because the test launch lacked the desk's per-OS setting
+for Codex's state database; not a Codex fault.)
 
 **On the phone** (test phone, debug build, the throwaway Claude Code
 session): thumbnails and the full-screen view loaded for images the agent
@@ -245,4 +249,4 @@ wrong dialog).
    in section 4; no slash commands from the chat in the first version.
 6. Images in v1: fetched one at a time by the reference the tail leaves,
    shown as thumbnails and full screen; attached from the phone through
-   `terminal.put` and a path line. Codex sending needs its own test first.
+   `terminal.put` and a path line, for both agents.

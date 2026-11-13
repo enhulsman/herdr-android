@@ -268,3 +268,20 @@ fn a_shell_command_the_person_ran_shows_as_a_tool_call() {
     assert_eq!(p.items().len(), 6, "{:#?}", p.items());
     assert!(!format!("{:?}", p.items()).contains("<bash-"));
 }
+
+#[test]
+fn image_paths_sent_before_the_text_show_as_the_images() {
+    // Codex 0.169 keeps a pasted path as text and opens it with its viewer.
+    let mut p = Parser::new(Agent::Codex);
+    p.feed("{\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"UserMessage\",\"id\":\"u\",\"content\":[{\"type\":\"text\",\"text\":\"/files/t1/a.png\\n/files/t1/b photo.JPG\\nWhat is this?\\n/not/leading.png\"}]}}}\n");
+    assert_eq!(
+        p.items(),
+        &[Item::User {
+            text: "What is this?\n/not/leading.png".into(),
+            images: vec![
+                Image::File { path: "/files/t1/a.png".into() },
+                Image::File { path: "/files/t1/b photo.JPG".into() },
+            ]
+        }]
+    );
+}

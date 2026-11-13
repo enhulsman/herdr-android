@@ -468,6 +468,7 @@ impl Parser {
         };
         match t {
             "UserMessage" => {
+                let (shown, mut sent) = leading_image_paths(&text());
                 // Not seen in a log yet: shown as an image that cannot be fetched.
                 let images = item["content"]
                     .as_array()
@@ -475,10 +476,11 @@ impl Parser {
                     .flatten()
                     .filter(|c| c["type"].as_str().is_some_and(|k| k.contains("image")))
                     .map(|_| Image::Missing)
-                    .collect();
+                    .collect::<Vec<_>>();
+                sent.extend(images);
                 self.push(Item::User {
-                    text: text(),
-                    images,
+                    text: shown,
+                    images: sent,
                 })
             }
             "AgentMessage" => self.push(Item::Assistant { text: text() }),
@@ -623,6 +625,25 @@ fn strip_image_marks(s: &str) -> String {
     }
     out.push_str(rest);
     out.trim().to_owned()
+}
+
+/// Lines at the start of a message that are absolute paths to images (the
+/// phone puts each attached image's path before the text): taken out of the
+/// text and returned as images.
+fn leading_image_paths(text: &str) -> (String, Vec<Image>) {
+    let mut images = Vec::new();
+    let mut rest = text;
+    loop {
+        let (line, after) = rest.split_once('\n').unwrap_or((rest, ""));
+        let l = line.trim().to_ascii_lowercase();
+        let image = line.trim().starts_with('/')
+            && [".png", ".jpg", ".jpeg", ".gif", ".webp"].iter().any(|e| l.ends_with(e));
+        if !image {
+            return (rest.trim().to_owned(), images);
+        }
+        images.push(Image::File { path: line.trim().to_owned() });
+        rest = after;
+    }
 }
 
 /// `%20` and friends in a file URL's path.

@@ -172,10 +172,68 @@ fn an_unknown_codex_item_is_counted_not_shown() {
 }
 
 #[test]
-fn a_line_that_is_not_json_breaks_the_view() {
+fn one_line_that_is_not_json_is_left_out_but_many_break_the_view() {
+    // One bad line (a write cut short) must not hide the whole session.
     let mut p = parse(Agent::Claude, CLAUDE);
     p.feed("{\"type\":\"user\", this is not json\n");
-    assert!(matches!(p.health(), Health::Broken { .. }));
+    assert!(matches!(p.health(), Health::Degraded { .. }), "{:?}", p.health());
+    let n = p.items().len();
+    p.feed("{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{\"role\":\"user\",\"content\":\"Still here\"}}\n");
+    assert_eq!(p.items().len(), n + 1);
+    // Mostly not JSON: not this format at all.
+    let junk: String = (0..10).map(|i| format!("not json {i}\n")).collect();
+    assert!(matches!(parse(Agent::Claude, &junk).health(), Health::Broken { .. }));
+}
+
+fn queued(origin: &str, prompt: &str) -> String {
+    format!(
+        "{{\"type\":\"attachment\",\"sessionId\":\"s\",\"isSidechain\":false,\"attachment\":{{\"type\":\"queued_command\",\"commandMode\":\"prompt\",\"prompt\":{},\"origin\":{origin}}}}}\n",
+        serde_json::to_string(prompt).unwrap()
+    )
+}
+
+fn user_line(text: &str) -> String {
+    format!(
+        "{{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{{\"role\":\"user\",\"content\":{}}}}}\n",
+        serde_json::to_string(text).unwrap()
+    )
+}
+
+#[test]
+fn a_message_sent_while_the_agent_works_is_the_persons_message() {
+    // Claude Code writes a message typed mid-turn only as a queued command.
+    let p = parse(Agent::Claude, &queued("{\"kind\":\"human\"}", "Say SECOND."));
+    assert_eq!(p.items(), &[user("Say SECOND.")]);
+    // With images: the prompt is a list of blocks.
+    let blocks = "{\"type\":\"attachment\",\"sessionId\":\"s\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":[{\"type\":\"text\",\"text\":\"And this\"}],\"origin\":{\"kind\":\"human\"}}}\n";
+    assert_eq!(parse(Agent::Claude, blocks).items(), &[user("And this")]);
+}
+
+#[test]
+fn queued_notices_and_peer_messages_show_once() {
+    let task = "<task-notification><summary>Agent \"Docs\" finished</summary></task-notification>";
+    let peer = "<agent-message from=\"docs-writer\">Check the README</agent-message>";
+    let mut text = queued("{\"kind\":\"task-notification\",\"producer\":\"x\"}", task);
+    text += &queued("{\"kind\":\"peer\",\"name\":\"docs-writer\"}", peer);
+    // Sometimes the same text comes again as a user record: not twice.
+    text += &user_line(task);
+    text += &user_line(peer);
+    let p = parse(Agent::Claude, &text);
+    assert_eq!(
+        p.items(),
+        &[
+            Item::Note { text: "Agent \"Docs\" finished".into() },
+            Item::AgentMessage { from: "docs-writer".into(), text: "Check the README".into() },
+        ]
+    );
+}
+
+#[test]
+fn the_compaction_summary_and_an_interrupt_are_not_the_persons_messages() {
+    let summary = "{\"type\":\"user\",\"sessionId\":\"s\",\"isCompactSummary\":true,\"message\":{\"role\":\"user\",\"content\":\"This session is being continued from a previous conversation.\"}}\n";
+    let interrupt = "{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[Request interrupted by user for tool use]\"}]}}\n";
+    let p = parse(Agent::Claude, &format!("{summary}{interrupt}"));
+    assert_eq!(p.items(), &[Item::Note { text: "Interrupted".into() }]);
 }
 
 #[test]

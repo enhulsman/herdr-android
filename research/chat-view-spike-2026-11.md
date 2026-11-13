@@ -16,8 +16,8 @@ Spike code: branch `spike/chat-view`, never merged: the `herdr-chat` crate
 `terminal.get` gives the terminal's foreground process (`foreground.pid`,
 `foreground.name`, `foreground.argv`). The agent in front is a process named
 `claude` or `codex`, or `node` with the agent's script in its argv (an npm
-install; unit-tested, not run on the desk, where both run as their own
-binaries); `status.app` also names the agent once it reports. Everything else is read with one `machine.exec` of a
+install, then located as that agent rather than by its process name;
+unit-tested, not run on the desk, where both run as their own binaries); `status.app` also names the agent once it reports. Everything else is read with one `machine.exec` of a
 small POSIX sh script (`herdr_chat::locate::SCRIPT`, 40-120 ms on the desk).
 
 | Method | Claude Code | Codex |
@@ -93,7 +93,13 @@ and notes (a slash command, "Conversation compacted").
   `<bash-input>` record followed by one with `<bash-stdout>` and
   `<bash-stderr>`; the parser folds them into a "Shell" tool call. In 150
   recent logs no other tag-wrapped record reaches the chat as the person's
-  message.
+  message. **A message typed while the agent works** is written only as an
+  `attachment` record of type `queued_command` (origin "human"; in 150 logs
+  none of the 18 text ones had a user record too), and so are many
+  notifications and peer messages (origin "task-notification" or "peer",
+  some repeated later as user records, shown once). The compaction summary
+  (`isCompactSummary`) is left out, and "[Request interrupted by user]" is a
+  note.
 - **Codex**: the `event_msg` records with `item_completed` are the UI-level
   items (`UserMessage`, `AgentMessage`, `CommandExecution`, `FileChange`,
   `ImageView`, `Extension`, `Reasoning`). The `response_item` records repeat
@@ -105,8 +111,9 @@ and notes (a slash command, "Conversation compacted").
   terminal, as the phone does); Claude Code stores a paste of three or more
   lines, or a long one, inside `<pasted_content id="…">`. The parser unwraps
   both.
-- **Format guard** (`Parser::health`): a line that is not JSON, or a message
-  record without role and content, is Broken; fewer than half the lines in a
+- **Format guard** (`Parser::health`): a message record without role and
+  content is Broken; a single line that is not JSON (a write cut short) is
+  left out and counted (Degraded); fewer than half the lines in a
   known shape is Broken (catches the other agent's format); 30 lines or more
   with no message at all is Broken (catches a renamed message record or
   Codex `item_completed`). Inside known records, unknown content blocks or
@@ -114,8 +121,11 @@ and notes (a slash command, "Conversation compacted").
   are not shown). Unknown record types are ignored by design: the desk's
   Claude Code logs carry some 20 bookkeeping types and new ones appear with
   releases. Broken hides the chat and shows the terminal. All 37 real logs
-  still parse Ok under this guard. Not caught: a renamed field inside a known
-  record that leaves messages empty but present.
+  still parse Ok under this guard (40 recent ones again after the round-2
+  changes). Not caught: a renamed field inside a known record that leaves
+  messages empty but present, and a message record renamed after messages
+  were already shown (the no-message check only covers a log with none);
+  the spec needs a check that keeps running.
 - **Against real logs**: twelve Claude Code logs from 2.1.292 to 2.1.323 (up
   to 49 MB) and all 25 Codex rollouts of the month (0.166.0 and 0.169.0) parse with health Ok;
   a synthetic unknown Codex item gives Degraded, as tested.
@@ -205,12 +215,21 @@ agent is blocked) is enough for both agents, multi-line included:
   image uploads and again right before typing, and passes `terminal.send`'s
   own guard (`if`: only idle or working; a mismatch types nothing, tested),
   so a status change in between is refused by the core. `done` has no such
-  guard, a small window left. Text starting with `/` is refused.
+  guard, a small window left. It also refuses when the agent in front is no
+  longer the process whose log is shown (restarted, or another agent); a
+  `/clear` inside the same process is only noticed at the next look-up. Text
+  starting with `/` is refused, and so is text starting with `!`: both
+  agents run it as a shell command on the desk (tried in the throwaway
+  terminals: Claude Code wrote a `bash-input` record, Codex a
+  `user_shell_command`).
 - **A message sent while the agent works steers the running turn**, in both
   agents (tested in throwaway terminals: "sleep 8, then say FIRST", then
   "Say SECOND" while working): each took the second message into the turn
   and answered only it; neither said FIRST. So "working" is not a queue; the
   spec has to decide whether the chat offers that (as a steer) or waits.
+  Codex records the steering message as an ordinary `UserMessage` item;
+  Claude Code only as a queued command (section 2), which the spike first
+  dropped, so the message never showed and stayed "Sending…".
 
 ## 5. Images
 
@@ -307,9 +326,12 @@ back, tapping each of three thumbnails opened another image until they were
 scrolled out and back. A thumbnail's loaded image outlived a change of the
 image it stood for, and its loader then skipped the new one; it is now kept
 per image (test: `ChatThumbKeyTest`). What handed the slots other images is
-not pinned down: rows are keyed by position minus the rows read back, and the
-spec should give each row a stable identity instead (the byte offset of its
-first line).
+not pinned down: rows are keyed by position minus the rows read back; a
+likely cause is the first row held being a folded tool row that gains calls
+and images at its front when older text is merged in. The spec should give
+each row a stable identity instead: the byte offset of the line that starts
+it plus its index within that line (one line can give several rows, and
+rows merge across lines), which needs the tail to report line offsets.
 
 ## Go or no-go
 
@@ -336,13 +358,20 @@ first line).
    open from the end with a budget, older messages on scroll back, new bytes
    after the terminal's events and every 0.5 s while it works; show a sent
    message at once.
-4. Parse in Rust (`herdr-chat`), one module per agent, with the health guard;
-   fixtures stay synthetic.
+4. Parse in Rust (`herdr-chat`), one module per agent, with the health guard
+   (kept running, not only for a log with no message yet); include Claude
+   Code's queued commands; fixtures stay synthetic. Rows carry a stable
+   identity (line offset plus index), so the screen never keys them by
+   position.
 5. Send with `terminal.send` from the API, gated on foreground and status as
    in section 4, checked again right before typing and passed as its `if`
-   guard; no slash commands from the chat in the first version. Decide
+   guard, and only to the agent process whose log is shown; no slash
+   commands and no leading `!` from the chat in the first version. A sent
+   message waits as "Sending…" until a row with its text arrives. Decide
    whether a message while the agent works is offered as a steer of the
    running turn (what both agents do with it) or held until it is idle.
 6. Images in v1: fetched one at a time by the reference the tail leaves,
    shown as thumbnails and full screen; attached from the phone through
-   `terminal.put` and a path line, for both agents.
+   `terminal.put` and a path line, for both agents (Codex rests on one trial
+   where the model chose to open the file). Photos are turned upright from
+   their EXIF orientation before they are re-encoded.

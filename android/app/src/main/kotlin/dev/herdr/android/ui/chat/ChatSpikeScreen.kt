@@ -71,7 +71,11 @@ import uniffi.herdr_mobile.ChatRow
 // are rough on purpose; the OpenSpec change designs the real one.
 
 /** A message sent from the phone that the log does not hold yet; [at] is where its row will be. */
-data class Pending(val text: String, val images: Int, val at: Int)
+data class Pending(val text: String, val images: Int, val at: Int) {
+    /** The log's row for this message: the same text, or images and no text for a photo sent alone. */
+    fun matches(row: ChatRow): Boolean =
+        if (text.isBlank()) row.text.isBlank() && row.images.isNotEmpty() else row.text.trim() == text.trim()
+}
 
 class ChatSpikeState {
     var draft by mutableStateOf("")
@@ -109,15 +113,16 @@ class ChatSpikeState {
 
     /**
      * Drops the pending messages whose user row has arrived, oldest first;
-     * each row confirms one message, and those still waiting look past it.
+     * each row confirms one message with its text, and those still waiting
+     * look past it. A message typed at the desk meanwhile confirms nothing.
      */
     fun confirm(rows: List<ChatRow>) {
         if (pending.isEmpty()) return
-        val users = rows.withIndex().filter { it.value.kind == "user" }.map { it.index - base }
+        val users = rows.withIndex().filter { it.value.kind == "user" }.map { (it.index - base) to it.value }
         var after = Int.MIN_VALUE
         val left = mutableListOf<Pending>()
         for (p in pending) {
-            val hit = if (left.isEmpty()) users.firstOrNull { it >= maxOf(p.at, after) } else null
+            val hit = if (left.isEmpty()) users.firstOrNull { (at, row) -> at >= maxOf(p.at, after) && p.matches(row) }?.first else null
             if (hit != null) after = hit + 1 else left += if (after > p.at) p.copy(at = after) else p
         }
         if (left != pending) pending = left

@@ -9,7 +9,7 @@ pub mod locate;
 pub mod tail;
 
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Agent {
@@ -76,6 +76,9 @@ pub struct Parser {
     calls: HashMap<String, (usize, usize)>,
     /// subagent id -> the task it was started with
     agents: HashMap<String, String>,
+    /// Notices and peer messages already shown from a queued command: the
+    /// same text may come again as a user record.
+    injected: HashSet<String>,
     last_text_id: Option<String>,
     cwd: String,
     lines: u32,
@@ -94,6 +97,7 @@ impl Parser {
             items: Vec::new(),
             calls: HashMap::new(),
             agents: HashMap::new(),
+            injected: HashSet::new(),
             last_text_id: None,
             cwd: String::new(),
             lines: 0,
@@ -157,9 +161,11 @@ impl Parser {
 
     fn line(&mut self, line: &str) {
         self.lines += 1;
-        let v: Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(e) => return self.break_with(format!("line {}: {e}", self.lines)),
+        // One bad line (a write cut short) is left out; a log that is mostly
+        // not JSON fails the format check in health().
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            self.unknown += 1;
+            return;
         };
         match self.agent {
             Agent::Claude => self.claude(&v),
@@ -225,6 +231,13 @@ impl Parser {
         }
         match kind {
             "user" | "assistant" => {}
+            "attachment" => {
+                let a = &v["attachment"];
+                if a["type"] == "queued_command" && v["isSidechain"] != true {
+                    self.claude_queued(a);
+                }
+                return;
+            }
             "ai-title" => {
                 self.title = v["aiTitle"].as_str().map(str::to_owned);
                 return;
@@ -247,10 +260,15 @@ impl Parser {
         if v["isSidechain"] == true {
             return;
         }
+        if content.as_str().is_some_and(|t| self.injected.contains(t.trim())) {
+            return;
+        }
         if let Some(text) = content.as_str().filter(|t| kind == "user" && t.contains("<agent-message from=\"")) {
             return self.claude_agent_message(text);
         }
-        if v["isMeta"] == true {
+        // The summary a compaction writes is not the person's; the boundary
+        // already left a note.
+        if v["isMeta"] == true || v["isCompactSummary"] == true {
             return;
         }
         if kind == "assistant" {
@@ -349,9 +367,35 @@ impl Parser {
         });
     }
 
+    /// A message that arrived while the agent worked: Claude Code writes the
+    /// person's only as this record, and notices and peer messages often too.
+    fn claude_queued(&mut self, a: &Value) {
+        let prompt = &a["prompt"];
+        let kind = a["origin"]["kind"].as_str().unwrap_or("");
+        match (kind, prompt.as_str()) {
+            ("human", Some(_)) | ("human", None) if prompt.is_string() || prompt.is_array() => self.claude_user(prompt),
+            (_, Some(s)) => {
+                let t = s.trim();
+                if !self.injected.insert(t.to_owned()) {
+                    return;
+                }
+                if t.contains("<agent-message from=\"") {
+                    self.claude_agent_message(t);
+                } else if t.starts_with("<task-notification>") {
+                    self.claude_user(prompt);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn claude_user(&mut self, content: &Value) {
         if let Some(s) = content.as_str() {
             let t = s.trim_start();
+            if t.starts_with("[Request interrupted by user") {
+                self.push(Item::Note { text: "Interrupted".into() });
+                return;
+            }
             if t.starts_with("<task-notification>") {
                 let summary = between(t, "<summary>", "</summary>").unwrap_or("A background task finished");
                 self.push(Item::Note { text: summary.trim().to_owned() });
@@ -399,6 +443,9 @@ impl Parser {
         let mut images = Vec::new();
         for b in content.as_array().into_iter().flatten() {
             match b["type"].as_str().unwrap_or("") {
+                "text" if b["text"].as_str().is_some_and(|t| t.trim_start().starts_with("[Request interrupted by user")) => {
+                    self.push(Item::Note { text: "Interrupted".into() });
+                }
                 "text" => {
                     let t = strip_image_marks(&unwrap_sent(b["text"].as_str().unwrap_or("")));
                     if !t.is_empty() {

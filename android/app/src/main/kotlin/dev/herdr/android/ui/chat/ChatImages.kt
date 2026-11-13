@@ -3,6 +3,8 @@ package dev.herdr.android.ui.chat
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.util.LruCache
 import androidx.compose.foundation.Image
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.theme.HerdrType
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -103,10 +106,12 @@ internal sealed interface Load {
  */
 @Composable
 internal fun rememberLoad(source: ChatImageSource, key: String): Load {
-    val state = remember(key) { mutableStateOf(source.cached(key)?.let { Load.Loaded(it) } ?: Load.Loading) }
+    val state = remember(key) {
+        mutableStateOf(if (key == "missing") Load.Missing else source.cached(key)?.let { Load.Loaded(it) } ?: Load.Loading)
+    }
     LaunchedEffect(key) {
-        if (state.value is Load.Loaded) return@LaunchedEffect
-        state.value = if (key == "missing") Load.Missing else source.load(key)?.let { Load.Loaded(it) } ?: Load.Missing
+        if (state.value != Load.Loading) return@LaunchedEffect
+        state.value = source.load(key)?.let { Load.Loaded(it) } ?: Load.Missing
     }
     return state.value
 }
@@ -230,25 +235,42 @@ fun decodeSampled(bytes: ByteArray, maxEdge: Int, atLeast: Boolean = false): Ima
 
 private val SENDABLE = setOf("image/png", "image/jpeg", "image/gif", "image/webp")
 
+/** An attached photo's file name beside the terminal: unique within a pick and across picks. */
+fun photoName(stamp: Long, index: Int, ext: String) = "photo-$stamp-$index.$ext"
+
+/** The turn that puts a photo upright, from its EXIF orientation (mirrored ones are left as they are). */
+fun exifRotation(orientation: Int): Float = when (orientation) {
+    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+    else -> 0f
+}
+
 /** A picked photo as it will be sent: small enough, in a type agents take. */
-fun prepareAttachment(context: Context, uri: Uri): Attachment? {
+fun prepareAttachment(context: Context, uri: Uri, index: Int = 0): Attachment? {
     val type = context.contentResolver.getType(uri) ?: "image/jpeg"
     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     if (bounds.outWidth <= 0) return null
-    val stamp = System.currentTimeMillis() % 100000
+    val stamp = System.currentTimeMillis()
+    // A camera photo is stored sideways with an orientation tag; re-encoding
+    // drops the tag, so it is turned upright first (and always re-encoded).
+    val turn = runCatching {
+        exifRotation(ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL))
+    }.getOrDefault(0f)
     val long = uploadLongEdge(bounds.outWidth, bounds.outHeight, bytes.size)
-        ?: if (type in SENDABLE) null else maxOf(bounds.outWidth, bounds.outHeight).coerceAtMost(2000)
+        ?: if (type in SENDABLE && turn == 0f) null else maxOf(bounds.outWidth, bounds.outHeight).coerceAtMost(2000)
     val (name, out) = if (long == null) {
-        "photo-$stamp.${type.substringAfter('/')}" to bytes
+        photoName(stamp, index, type.substringAfter('/')) to bytes
     } else {
         val full = decodeSampled(bytes, long, atLeast = true)?.asAndroidBitmap() ?: return null
         val k = long.toFloat() / maxOf(full.width, full.height)
         val scaled = if (k < 1f) Bitmap.createScaledBitmap(full, (full.width * k).toInt(), (full.height * k).toInt(), true) else full
+        val upright = if (turn == 0f) scaled else Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, Matrix().apply { postRotate(turn) }, true)
         val buf = ByteArrayOutputStream()
-        scaled.compress(Bitmap.CompressFormat.JPEG, 85, buf)
-        "photo-$stamp.jpg" to buf.toByteArray()
+        upright.compress(Bitmap.CompressFormat.JPEG, 85, buf)
+        photoName(stamp, index, "jpg") to buf.toByteArray()
     }
     val preview = decodeSampled(out, 256) ?: return null
     return Attachment(name, out, preview)

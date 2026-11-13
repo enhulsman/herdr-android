@@ -90,6 +90,15 @@ pub fn decide(p: &Probe) -> Found {
     }
 }
 
+/// [`decide`] for an agent already known by other means (a launcher-wrapped
+/// install runs as `node`, so its process name says nothing).
+pub fn decide_for(agent: crate::Agent, p: &Probe) -> Found {
+    match agent {
+        crate::Agent::Claude => claude(p),
+        crate::Agent::Codex => codex(p),
+    }
+}
+
 fn claude(p: &Probe) -> Found {
     let Some(file) = p.claude_pidfile.as_deref() else {
         return Found::Nothing("no session file");

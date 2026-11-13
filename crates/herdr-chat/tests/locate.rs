@@ -141,3 +141,12 @@ fn the_desk_script_output_parses_into_a_probe() {
     assert_eq!(p.proc_start, Some(9001));
     assert_eq!(p.claude_logs, vec!["/x/a.jsonl".to_string()]);
 }
+
+#[test]
+fn a_launcher_wrapped_agent_is_located_as_that_agent() {
+    // An npm install runs as `node .../cli.js`: the process name is node.
+    let mut p = claude_probe(PIDFILE, Some(9001), &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"]);
+    p.name = "node".into();
+    assert_eq!(locate::decide(&p), Found::Nothing("not an agent"));
+    assert!(matches!(locate::decide_for(herdr_chat::Agent::Claude, &p), Found::Log { .. }));
+}

@@ -133,6 +133,9 @@ class ChatSpikeScreenshotTest {
         // A poll with nothing new keeps both.
         s.confirm(before)
         assertEquals(2, s.pending.size)
+        // A message typed at the desk meanwhile confirms neither.
+        s.confirm(before + row("user", "Something from the desk"))
+        assertEquals(2, s.pending.size)
         // The first one arrives (with an answer after it): only the second waits.
         s.confirm(before + row("user", "Run the tests") + row("said", "Running."))
         assertEquals(listOf("And push"), s.pending.map { it.text })
@@ -142,6 +145,31 @@ class ChatSpikeScreenshotTest {
         assertEquals(listOf("And push"), s.pending.map { it.text })
         s.confirm(List(3) { row("user", "older $it") } + before + row("user", "Run the tests") + row("said", "Running.") + row("user", "And push"))
         assertEquals(emptyList<Pending>(), s.pending)
+    }
+
+    @Test
+    fun anImageOnlyMessageIsConfirmedByARowWithImagesAndNoText() {
+        val s = ChatSpikeState()
+        s.sent("", images = 1, rows = 0)
+        s.confirm(listOf(row("user", "typed at the desk")))
+        assertEquals(1, s.pending.size)
+        s.confirm(listOf(row("user", "typed at the desk"), row("user", "", images = listOf(img("log:9:0")))))
+        assertEquals(emptyList<Pending>(), s.pending)
+    }
+
+    @Test
+    fun cameraPhotosAreTurnedUprightBeforeSending() {
+        assertEquals(0f, exifRotation(android.media.ExifInterface.ORIENTATION_NORMAL))
+        assertEquals(0f, exifRotation(android.media.ExifInterface.ORIENTATION_UNDEFINED))
+        assertEquals(90f, exifRotation(android.media.ExifInterface.ORIENTATION_ROTATE_90))
+        assertEquals(180f, exifRotation(android.media.ExifInterface.ORIENTATION_ROTATE_180))
+        assertEquals(270f, exifRotation(android.media.ExifInterface.ORIENTATION_ROTATE_270))
+    }
+
+    @Test
+    fun attachedPhotosGetDistinctNames() {
+        val names = List(4) { photoName(stamp = 4242L, index = it, ext = "jpg") }
+        assertEquals(4, names.toSet().size)
     }
 
     @Test

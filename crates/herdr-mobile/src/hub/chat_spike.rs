@@ -284,10 +284,37 @@ fn agent_in_front(t: &Value) -> Option<Agent> {
     })
 }
 
+/// The agent in front is still the one whose log the chat shows (`shown`:
+/// its pid and agent): not restarted, not replaced by another agent.
+fn still_shown(t: &Value, shown: Option<(i64, Agent)>) -> bool {
+    shown.is_some_and(|(pid, agent)| t["foreground"]["pid"].as_i64() == Some(pid) && agent_in_front(t) == Some(agent))
+}
+
+#[derive(Debug, PartialEq)]
+enum Older {
+    Prepend,
+    /// Not one whole line fits the budget: a record too big to read.
+    Blocked,
+    Failed(String),
+}
+
+fn older_outcome(chunk: &Result<tail::Chunk, String>, from: u64) -> Older {
+    match chunk {
+        Ok(c) if c.from == from => Older::Blocked,
+        Ok(_) => Older::Prepend,
+        Err(e) => Older::Failed(e.clone()),
+    }
+}
+
 /// Why the chat does not send `text`, if it does not: slash commands are not
-/// sent from the chat (a pasted one opened another command's dialog).
+/// sent from the chat (a pasted one opened another command's dialog), nor a
+/// leading `!` (both agents run it as a shell command on the desk).
 fn refuse_text(text: &str) -> Option<&'static str> {
-    text.trim_start().starts_with('/').then_some("Slash commands are not sent from the chat; use the terminal")
+    match text.trim_start().chars().next() {
+        Some('/') => Some("Slash commands are not sent from the chat; use the terminal"),
+        Some('!') => Some("A message starting with ! runs a shell command; use the terminal"),
+        _ => None,
+    }
 }
 
 #[uniffi::export]
@@ -320,7 +347,12 @@ impl ChatSpike {
                 };
                 match conn.client.subscribe(json!({"terminal": self.address})).await {
                     Ok((_, stream)) => *events = Some(stream),
-                    Err(_) => return false,
+                    // Waits anyway: returning at once would make the poll loop spin.
+                    Err(_) => {
+                        drop(events);
+                        tokio::time::sleep(Duration::from_millis(timeout_ms.into())).await;
+                        return false;
+                    }
                 }
             }
             let stream = events.as_mut().unwrap();
@@ -340,6 +372,8 @@ impl ChatSpike {
                 Ok(Some(changed)) => changed,
                 Ok(None) => {
                     *events = None;
+                    drop(events);
+                    tokio::time::sleep(Duration::from_millis(u64::from(timeout_ms).min(1000))).await;
                     false
                 }
                 Err(_) => false,
@@ -370,6 +404,10 @@ impl ChatSpike {
                 Ok(t) => t,
                 Err(e) => return Some(format!("{e}")),
             };
+            let shown = self.open.lock().unwrap().as_ref().map(|o| (o.pid, o.agent));
+            if !still_shown(&t, shown) {
+                return Some("Another agent is in this terminal now; reopen the chat".into());
+            }
             if !may_send(&t) {
                 return Some("The agent can't take a message right now".into());
             }
@@ -396,6 +434,10 @@ impl ChatSpike {
                 Ok(t) => t,
                 Err(e) => return Some(format!("{e}")),
             };
+            let shown = self.open.lock().unwrap().as_ref().map(|o| (o.pid, o.agent));
+            if !still_shown(&t, shown) {
+                return Some("Another agent is in this terminal now; reopen the chat".into());
+            }
             if !may_send(&t) {
                 return Some("The agent can't take a message right now".into());
             }
@@ -493,13 +535,22 @@ impl ChatSpike {
                 )
                 .await;
             times.mark("locate", at);
-            let probe = match got.as_ref().ok().and_then(exec_stdout) {
-                Some(out) => locate::parse_probe(&out),
-                None => return fallback("locating the log failed", &fg),
+            // A lookup that fails while this agent's log is held keeps the
+            // chat (and its message box) with a note; looked up again later.
+            let held = self.open.lock().unwrap().as_ref().is_some_and(|o| o.path.is_some() && still_shown(&t, Some((o.pid, o.agent))));
+            let found = match got.as_ref().ok().and_then(exec_stdout) {
+                Some(out) => locate::decide_for(agent, &locate::parse_probe(&out)),
+                None => locate::Found::Nothing("locating the log failed"),
             };
-            let (session, path) = match locate::decide(&probe) {
+            let (session, path) = match found {
                 locate::Found::Log { path, session } => (session, Some(path)),
                 locate::Found::Empty { session } => (session, None),
+                locate::Found::Nothing(why) if held => {
+                    if let Some(o) = self.open.lock().unwrap().as_mut() {
+                        o.problem = format!("Couldn't check the session log: {why}");
+                    }
+                    return self.ready(can_send, &status, &fg, times, began);
+                }
                 locate::Found::Nothing(why) => return fallback(why, &fg),
             };
             let mut open = self.open.lock().unwrap();
@@ -626,16 +677,23 @@ impl ChatSpike {
             };
             times.mark("older", began);
             let mut open = self.open.lock().unwrap();
-            if let (Some(o), Ok(chunk)) = (open.as_mut(), &chunk) {
-                if o.from == from && o.agent == agent && chunk.from == from {
-                    o.older_blocked = true;
-                } else if o.from == from && o.agent == agent {
-                    let at = Instant::now();
-                    o.text.insert_str(0, &chunk.text);
-                    o.from = chunk.from;
-                    o.parser = Parser::new(agent);
-                    o.parser.feed(&o.text);
-                    times.mark("parse", at);
+            if let Some(o) = open.as_mut().filter(|o| o.from == from && o.agent == agent) {
+                match (older_outcome(&chunk, from), &chunk) {
+                    // Stops reading back, so the top of the list does not ask again and again.
+                    (Older::Failed(why), _) => {
+                        o.problem = why;
+                        o.older_blocked = true;
+                    }
+                    (Older::Blocked, _) => o.older_blocked = true,
+                    (Older::Prepend, Ok(chunk)) => {
+                        let at = Instant::now();
+                        o.text.insert_str(0, &chunk.text);
+                        o.from = chunk.from;
+                        o.parser = Parser::new(agent);
+                        o.parser.feed(&o.text);
+                        times.mark("parse", at);
+                    }
+                    (Older::Prepend, Err(_)) => {}
                 }
             }
         }
@@ -762,10 +820,35 @@ mod tests {
     }
 
     #[test]
+    fn sends_only_to_the_agent_the_chat_shows() {
+        let shown = Some((7, Agent::Claude));
+        assert!(still_shown(&term("claude", &[], "idle"), shown));
+        assert!(!still_shown(&term("codex", &[], "idle"), shown), "another agent took the terminal");
+        let mut other = term("claude", &[], "idle");
+        other["foreground"]["pid"] = json!(8);
+        assert!(!still_shown(&other, shown), "the agent was restarted");
+        assert!(!still_shown(&term("claude", &[], "idle"), None), "nothing read yet");
+    }
+
+    #[test]
+    fn a_failed_read_back_stops_and_says_why() {
+        let chunk = |from| Ok(tail::Chunk { text: "x\n".into(), from, next: 100, size: 100 });
+        assert_eq!(older_outcome(&chunk(40), 100), Older::Prepend);
+        assert_eq!(older_outcome(&chunk(100), 100), Older::Blocked, "no whole line fits");
+        assert_eq!(
+            older_outcome(&Err("Couldn't read the log: it took too long".into()), 100),
+            Older::Failed("Couldn't read the log: it took too long".into())
+        );
+    }
+
+    #[test]
     fn slash_commands_are_not_sent() {
         assert!(refuse_text("/clear").is_some());
         assert!(refuse_text("  /exit").is_some());
         assert!(refuse_text("Fix the /api route").is_none());
-        assert!(refuse_text("!ls").is_none());
+        // Both agents run a leading `!` as a shell command on the desk (tried on both).
+        assert!(refuse_text("!ls").is_some());
+        assert!(refuse_text(" !rm -rf build").is_some());
+        assert!(refuse_text("Is it done!").is_none());
     }
 }

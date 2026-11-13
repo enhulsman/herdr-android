@@ -68,7 +68,7 @@ fun ChatSpikeRoute(
     val lock = remember(spike) { Mutex() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris ->
         scope.launch {
-            val picked = withContext(Dispatchers.IO) { uris.mapNotNull { runCatching { prepareAttachment(context, it) }.getOrNull() } }
+            val picked = withContext(Dispatchers.IO) { uris.mapIndexedNotNull { i, uri -> runCatching { prepareAttachment(context, uri, i) }.getOrNull() } }
             if (picked.size < uris.size) Toast.makeText(context, "Some images couldn't be read", Toast.LENGTH_LONG).show()
             state.attached = state.attached + picked
         }

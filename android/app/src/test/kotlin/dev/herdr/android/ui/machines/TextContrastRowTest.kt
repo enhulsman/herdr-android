@@ -9,8 +9,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.HubSnapshot
 
-// The "Text contrast" row under "This phone": its second line names the current
-// choice, and a tap switches to the other one in place (no dialog).
+// The "Higher text contrast" switch row under "This phone": off (like the Mac)
+// it says so on its second line, on it has none; a tap switches it in place.
 @RunWith(RobolectricTestRunner::class)
 class TextContrastRowTest {
     private val app = RuntimeEnvironment.getApplication()
@@ -19,10 +19,17 @@ class TextContrastRowTest {
 
     @Test
     fun theRowNamesTheCurrentChoice() {
-        assertEquals("Text contrast", res.getString(dev.herdr.android.R.string.machines_text_contrast))
-        assertEquals("Like the Mac", machinesUi(empty, null, 0, res).textContrastDetail)
-        assertEquals("Like the Mac", machinesUi(empty, null, 0, res, Contrast.Mac).textContrastDetail)
-        assertEquals("Higher", machinesUi(empty, null, 0, res, Contrast.Aa).textContrastDetail)
+        assertEquals("Higher text contrast", res.getString(dev.herdr.android.R.string.machines_text_contrast))
+        assertEquals("Off: like the Mac", machinesUi(empty, null, 0, res).textContrastDetail)
+        assertEquals("Off: like the Mac", machinesUi(empty, null, 0, res, Contrast.Mac).textContrastDetail)
+        assertEquals(null, machinesUi(empty, null, 0, res, Contrast.Aa).textContrastDetail)
+    }
+
+    @Test
+    fun theSwitchIsOnForHigherContrast() {
+        assertEquals(false, machinesUi(empty, null, 0, res).textContrastHigher)
+        assertEquals(false, machinesUi(empty, null, 0, res, Contrast.Mac).textContrastHigher)
+        assertEquals(true, machinesUi(empty, null, 0, res, Contrast.Aa).textContrastHigher)
     }
 
     @Test

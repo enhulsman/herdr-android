@@ -70,14 +70,13 @@
     <!-- The key accepts a strong biometric or the device credential, for 30 minutes (AndroidKeystoreBackend). -->
     <string name="machines_phone_key_detail">Needs your fingerprint or screen lock, then valid 30 min</string>
     <!-- Text contrast: a row that toggles in place; its second line names the current choice. -->
-    <string name="machines_text_contrast">Text contrast</string>
-    <string name="machines_text_contrast_mac">Like the Mac</string>
-    <string name="machines_text_contrast_higher">Higher</string>
+    <string name="machines_text_contrast">Higher text contrast</string>
+    <string name="machines_text_contrast_mac">Off: like the Mac</string>
     <!-- Stay connected: a row that toggles in place; the second line says whether its notification shows. -->
     <string name="machines_stay_connected">Stay connected</string>
-    <string name="machines_stay_connected_off">Off</string>
-    <string name="machines_stay_connected_on">On · shows a notification</string>
-    <string name="machines_stay_connected_unseen">On · notifications are off</string>
+    <string name="machines_stay_connected_off">Keeps the connection open in the background</string>
+    <string name="machines_stay_connected_on">Shows a notification, uses more battery</string>
+    <string name="machines_stay_connected_unseen">Notifications are off</string>
     <string name="machines_export">Export machine list</string>
     <string name="machines_export_detail">Without keys</string>
     <!-- The export row, disabled while the list is empty. -->

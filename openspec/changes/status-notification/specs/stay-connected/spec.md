@@ -1,25 +1,27 @@
 ## ADDED Requirements
 
 ### Requirement: Stay connected is an option, off by default
-The Machines screen SHALL have a "Stay connected" row that toggles in place,
-with the second line "Off", "On · shows a notification", or "On ·
-notifications are off" when the notification permission is refused or the
-Status channel is blocked. It SHALL be off on a fresh install and after an
-update from a version without it. Turning it on SHALL ask for the notification
-permission when it is not granted; the option SHALL work whether or not the
-permission is granted.
+The Machines screen SHALL have a "Stay connected" row with a switch; a tap
+anywhere on the row toggles it in place, and screen readers hear it as a
+switch with its state. The second line SHALL read "Keeps the connection open
+in the background" while off, "Shows a notification, uses more battery" while
+on, or "Notifications are off" while on with the notification permission
+refused or the Status channel blocked. It SHALL be off on a fresh install and
+after an update from a version without it. Turning it on SHALL ask for the
+notification permission when it is not granted; the option SHALL work whether
+or not the permission is granted.
 
 #### Scenario: Fresh install
 - **WHEN** Ezra opens the Machines screen for the first time
-- **THEN** the row reads "Stay connected" over "Off" and no status notification is shown
+- **THEN** the row reads "Stay connected" over "Keeps the connection open in the background", its switch is off, and no status notification is shown
 
 #### Scenario: Turned on
 - **WHEN** Ezra taps the row while it is off and notifications are allowed
-- **THEN** it reads "On · shows a notification" and the status notification appears
+- **THEN** its switch is on, it reads "Shows a notification, uses more battery", and the status notification appears
 
 #### Scenario: Notifications refused
 - **WHEN** Ezra turns the option on and refuses the notification permission
-- **THEN** the row reads "On · notifications are off" and the connection still stays up in the background
+- **THEN** its switch is on, the row reads "Notifications are off", and the connection still stays up in the background
 
 ### Requirement: While on, connections stay up in the background
 The app SHALL keep its connections open in the background while the option is

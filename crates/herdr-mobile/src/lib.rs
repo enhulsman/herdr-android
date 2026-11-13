@@ -289,6 +289,12 @@ impl Hub {
             .block_on(async move { core.start_terminal(&machine, place, agent).await })
     }
 
+    /// Spike for issue 17 (never merged): the try-it chat view of the agent in
+    /// `address`. Poll it off the main thread.
+    pub fn open_chat_spike(&self, machine: String, address: String) -> Arc<hub::chat_spike::ChatSpike> {
+        Arc::new(hub::chat_spike::ChatSpike::new(self.core.clone(), machine, address))
+    }
+
     /// Opens a terminal, at the phone's size when `at_phone_size` (the app,
     /// since phone check round 2), else to watch; `phone_cols` x `phone_rows`
     /// is the phone's own grid. The listener hears frames and states.

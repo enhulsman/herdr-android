@@ -117,6 +117,8 @@ class TerminalActions(
     val onWatchView: (WatchView) -> Unit = {},
     /** A sideways swipe on the title bar: the next or previous agent, like tabs; false at the end. */
     val onTab: (next: Boolean) -> Boolean = { false },
+    /** Spike for issue 17 (never merged): the debug build's switch to the chat view; null hides it. */
+    val onChat: (() -> Unit)? = null,
 )
 
 /** What the screen itself remembers while it is open. */
@@ -276,6 +278,7 @@ private fun TitleBar(header: TerminalHeader, actions: TerminalActions) {
             BasicText(header.lineTwo, style = HerdrType.secondary.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (header.state != null && header.tone != SheetTone.None) StatePill(header.state, header.tone)
+        actions.onChat?.let { dev.herdr.android.ui.chat.ViewSwitch("Chat", it) }
     }
 }
 

@@ -266,6 +266,8 @@ class FakeHub : HubInterface {
     override fun suspend() { calls += "suspend" }
 
     /** The terminal screen opens terminals through TerminalOpener, faked in its own tests. */
+    override fun openChatSpike(machine: String, address: String): uniffi.herdr_mobile.ChatSpike = throw UnsupportedOperationException()
+
     override fun openTerminal(
         machine: String,
         address: String,

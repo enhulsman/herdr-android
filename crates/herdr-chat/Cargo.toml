@@ -1,0 +1,10 @@
+[package]
+name = "herdr-chat"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Spike (issue 17, never merged): agent session logs as a conversation."
+
+[dependencies]
+serde_json = "1"

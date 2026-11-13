@@ -132,8 +132,13 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
         }
     }
 
+    // Spike for issue 17 (never merged): the chat view over the attached terminal.
+    var chatOpen by remember(key) { mutableStateOf(false) }
+    val chatEnabled = remember { dev.herdr.android.ui.chat.chatSpikeEnabled(context) }
+
     BackHandler {
         when {
+            chatOpen -> chatOpen = false
             screen.composeOpen -> {
                 screen.composeOpen = false
                 screen.composeText = ""
@@ -152,11 +157,15 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             onTab = home::tab,
             onPhoneGrid = { phone = it },
             onWatchView = { app.terminalZoom[key] = it.zoom },
+            onChat = if (chatEnabled) ({ chatOpen = true }) else null,
         )
     }
     Box {
         val input = TerminalKeyboard(key, sink)
         TerminalScreen(ui, session, screen, actions, input)
+        if (chatOpen) {
+            dev.herdr.android.ui.chat.ChatSpikeRoute(app, key, ui.header, onBack = home::close, onTerminal = { chatOpen = false })
+        }
     }
 }
 

@@ -90,9 +90,13 @@ data class MachinesUi(
     val removing: String? = null,
     /** Why the hub refused the last remove, in the notice style. */
     val error: String? = null,
-    /** The "Text contrast" row's second line: "Like the Mac" or "Higher". */
-    val textContrastDetail: String = "",
-    /** The "Stay connected" row's second line: "Off", "On · shows a notification" or "On · notifications are off". */
+    /** The "Higher text contrast" switch: on for the AA values. */
+    val textContrastHigher: Boolean = false,
+    /** Its second line: "Off: like the Mac" while off, none while on. */
+    val textContrastDetail: String? = null,
+    /** The "Stay connected" switch: follows the setting, also when its notification is not shown. */
+    val stayConnectedOn: Boolean = false,
+    /** Its second line: what it does while off; "Shows a notification, uses more battery" or "Notifications are off" while on. */
     val stayConnectedDetail: String = "",
 )
 
@@ -121,12 +125,12 @@ fun machinesUi(
         exportDetail = res.getString(
             if (snapshot.machines.isNotEmpty()) R.string.machines_export_detail else R.string.machines_export_detail_empty,
         ),
-        textContrastDetail = res.getString(
-            when (contrast) {
-                Contrast.Mac -> R.string.machines_text_contrast_mac
-                Contrast.Aa -> R.string.machines_text_contrast_higher
-            },
-        ),
+        textContrastHigher = contrast == Contrast.Aa,
+        textContrastDetail = when (contrast) {
+            Contrast.Mac -> res.getString(R.string.machines_text_contrast_mac)
+            Contrast.Aa -> null
+        },
+        stayConnectedOn = stayConnected != StayConnectedRow.Off,
         stayConnectedDetail = res.getString(
             when (stayConnected) {
                 StayConnectedRow.Off -> R.string.machines_stay_connected_off

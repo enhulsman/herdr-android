@@ -523,6 +523,10 @@
       "head": "status dot or ring, name 17/500, status line 13 muted",
       "rows": "Alerts status, Mute alerts toggle, Send test alert"
     },
+    "thisPhoneCard": {
+      "rows": "Phone key (chevron); Higher text contrast (toggle, 'Off: like the Mac' while off); Stay connected (toggle: 'Keeps the connection open in the background' / 'Shows a notification, uses more battery' / 'Notifications are off'); Export machine list; Import machine list",
+      "note": "Toggle rows added 2026-11-13 (owner); render 7 drew text contrast without a switch"
+    },
     "hostKeyDialog": {
       "radius": 24,
       "parts": "'Trust this machine?' 21/600, host in fg, fingerprint box (mono, canvas), 'After this, a different key stops the connection.', Cancel and 'Trust and connect' (solid)"
@@ -531,8 +535,10 @@
       "channels": [
         "Needs you (loud)",
         "Finished (quiet)",
-        "Alert health (quiet)"
+        "Alert health (quiet)",
+        "Status (silent, only while Stay connected is on)"
       ],
+      "status": "Stay connected's ongoing notification: title the counts '<n> need(s) you · <n> done · <n> working', zeros left out, or 'Nothing needs you'; second line 'Connected', 'Connected to <n> of <m> machines[ · unlock to reconnect]'; with no machine connected only a title: 'Not connected · open the app', 'Disconnected · unlock to reconnect', 'Reconnecting'. Names no agent, project, folder or machine (approved 2026-11-08)",
       "title": "'<agent> needs you' / '<agent> finished'",
       "body": "'<kind> · <place> · <machine>' / '<place> · <machine>', absent parts left out",
       "never": "screen text or msg"

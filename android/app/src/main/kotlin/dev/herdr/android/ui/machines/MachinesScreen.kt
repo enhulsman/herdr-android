@@ -169,18 +169,21 @@ private fun MachinesList(ui: MachinesUi, actions: MachinesActions) {
                 // Render 7 draws this row without a chevron; the owner asked for one (it opens the line).
                 onClick = actions.onPhoneKey,
             )
-            // Toggles in place, so no chevron.
+            // Switch rows (owner, 2026-11-13; render 7 drew them as plain rows): the whole row toggles, as Mute alerts does.
             CardRow(
                 stringResource(R.string.machines_text_contrast),
                 ui.textContrastDetail,
                 chevron = false,
+                toggled = ui.textContrastHigher,
+                trailing = { Toggle(ui.textContrastHigher) },
                 onClick = actions.onTextContrast,
             )
-            // Toggles in place too.
             CardRow(
                 stringResource(R.string.machines_stay_connected),
                 ui.stayConnectedDetail,
                 chevron = false,
+                toggled = ui.stayConnectedOn,
+                trailing = { Toggle(ui.stayConnectedOn) },
                 onClick = actions.onStayConnected,
             )
             // Shown even with no machines (the spec makes export unconditional), but dim and inert until one exists.

@@ -16,6 +16,20 @@ Start with `decisions.md`, then `openspec/changes/android-client-v1/`.
 The visual contract is the signed-off renders in `design/`; `design-tokens.json`
 and `design-brief.md` record them.
 
+## Work tracking
+
+The roadmap lives in GitHub, in the open: issues are the items, the
+`v1.0.0` and `1.x` milestones group them, and the "herdr-android roadmap"
+project board shows what is in progress.
+
+- Start a session with `gh issue list --milestone v1.0.0` and the board.
+- An issue says what and why and links its OpenSpec change; the change
+  holds the tasks, `decisions.md` the decisions. Task state is never kept
+  in two places.
+- Move an issue to In Progress when work on it starts; close it from the
+  PR with `Closes #n`.
+- Issue text is public: the wording rules above apply to it.
+
 ## Putting a build on a phone
 
 Test rounds use the debug build ("herdr debug", `dev.herdr.android.debug`,

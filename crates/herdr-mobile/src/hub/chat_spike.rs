@@ -306,17 +306,6 @@ fn older_outcome(chunk: &Result<tail::Chunk, String>, from: u64) -> Older {
     }
 }
 
-/// Why the chat does not send `text`, if it does not: slash commands are not
-/// sent from the chat (a pasted one opened another command's dialog), nor a
-/// leading `!` (both agents run it as a shell command on the desk).
-fn refuse_text(text: &str) -> Option<&'static str> {
-    match text.trim_start().chars().next() {
-        Some('/') => Some("Slash commands are not sent from the chat; use the terminal"),
-        Some('!') => Some("A message starting with ! runs a shell command; use the terminal"),
-        _ => None,
-    }
-}
-
 #[uniffi::export]
 impl ChatSpike {
     /// Locates and reads what is new. Blocks: call it off the main thread.
@@ -392,9 +381,6 @@ impl ChatSpike {
     /// 2.1.323). The error is for a toast.
     pub fn send_with_images(&self, text: String, images: Vec<ChatUpload>) -> Option<String> {
         let core = self.core.clone();
-        if let Some(why) = refuse_text(&text) {
-            return Some(why.into());
-        }
         core.runtime().block_on(async {
             let Some(conn) = self.core.live_conn(&self.machine) else {
                 return Some("Not connected".into());
@@ -842,13 +828,11 @@ mod tests {
     }
 
     #[test]
-    fn slash_commands_are_not_sent() {
-        assert!(refuse_text("/clear").is_some());
-        assert!(refuse_text("  /exit").is_some());
-        assert!(refuse_text("Fix the /api route").is_none());
-        // Both agents run a leading `!` as a shell command on the desk (tried on both).
-        assert!(refuse_text("!ls").is_some());
-        assert!(refuse_text(" !rm -rf build").is_some());
-        assert!(refuse_text("Is it done!").is_none());
+    fn commands_are_sent_as_typed() {
+        // The chat sends whatever the agent's own input box takes: slash
+        // commands and a leading `!` (a shell command on the desk) included.
+        assert_eq!(with_images(&[], "/clear"), "/clear");
+        assert_eq!(with_images(&[], "!ls"), "!ls");
+        assert_eq!(with_images(&[], "/compact keep the API notes"), "/compact keep the API notes");
     }
 }

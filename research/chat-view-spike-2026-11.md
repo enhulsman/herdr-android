@@ -105,7 +105,10 @@ and notes (a slash command, "Conversation compacted").
   `ImageView`, `Extension`, `Reasoning`). The `response_item` records repeat
   the same turn for the model and include injected context (AGENTS.md, the
   environment) as role "user", so they are not used. Codex writes no
-  "started" item, so a running command shows only once it ends.
+  "started" item, so a running command shows only once it ends, and it can
+  end after the turn: in the steering test (section 4) the steered turn's
+  `sleep 8` was written after the turn's `task_complete`, so in the chat it
+  shows below the answer.
 - **Sent text comes back wrapped.** herdr-core puts `<hc from="t…">` around a
   message sent from inside a terminal (not one sent through the API without a
   terminal, as the phone does); Claude Code stores a paste of three or more
@@ -217,11 +220,20 @@ agent is blocked) is enough for both agents, multi-line included:
   so a status change in between is refused by the core. `done` has no such
   guard, a small window left. It also refuses when the agent in front is no
   longer the process whose log is shown (restarted, or another agent); a
-  `/clear` inside the same process is only noticed at the next look-up. Text
-  starting with `/` is refused, and so is text starting with `!`: both
-  agents run it as a shell command on the desk (tried in the throwaway
-  terminals: Claude Code wrote a `bash-input` record, Codex a
-  `user_shell_command`).
+  `/clear` inside the same process is only noticed at the next look-up.
+- **Slash commands and `!` are sent like any message.** The owner's
+  decision: the app steers the agent, so it sends whatever the agent's own
+  input box takes; permissions are the agent's job, not the chat's. A
+  leading `!` runs a shell command on the desk in both agents (tried in the
+  throwaway terminals: Claude Code wrote a `bash-input` record, Codex a
+  `user_shell_command`, recorded as a `CommandExecution` item with no
+  `UserMessage`, so a tool line and no bubble). A command that opens a
+  dialog leaves the agent blocked: the chat then says so and offers the
+  terminal, where the dialog is answered. A command's output is shown in
+  the chat; the spike still leaves out Claude Code's `<local-command-stdout>`
+  records, and Codex's slash command output was not looked at. The state
+  gates above stay: they are about where the text lands (a dialog, a bare
+  shell), not about what it says.
 - **A message sent while the agent works steers the running turn**, in both
   agents (tested in throwaway terminals: "sleep 8, then say FIRST", then
   "Say SECOND" while working): each took the second message into the turn
@@ -356,6 +368,10 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   path shows another image), a session file whose id the script misses
   giving an empty chat instead of the terminal, and saying on screen that a
   message while the agent works steers its turn.
+- **Found after round 3:** a Codex command can be written after its turn
+  ended, so it shows below the answer (section 2); order by turn, or mark
+  it, rather than by log position. A Codex `!` command has no person's
+  message, only the command (section 4).
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.
@@ -392,9 +408,11 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
    position.
 5. Send with `terminal.send` from the API, gated on foreground and status as
    in section 4, checked again right before typing and passed as its `if`
-   guard, and only to the agent process whose log is shown; no slash
-   commands and no leading `!` from the chat in the first version. A sent
-   message waits as "Sending…" until a row with its text arrives. Decide
+   guard, and only to the agent process whose log is shown. Slash commands
+   and a leading `!` are sent as typed; when one leaves the agent blocked
+   (a dialog), the chat says so and offers the terminal, and command
+   output (Claude Code's local command output, a `!` command's result) is
+   shown in the chat. A sent message waits as "Sending…" until a row with its text arrives. Decide
    whether a message while the agent works is offered as a steer of the
    running turn (what both agents do with it) or held until it is idle.
 6. Images in v1: fetched one at a time by the reference the tail leaves,

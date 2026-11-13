@@ -25,6 +25,9 @@ pub enum Item {
     /// Tool calls in a row, shown folded as one line.
     Tools { calls: Vec<ToolCall> },
     Note { text: String },
+    /// A message from another agent: a subagent's report (named after the
+    /// task it was given) or another session's message.
+    AgentMessage { from: String, text: String },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -68,6 +71,8 @@ pub struct Parser {
     items: Vec<Item>,
     /// tool id -> (item index, call index)
     calls: HashMap<String, (usize, usize)>,
+    /// subagent id -> the task it was started with
+    agents: HashMap<String, String>,
     last_text_id: Option<String>,
     cwd: String,
     lines: u32,
@@ -85,6 +90,7 @@ impl Parser {
             partial: String::new(),
             items: Vec::new(),
             calls: HashMap::new(),
+            agents: HashMap::new(),
             last_text_id: None,
             cwd: String::new(),
             lines: 0,
@@ -228,13 +234,28 @@ impl Parser {
         if msg["role"].as_str().is_none() || !(content.is_string() || content.is_array()) {
             return self.break_with(format!("line {}: message without role or content", self.lines));
         }
-        if v["isSidechain"] == true || v["isMeta"] == true {
+        if v["isSidechain"] == true {
+            return;
+        }
+        if let Some(text) = content.as_str().filter(|t| kind == "user" && t.contains("<agent-message from=\"")) {
+            return self.claude_agent_message(text);
+        }
+        if v["isMeta"] == true {
             return;
         }
         if kind == "assistant" {
             self.claude_assistant(msg);
         } else {
             self.claude_user(content);
+            // A subagent's id, to name its report when it comes back.
+            if let Some(agent) = v["toolUseResult"]["agentId"].as_str() {
+                for b in content.as_array().into_iter().flatten() {
+                    if let Some(call) = b["tool_use_id"].as_str().and_then(|id| self.call_mut(id)) {
+                        let task = call.title.clone();
+                        self.agents.insert(agent.to_owned(), task);
+                    }
+                }
+            }
         }
     }
 
@@ -298,9 +319,61 @@ impl Parser {
         (title.unwrap_or_else(|| name.to_owned()), shown)
     }
 
+    fn claude_agent_message(&mut self, s: &str) {
+        let Some(rest) = s.split("<agent-message from=\"").nth(1) else { return };
+        let Some((from, rest)) = rest.split_once("\">") else { return };
+        let body = rest.split("</agent-message>").next().unwrap_or("");
+        let text = match body.split_once("The report follows:\n") {
+            // A subagent's hand-back: the harness indents each line by two.
+            Some((_, report)) => report
+                .lines()
+                .map(|l| l.strip_prefix("  ").unwrap_or(l))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            None => body.to_owned(),
+        };
+        let from = self.agents.get(from).cloned().unwrap_or_else(|| from.to_owned());
+        self.push(Item::AgentMessage {
+            from,
+            text: text.trim().to_owned(),
+        });
+    }
+
     fn claude_user(&mut self, content: &Value) {
         if let Some(s) = content.as_str() {
             let t = s.trim_start();
+            if t.starts_with("<task-notification>") {
+                let summary = between(t, "<summary>", "</summary>").unwrap_or("A background task finished");
+                self.push(Item::Note { text: summary.trim().to_owned() });
+                return;
+            }
+            if let Some(cmd) = between(t, "<bash-input>", "</bash-input>") {
+                let cmd = cmd.trim().to_owned();
+                self.add_call(
+                    Some(BASH.into()),
+                    ToolCall {
+                        name: "Shell".into(),
+                        title: format!("! {}", cmd.lines().next().unwrap_or("")),
+                        input: cmd,
+                        output: String::new(),
+                        done: false,
+                        failed: false,
+                        images: vec![],
+                    },
+                );
+                return;
+            }
+            if t.starts_with("<bash-stdout>") || t.starts_with("<bash-stderr>") {
+                let out = between(t, "<bash-stdout>", "</bash-stdout>").unwrap_or("").trim_end();
+                let err = between(t, "<bash-stderr>", "</bash-stderr>").unwrap_or("").trim_end();
+                if let Some(call) = self.call_mut(BASH) {
+                    call.output = [out, err].iter().filter(|x| !x.is_empty()).copied().collect::<Vec<_>>().join("\n");
+                    call.failed = out.is_empty() && !err.is_empty();
+                    call.done = true;
+                }
+                self.calls.remove(BASH);
+                return;
+            }
             if let Some(rest) = t.strip_prefix("<command-name>") {
                 let cmd = rest.split("</command-name>").next().unwrap_or("").trim();
                 self.push(Item::Note { text: cmd.into() });
@@ -489,6 +562,15 @@ impl Parser {
             _ => self.unknown += 1,
         }
     }
+}
+
+/// The key a `!` shell command waits under for its output record.
+const BASH: &str = "!bash";
+
+/// The text between the first `open` and the `close` after it.
+fn between<'a>(s: &'a str, open: &str, close: &str) -> Option<&'a str> {
+    let rest = &s[s.find(open)? + open.len()..];
+    Some(&rest[..rest.find(close)?])
 }
 
 /// A tool result's text (its images are taken separately).

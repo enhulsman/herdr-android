@@ -45,9 +45,11 @@ pub struct ChatCall {
 
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ChatRow {
-    /// "user", "said", "tools" or "note".
+    /// "user", "said", "tools", "note" or "agent".
     pub kind: String,
     pub text: String,
+    /// For "agent": who sent it (a subagent's task, or a session's name).
+    pub from: String,
     pub images: Vec<ChatImage>,
     pub calls: Vec<ChatCall>,
 }
@@ -148,24 +150,35 @@ fn rows(items: &[Item]) -> Vec<ChatRow> {
             Item::User { text, images } => ChatRow {
                 kind: "user".into(),
                 text: text.clone(),
+                from: String::new(),
                 images: chat_images(images),
                 calls: vec![],
             },
             Item::Assistant { text } => ChatRow {
                 kind: "said".into(),
                 text: text.clone(),
+                from: String::new(),
+                images: vec![],
+                calls: vec![],
+            },
+            Item::AgentMessage { from, text } => ChatRow {
+                kind: "agent".into(),
+                text: text.clone(),
+                from: from.clone(),
                 images: vec![],
                 calls: vec![],
             },
             Item::Note { text } => ChatRow {
                 kind: "note".into(),
                 text: text.clone(),
+                from: String::new(),
                 images: vec![],
                 calls: vec![],
             },
             Item::Tools { calls } => ChatRow {
                 kind: "tools".into(),
                 text: String::new(),
+                from: String::new(),
                 images: vec![],
                 calls: calls
                     .iter()

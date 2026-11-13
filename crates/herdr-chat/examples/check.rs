@@ -23,11 +23,15 @@ fn main() {
     let (mut u, mut s, mut tools, mut calls, mut notes, mut running, mut img) = (0, 0, 0, 0, 0, 0, 0);
     for i in p.items() {
         match i {
-            Item::User { images, .. } => {
+            Item::User { images, text } => {
+                if text.starts_with('<') {
+                    let tag: String = text.chars().take_while(|c| *c != '>' && *c != ' ').take(30).collect();
+                    eprintln!("tagged user text: {tag}");
+                }
                 u += 1;
                 img += images.len()
             }
-            Item::Assistant { .. } => s += 1,
+            Item::Assistant { .. } | Item::AgentMessage { .. } => s += 1,
             Item::Tools { calls: c } => {
                 tools += 1;
                 calls += c.len();

@@ -1,6 +1,14 @@
 package dev.herdr.android.ui.chat
 
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -155,7 +163,8 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
         itemsIndexed(rows) { _, row ->
             when (row.kind) {
                 "user" -> UserBubble(row, images) { state.viewer = it }
-                "said" -> Said(row.text)
+                "said" -> Copyable(row.text) { Said(row.text) }
+                "agent" -> AgentCard(row)
                 "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ToolLine(row.calls) { state.sheet = row.calls }
                     val shots = row.calls.flatMap { it.images }
@@ -172,7 +181,7 @@ private fun UserBubble(row: ChatRow, images: ChatImageSource, onOpen: (String) -
     val c = HerdrTheme.colors
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (row.images.isNotEmpty()) Thumbs(row.images, images, end = true, onOpen)
-        if (row.text.isNotEmpty()) {
+        if (row.text.isNotEmpty()) Copyable(row.text) {
             BasicText(
                 row.text, style = HerdrType.body.copy(color = c.fg),
                 modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
@@ -181,11 +190,42 @@ private fun UserBubble(row: ChatRow, images: ChatImageSource, onOpen: (String) -
     }
 }
 
+/** Long press copies the message's text. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Said(text: String) {
+private fun Copyable(text: String, content: @Composable () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Box(Modifier.combinedClickable(onClick = {}, onLongClick = {
+        clipboard.setText(AnnotatedString(text))
+        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    })) { content() }
+}
+
+/** A subagent's report or another session's message, folded after a few blocks. */
+@Composable
+private fun AgentCard(row: ChatRow) {
+    val c = HerdrTheme.colors
+    var open by remember(row.text) { mutableStateOf(false) }
+    val long = markdownBlocks(row.text).size > 3 || row.text.length > 400
+    Copyable(row.text) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(HerdrRadius.row)).border(1.dp, c.border, RoundedCornerShape(HerdrRadius.row))
+                .clickable(enabled = long) { open = !open }.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            BasicText("Agent · ${row.from}", style = HerdrType.secondary.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Said(row.text, maxBlocks = if (long && !open) 3 else Int.MAX_VALUE)
+            if (long) BasicText(if (open) "Show less" else "Show all", style = HerdrType.secondary.copy(color = c.fg, fontWeight = FontWeight.Medium))
+        }
+    }
+}
+
+@Composable
+private fun Said(text: String, maxBlocks: Int = Int.MAX_VALUE) {
     val c = HerdrTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (b in markdownBlocks(text)) {
+        for (b in markdownBlocks(text).take(maxBlocks)) {
             when (b) {
                 is MdBlock.Heading -> BasicText(inline(b.text, c.raised), style = HerdrType.body.copy(color = c.fg, fontWeight = FontWeight.SemiBold))
                 is MdBlock.Para -> BasicText(inline(b.text, c.raised), style = HerdrType.body.copy(color = c.fg))
@@ -193,13 +233,8 @@ private fun Said(text: String) {
                     BasicText(b.marker, style = HerdrType.body.copy(color = c.fg), modifier = Modifier.widthIn(min = 18.dp).padding(end = 4.dp))
                     BasicText(inline(b.text, c.raised), style = HerdrType.body.copy(color = c.fg))
                 }
-                is MdBlock.Code -> BasicText(
-                    b.text,
-                    style = HerdrType.cardMsg.copy(color = c.termFg),
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(HerdrRadius.row)).background(c.canvas)
-                        .horizontalScroll(rememberScrollState()).padding(10.dp),
-                    softWrap = false,
-                )
+                is MdBlock.Code -> CodeBlock(b.text)
+                is MdBlock.Table -> MdTable(b)
             }
         }
     }
@@ -294,6 +329,51 @@ private fun ToolSheet(calls: List<ChatCall>, state: ChatSpikeState, images: Chat
                 CodeBox(d.input)
                 if (d.images.isNotEmpty()) Thumbs(d.images, images, end = false) { state.viewer = it }
                 if (d.output.isNotEmpty()) CodeBox(d.output.take(4000) + if (d.output.length > 4000) "\n…" else "")
+            }
+        }
+    }
+}
+
+/** A code block: wraps, with a copy button. */
+@Composable
+private fun CodeBlock(text: String) {
+    val c = HerdrTheme.colors
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(HerdrRadius.row)).background(c.canvas)) {
+        BasicText(text, style = HerdrType.cardMsg.copy(color = c.termFg), modifier = Modifier.fillMaxWidth().padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = 56.dp))
+        BasicText(
+            "Copy", style = HerdrType.secondary.copy(color = c.dimText),
+            modifier = Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
+                clipboard.setText(AnnotatedString(text))
+                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+            }.padding(horizontal = 10.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/** A Markdown table: columns sized to their text, scrolled sideways when wide. */
+@Composable
+private fun MdTable(t: MdBlock.Table) {
+    val c = HerdrTheme.colors
+    val n = t.header.size
+    val widths = (0 until n).map { col ->
+        val longest = (listOf(t.header) + t.rows).maxOf { it.getOrNull(col)?.length ?: 0 }
+        (longest * 9 + 28).coerceIn(56, 220).dp
+    }
+    Column(
+        Modifier.horizontalScroll(rememberScrollState()).clip(RoundedCornerShape(HerdrRadius.row))
+            .border(1.dp, c.border, RoundedCornerShape(HerdrRadius.row)),
+    ) {
+        for ((r, cellsRow) in (listOf(t.header) + t.rows).withIndex()) {
+            Row(Modifier.background(if (r == 0) c.raised else c.bg)) {
+                for (col in 0 until n) {
+                    BasicText(
+                        inline(cellsRow.getOrElse(col) { "" }, c.raised),
+                        style = HerdrType.secondary.copy(color = c.fg, fontWeight = if (r == 0) FontWeight.SemiBold else FontWeight.Normal),
+                        modifier = Modifier.width(widths[col]).padding(horizontal = 10.dp, vertical = 7.dp),
+                    )
+                }
             }
         }
     }

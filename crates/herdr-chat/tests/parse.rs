@@ -216,3 +216,55 @@ fn image_data_emptied_without_a_reference_is_missing() {
         }]
     );
 }
+
+const AGENTS: &str = include_str!("fixtures/claude-agents.jsonl");
+
+#[test]
+fn a_subagents_report_is_its_own_item_named_after_its_task() {
+    let p = parse(Agent::Claude, AGENTS);
+    let items = p.items();
+    assert_eq!(items[0], user("Ask an agent about the docs"));
+    let Item::Tools { calls } = &items[1] else {
+        panic!("{:?}", items[1])
+    };
+    assert_eq!(calls[0].title, "Check the upload docs");
+    // The harness frame and the two-space indent are taken off.
+    assert_eq!(
+        items[2],
+        Item::AgentMessage {
+            from: "Check the upload docs".into(),
+            text: "The docs say **three** retries.\n\n- backoff doubles".into(),
+        }
+    );
+    // A finished background task is a note, never the person's own bubble.
+    assert_eq!(
+        items[3],
+        Item::Note {
+            text: "Agent \"Check the upload docs\" finished".into()
+        }
+    );
+    // Another session's message: no frame, named by its sender.
+    assert_eq!(
+        items[4],
+        Item::AgentMessage {
+            from: "docs-writer".into(),
+            text: "Can you check the README wording?".into(),
+        }
+    );
+}
+
+#[test]
+fn a_shell_command_the_person_ran_shows_as_a_tool_call() {
+    let p = parse(Agent::Claude, AGENTS);
+    let Item::Tools { calls } = &p.items()[5] else {
+        panic!("{:?}", p.items())
+    };
+    assert_eq!(calls.len(), 2, "two commands in a row fold together");
+    assert_eq!((calls[0].name.as_str(), calls[0].title.as_str()), ("Shell", "! ls src"));
+    assert_eq!(calls[0].output, "main.rs\nupload.rs");
+    assert!(calls[0].done && !calls[0].failed);
+    assert_eq!(calls[1].output, "cat: nope: No such file");
+    assert!(calls[1].failed, "only stderr: shown as failed");
+    assert_eq!(p.items().len(), 6, "{:#?}", p.items());
+    assert!(!format!("{:?}", p.items()).contains("<bash-"));
+}

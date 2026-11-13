@@ -15,7 +15,13 @@ sealed interface MdBlock {
     data class Para(val text: String) : MdBlock
     data class Item(val marker: String, val text: String, val depth: Int) : MdBlock
     data class Code(val text: String) : MdBlock
+    data class Table(val header: List<String>, val rows: List<List<String>>) : MdBlock
 }
+
+private val TABLE_RULE = Regex("^\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?$")
+
+private fun cells(line: String): List<String> =
+    line.trim().removePrefix("|").removeSuffix("|").split('|').map { it.trim() }
 
 fun markdownBlocks(src: String): List<MdBlock> {
     val out = mutableListOf<MdBlock>()
@@ -39,6 +45,17 @@ fun markdownBlocks(src: String): List<MdBlock> {
                     code.appendLine(lines[i]); i++
                 }
                 out += MdBlock.Code(code.toString().trimEnd())
+            }
+            trimmed.startsWith("|") && i + 1 < lines.size && TABLE_RULE.matches(lines[i + 1].trim()) -> {
+                flush()
+                val header = cells(trimmed)
+                val rows = mutableListOf<List<String>>()
+                i += 2
+                while (i < lines.size && lines[i].trimStart().startsWith("|")) {
+                    rows += cells(lines[i]); i++
+                }
+                i--
+                out += MdBlock.Table(header, rows)
             }
             trimmed.startsWith("#") -> {
                 flush(); out += MdBlock.Heading(trimmed.trimStart('#').trim())

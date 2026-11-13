@@ -35,8 +35,8 @@ class ChatSpikeScreenshotTest {
     private fun call(name: String, title: String, failed: Boolean = false, done: Boolean = true, out: String = "ok", images: List<ChatImage> = emptyList()) =
         ChatCall(name, title, title, out, done, failed, images)
 
-    private fun row(kind: String, text: String = "", images: List<ChatImage> = emptyList(), calls: List<ChatCall> = emptyList()) =
-        ChatRow(kind, text, images, calls)
+    private fun row(kind: String, text: String = "", images: List<ChatImage> = emptyList(), calls: List<ChatCall> = emptyList(), from: String = "") =
+        ChatRow(kind, text, from, images, calls)
 
     /** A synthetic picture: a two-colour gradient with a light disc. */
     private fun picture(w: Int, h: Int, from: Int, to: Int): ImageBitmap {
@@ -108,6 +108,36 @@ class ChatSpikeScreenshotTest {
             b,
         )
     }
+
+    @Test
+    fun markdownTables() {
+        val b = markdownBlocks("Sizes:\n\n| Log | Raw |\n|---|--:|\n| one | 30 MB |\n| `two` | 4 MB |\n\nafter")
+        assertEquals(
+            listOf(
+                MdBlock.Para("Sizes:"),
+                MdBlock.Table(listOf("Log", "Raw"), listOf(listOf("one", "30 MB"), listOf("`two`", "4 MB"))),
+                MdBlock.Para("after"),
+            ),
+            b,
+        )
+        // A pipe line without the separator under it is just text.
+        assertEquals(listOf(MdBlock.Para("| not | a table |")), markdownBlocks("| not | a table |"))
+    }
+
+    private val feedback = ChatPoll(
+        state = "ready", reason = "", agent = "claude", title = "Docs check", version = "2.1.323",
+        canSend = true, cut = false,
+        rows = listOf(
+            row("tools", calls = listOf(call("Shell", "! ls src", out = "main.rs\nupload.rs"))),
+            row("said", "Here is the comparison:\n\n| Log | Raw | Sent |\n|---|---|---|\n| website | 30 MB | 2.4 MB |\n| api | 45 MB | 8.0 MB |\n\n```\ncargo test -p upload --features retry-backoff -- --nocapture retries_three_times_with_backoff\n```"),
+            row("tools", calls = listOf(call("Agent", "Check the upload docs"))),
+            row("agent", "The docs say **three** retries.\n\n- backoff doubles each time\n- the limit is in `upload.toml`\n\nNothing else changed since the last release, and the examples still match the code.", from = "Check the upload docs"),
+            row("note", "Agent \"Check the upload docs\" finished"),
+        ),
+    )
+
+    @Test
+    fun feedbackItems() = capture("chat-spike-feedback", feedback, ChatSpikeState(), dark = true)
 
     @Test
     fun uploadsAreScaledOnlyWhenLarge() {

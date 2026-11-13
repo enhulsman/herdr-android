@@ -72,6 +72,20 @@ and notes (a slash command, "Conversation compacted").
   `tool_result` blocks in `user` records, matched by `tool_use_id`. Left out:
   `isMeta`, `isSidechain` (subagents), thinking, and some 20 bookkeeping record
   types. `ai-title` gives the title.
+- **Claude Code, other agents and the shell.** A subagent's report comes
+  back as a `user` record marked `isMeta` (origin "peer") holding
+  `<agent-message from="<agent id>">`, its lines indented under a fixed
+  harness preamble; the parser shows it as its own kind of item, named after
+  the task the agent was started with (the `Agent` tool call's description,
+  matched through `toolUseResult.agentId`). Another session's message has the
+  same tag without the preamble. A finished background task arrives as a
+  `<task-notification>` record (origin "task-notification"); the spike
+  showed it as the person's own message until this was found, and now shows
+  its `<summary>` as a note. A `!` command the person ran is a
+  `<bash-input>` record followed by one with `<bash-stdout>` and
+  `<bash-stderr>`; the parser folds them into a "Shell" tool call. In 150
+  recent logs no other tag-wrapped record reaches the chat as the person's
+  message.
 - **Codex**: the `event_msg` records with `item_completed` are the UI-level
   items (`UserMessage`, `AgentMessage`, `CommandExecution`, `FileChange`,
   `ImageView`, `Extension`, `Reasoning`). The `response_item` records repeat
@@ -191,6 +205,17 @@ session): thumbnails and the full-screen view loaded for images the agent
 read and images sent; a synthetic photo picked in the system photo picker
 was sent with a question, the agent answered from it, and the chat showed it
 in the person's bubble.
+
+## Tried on the phone, for the spec
+
+After a first try on the test phone the owner asked for: subagent messages
+(done, above), Markdown tables, `!` commands shown as tool calls, code
+blocks that wrap and copy, and copying a message (long press). All are in
+the spike now. Ideas for later, not built: a context gauge (from the last
+assistant record's `usage`: input plus cache tokens against the model's
+window), switching between an agent's sessions from the chat, and slash
+command completion (careful: section 4's pasted slash command opened the
+wrong dialog).
 
 ## Go or no-go
 

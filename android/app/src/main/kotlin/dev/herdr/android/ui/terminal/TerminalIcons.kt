@@ -41,6 +41,14 @@ enum class LineIcon(val strokeWidth: Float, val paths: List<String>) {
     // The Agents top bar's "New" (`ico.plus`) and the sheet's Terminal (`ico.shell`).
     Plus(1.8f, listOf("M12 5v14", "M5 12h14")),
     Shell(2f, listOf("M4 17l6-6-6-6", "M12 19h8")),
+    // lucide copy (ISC), the square as a path; spike for issue 17 (the chat's copy button).
+    Copy(
+        2f,
+        listOf(
+            "M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z",
+            "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2",
+        ),
+    ),
     Eye(
         1.8f,
         listOf(

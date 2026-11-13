@@ -1,12 +1,7 @@
 package dev.herdr.android.ui.chat
 
 import android.widget.Toast
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.border
@@ -56,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
+import dev.herdr.android.ui.terminal.LineIcon
+import dev.herdr.android.ui.terminal.LineIconImage
 import dev.herdr.android.ui.terminal.TerminalHeader
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrRadius
@@ -211,17 +208,10 @@ private fun Copyable(text: String, end: Boolean = false, content: @Composable ()
     }
 }
 
-/** Two overlapping rounded squares, the usual copy mark. */
+/** Lucide's copy icon, as the app's other line icons. */
 @Composable
 private fun CopyIcon(modifier: Modifier = Modifier) {
-    val color = HerdrTheme.colors.dimText
-    Canvas(modifier.size(16.dp).semantics { contentDescription = "Copy" }) {
-        val w = 1.4.dp.toPx()
-        val side = size.width * 0.66f
-        val r = CornerRadius(2.5.dp.toPx())
-        drawRoundRect(color, topLeft = Offset(size.width - side, 0f), size = Size(side, side), cornerRadius = r, style = Stroke(w))
-        drawRoundRect(color, topLeft = Offset(0f, size.height - side), size = Size(side, side), cornerRadius = r, style = Stroke(w))
-    }
+    LineIconImage(LineIcon.Copy, HerdrTheme.colors.dimText, 16.dp, modifier.semantics { contentDescription = "Copy" })
 }
 
 /** A subagent's report or another session's message, folded after a few blocks. */

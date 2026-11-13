@@ -62,25 +62,15 @@ go to the app's notifications, open "Finished", and set it to alerting.
 
 ## Roadmap
 
-**Next (specified):**
+Version 1.0 completes the loop: a chat view beside the terminal that you
+can also answer from, Stay connected, muting a session, and a view of an
+agent's git changes, plus the work that lets someone else set the app up
+without help.
 
-- **Stay connected** (built, in testing): an optional setting that keeps the
-  connection open in the background, with a quiet notification that counts
-  the agents that need you, have finished or are working, so the app opens at
-  once.
-- A spaces drawer, a tab overview and a peek at sub-agents.
-- A wide layout for landscape and tablets.
-- Four more themes, chosen per light and dark mode.
-- A view-only Changes panel: an agent's git changes, to review before you
-  approve.
-
-**Planned (not yet specified):**
-
-- **A reader view beside the terminal:** switch between an agent's live
-  terminal and its conversation as formatted text, the way a chat app shows it.
-- **Mute a session:** leave one session out of alerts and the status
-  notification, for an agent stuck in a loop or an orchestrator you never talk
-  to.
+What is planned and what is being worked on now are tracked in the open:
+the [v1.0.0 milestone](https://github.com/enhulsman/herdr-android/milestone/1)
+and the [roadmap board](https://github.com/users/enhulsman/projects/4). Ideas
+and bug reports are welcome as issues.
 
 **Not planned:** closing or killing agents, editing spaces and tabs, a file
 browser, custom theme files, image paste.

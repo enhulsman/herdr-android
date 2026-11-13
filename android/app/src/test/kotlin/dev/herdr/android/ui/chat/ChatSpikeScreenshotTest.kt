@@ -34,8 +34,8 @@ class ChatSpikeScreenshotTest {
     private val header = TerminalHeader("upload retry", ProgramIcon.Claude, "website · workstation", "done", SheetTone.Done)
     private val actions = TerminalActions(onBack = {}, onOpen = {}, onSwipe = { false }, onPhoneGrid = {})
 
-    private fun call(name: String, title: String, failed: Boolean = false, done: Boolean = true, out: String = "ok", images: List<ChatImage> = emptyList()) =
-        ChatCall(name, title, title, out, done, failed, images)
+    private fun call(name: String, title: String, failed: Boolean = false, done: Boolean = true, out: String = "ok", images: List<ChatImage> = emptyList(), input: String = title) =
+        ChatCall(name, title, input, out, done, failed, images)
 
     private fun row(kind: String, text: String = "", images: List<ChatImage> = emptyList(), calls: List<ChatCall> = emptyList(), from: String = "") =
         ChatRow(kind, text, from, images, calls)
@@ -73,9 +73,9 @@ class ChatSpikeScreenshotTest {
     )
 
     private val calls = listOf(
-        call("Bash", "Find the retry code", out = "12: retry(3)"),
-        call("Read", "Read src/upload.rs", out = "fn upload() {}"),
-        call("Bash", "cargo test", failed = true, out = "test upload::retries ... FAILED\n1 failed"),
+        call("Bash", "Find the retry code", out = "12: retry(3)", input = "rg -n retry src/upload.rs"),
+        call("Read", "Read src/upload.rs", out = "fn upload() {}", input = "{\"file_path\":\"src/upload.rs\"}"),
+        call("Bash", "Run the upload tests", failed = true, out = "test upload::retries ... FAILED\n1 failed", input = "cargo test -p upload -- --nocapture"),
     )
 
     private val poll = ChatPoll(
@@ -233,6 +233,9 @@ class ChatSpikeScreenshotTest {
 
     @Test
     fun toolSheet() = capture("chat-spike-sheet", poll, ChatSpikeState().apply { sheet = calls }, dark = true)
+
+    @Test
+    fun toolSheetPaper() = capture("chat-spike-sheet-paper", poll, ChatSpikeState().apply { sheet = calls }, dark = false)
 
     @Test
     fun toolDetail() = capture("chat-spike-detail", poll, ChatSpikeState().apply { sheet = calls; detail = calls[2] }, dark = true)

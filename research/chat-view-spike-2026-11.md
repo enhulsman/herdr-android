@@ -295,6 +295,22 @@ terminal, unless the chat was opened there by hand, which says why); and the
 terminal's own title bar in the chat (icon, status, swipes), with a switch
 labelled Terminal or Chat.
 
+A third round asked for two things. **A tool sheet like the Claude app's:**
+three fixed heights (about 46 and 62 percent of the screen, and full),
+dragged by its handle or by its list, the same whatever the number of calls;
+a colour that stands out from the dimmed chat; a row per call with its kind's
+icon and verb (Read, Ran, Updated, Searched, Ran agent), the path's file name
+or the command as code; a detail with a back arrow, the tool's name and
+Completed, Failed or Running, and Description, Command (or Input) and Output
+sections, the last two with a copy button. **A thumbnail bug:** after reading
+back, tapping each of three thumbnails opened another image until they were
+scrolled out and back. A thumbnail's loaded image outlived a change of the
+image it stood for, and its loader then skipped the new one; it is now kept
+per image (test: `ChatThumbKeyTest`). What handed the slots other images is
+not pinned down: rows are keyed by position minus the rows read back, and the
+spec should give each row a stable identity instead (the byte offset of its
+first line).
+
 ## Go or no-go
 
 - **Claude Code: go.** Matching is exact for a running agent through its

@@ -31,7 +31,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -89,19 +90,25 @@ fun uploadLongEdge(width: Int, height: Int, bytes: Int): Int? {
     }
 }
 
-private sealed interface Load {
+internal sealed interface Load {
     data object Loading : Load
     data object Missing : Load
     class Loaded(val image: ImageBitmap) : Load
 }
 
+/**
+ * The image behind [key]. Remembered per key: produceState keeps its value
+ * when the key changes, so a slot handed another image (a row re-keyed after
+ * reading back) went on showing the old one while a tap opened the new one.
+ */
 @Composable
-private fun rememberLoad(source: ChatImageSource, key: String): Load {
-    val state by produceState<Load>(source.cached(key)?.let { Load.Loaded(it) } ?: Load.Loading, key) {
-        if (value is Load.Loaded) return@produceState
-        value = if (key == "missing") Load.Missing else source.load(key)?.let { Load.Loaded(it) } ?: Load.Missing
+internal fun rememberLoad(source: ChatImageSource, key: String): Load {
+    val state = remember(key) { mutableStateOf(source.cached(key)?.let { Load.Loaded(it) } ?: Load.Loading) }
+    LaunchedEffect(key) {
+        if (state.value is Load.Loaded) return@LaunchedEffect
+        state.value = if (key == "missing") Load.Missing else source.load(key)?.let { Load.Loaded(it) } ?: Load.Missing
     }
-    return state
+    return state.value
 }
 
 /** A row of thumbnails; a tap opens one full screen. */
@@ -111,7 +118,7 @@ fun Thumbs(images: List<ChatImage>, source: ChatImageSource, end: Boolean, onOpe
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp, if (end) Alignment.End else Alignment.Start),
     ) {
-        for (im in images) Thumb(im.key, source, onOpen)
+        for (im in images) key(im.key) { Thumb(im.key, source, onOpen) }
     }
 }
 

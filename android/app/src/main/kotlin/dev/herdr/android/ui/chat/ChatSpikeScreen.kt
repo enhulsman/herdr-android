@@ -301,8 +301,8 @@ private fun Copyable(text: String, end: Boolean = false, content: @Composable ()
 
 /** Lucide's copy icon, as the app's other line icons. */
 @Composable
-private fun CopyIcon(modifier: Modifier = Modifier) {
-    LineIconImage(LineIcon.Copy, HerdrTheme.colors.dimText, 16.dp, modifier.semantics { contentDescription = "Copy" })
+internal fun CopyIcon(modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color = HerdrTheme.colors.dimText, size: androidx.compose.ui.unit.Dp = 16.dp) {
+    LineIconImage(LineIcon.Copy, tint, size, modifier.semantics { contentDescription = "Copy" })
 }
 
 /** A subagent's report or another session's message, folded after a few blocks. */
@@ -351,7 +351,7 @@ fun toolLine(calls: List<ChatCall>): String {
     return base + (if (failed > 0) " · $failed failed" else "") + (if (running) " · running" else "")
 }
 
-private enum class ToolKind(val one: String, val many: String) {
+internal enum class ToolKind(val one: String, val many: String) {
     Command("ran 1 command", "ran %d commands"),
     Search("searched for 1 pattern", "searched for %d patterns"),
     Read("read 1 file", "read %d files"),
@@ -361,7 +361,7 @@ private enum class ToolKind(val one: String, val many: String) {
     Other("used 1 tool", "used %d tools"),
 }
 
-private fun kindOf(name: String) = when (name) {
+internal fun kindOf(name: String) = when (name) {
     "Bash", "Shell" -> ToolKind.Command
     "Grep", "Glob" -> ToolKind.Search
     "Read" -> ToolKind.Read
@@ -429,38 +429,6 @@ private fun MessageBox(state: ChatSpikeState, canSend: Boolean, onPick: () -> Un
     }
 }
 
-@Composable
-private fun ToolSheet(calls: List<ChatCall>, state: ChatSpikeState, images: ChatImageSource) {
-    val c = HerdrTheme.colors
-    Box(Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.6f)).clickable { state.sheet = null; state.detail = null }, contentAlignment = Alignment.BottomCenter) {
-        Column(
-            Modifier.fillMaxWidth().heightIn(max = 640.dp).clip(RoundedCornerShape(topStart = HerdrRadius.sheetTop, topEnd = HerdrRadius.sheetTop))
-                .background(c.popover).clickable(enabled = false) {}.padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            val d = state.detail
-            if (d == null) {
-                BasicText(toolLine(calls), style = HerdrType.sheetTitle.copy(color = c.fg))
-                for (call in calls) {
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(HerdrRadius.row)).clickable { state.detail = call }.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        BasicText(call.name, style = HerdrType.settingRow.copy(color = if (call.failed) c.blocked else c.fg))
-                        BasicText(call.title, style = HerdrType.settingRow.copy(color = c.dimText), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(36.dp).clip(CircleShape).clickable { state.closeDetail() }, contentAlignment = Alignment.Center) { ChevronIcon(Chevron.Left, 18.dp, c.fg) }
-                    BasicText(d.name + if (!d.done) " · running" else if (d.failed) " · failed" else "", style = HerdrType.sheetTitle.copy(color = c.fg))
-                }
-                BasicText(d.title, style = HerdrType.secondary.copy(color = c.dimText))
-                CodeBox(d.input)
-                if (d.images.isNotEmpty()) Thumbs(d.images, images, end = false) { state.viewer = it }
-                if (d.output.isNotEmpty()) CodeBox(d.output.take(4000) + if (d.output.length > 4000) "\n…" else "")
-            }
-        }
-    }
-}
-
 /** A code block: wraps, with a copy button. */
 @Composable
 private fun CodeBlock(text: String) {
@@ -501,13 +469,4 @@ private fun MdTable(t: MdBlock.Table) {
             }
         }
     }
-}
-
-@Composable
-private fun CodeBox(text: String) {
-    val c = HerdrTheme.colors
-    BasicText(
-        text, style = HerdrType.cardMsg.copy(color = c.termFg),
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(HerdrRadius.row)).background(c.canvas).padding(10.dp),
-    )
 }

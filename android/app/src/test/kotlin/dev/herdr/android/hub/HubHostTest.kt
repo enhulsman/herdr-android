@@ -253,6 +253,8 @@ class FakeHub : HubInterface {
         return importAdds
     }
     override fun markSeen(machine: String, address: String) { calls += "seen $machine $address" }
+    override fun openChat(machine: String, address: String): uniffi.herdr_mobile.Chat = error("no chat in these tests")
+    override fun trimChats(shownMachine: String?, shownAddress: String?) { calls += "trim $shownMachine $shownAddress" }
     override fun setPush(registration: PushRegistration?) { calls += "push ${registration?.endpoint}" }
     override fun sendTest(machine: String) { calls += "test $machine" }
     override fun removeMachine(name: String) {

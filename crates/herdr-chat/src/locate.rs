@@ -74,57 +74,133 @@ pub fn parse_probe(out: &str) -> Probe {
     p
 }
 
+/// What the lookup found for a terminal (spec: the lookup's four results).
 #[derive(Clone, Debug, PartialEq)]
-pub enum Found {
-    Log { path: String, session: String },
-    /// The session has no log yet (before its first message).
+pub enum Lookup {
+    /// The agent's log exists and is read.
+    Found { path: String, session: String },
+    /// The session is known but has no log yet (before its first message).
     Empty { session: String },
-    Nothing(&'static str),
+    /// An agent is in front but its session is not known: why.
+    Missed(&'static str),
+    /// No agent in front.
+    None,
 }
 
-pub fn decide(p: &Probe) -> Found {
+pub fn decide(p: &Probe) -> Lookup {
     match p.name.as_str() {
         "claude" => claude(p),
         "codex" => codex(p),
-        _ => Found::Nothing("not an agent"),
+        _ => Lookup::None,
+    }
+}
+
+/// The lookup for a terminal: `agent` is [`agent_in_front`] of its
+/// foreground process, `out` what [`SCRIPT`] printed (none when the desk did
+/// not answer).
+pub fn lookup(agent: Option<crate::Agent>, out: Option<&str>) -> Lookup {
+    let Some(agent) = agent else { return Lookup::None };
+    match out {
+        Some(out) => decide_for(agent, &parse_probe(out)),
+        None => Lookup::Missed("the desk did not answer"),
+    }
+}
+
+/// The agent a foreground process is, by its name, or for an install that
+/// `node` runs (npm, nvm) by the script in its arguments. Node names its
+/// main thread, so the name may read `MainThread`: its first argument says
+/// it is node.
+pub fn agent_in_front(name: &str, argv: &[&str]) -> Option<crate::Agent> {
+    let by_name = |n: &str| match n {
+        "claude" => Some(crate::Agent::Claude),
+        "codex" => Some(crate::Agent::Codex),
+        _ => None,
+    };
+    if let Some(a) = by_name(name) {
+        return Some(a);
+    }
+    let base = |a: &str| a.rsplit('/').next().unwrap_or(a).to_owned();
+    if name != "node" && argv.first().map(|a| base(a)).as_deref() != Some("node") {
+        return None;
+    }
+    argv.iter().skip(1).take(2).find_map(|arg| {
+        let b = base(arg);
+        by_name(b.trim_end_matches(".js")).or_else(|| {
+            if arg.contains("@anthropic-ai/claude-code") {
+                Some(crate::Agent::Claude)
+            } else if arg.contains("@openai/codex") {
+                Some(crate::Agent::Codex)
+            } else {
+                None
+            }
+        })
+    })
+}
+
+/// Empty turns Missed once the agent's first turn ended and its log still
+/// does not exist: a misread session id shows the terminal, not an empty
+/// chat for good. A new session (another id) is Empty again until its own
+/// first turn ends.
+#[derive(Clone, Debug, Default)]
+pub struct EmptyGuard {
+    ended: Option<String>,
+}
+
+impl EmptyGuard {
+    /// The agent's turn ended (working, then done or idle) while the lookup
+    /// read `now`.
+    pub fn turn_ended(&mut self, now: &Lookup) {
+        if let Lookup::Empty { session } = now {
+            self.ended = Some(session.clone());
+        }
+    }
+
+    /// A lookup's result as the chat takes it.
+    pub fn apply(&self, l: Lookup) -> Lookup {
+        match &l {
+            Lookup::Empty { session } if self.ended.as_ref() == Some(session) => {
+                Lookup::Missed("no log after the first turn")
+            }
+            _ => l,
+        }
     }
 }
 
 /// [`decide`] for an agent already known by other means (a launcher-wrapped
 /// install runs as `node`, so its process name says nothing).
-pub fn decide_for(agent: crate::Agent, p: &Probe) -> Found {
+pub fn decide_for(agent: crate::Agent, p: &Probe) -> Lookup {
     match agent {
         crate::Agent::Claude => claude(p),
         crate::Agent::Codex => codex(p),
     }
 }
 
-fn claude(p: &Probe) -> Found {
+fn claude(p: &Probe) -> Lookup {
     let Some(file) = p.claude_pidfile.as_deref() else {
-        return Found::Nothing("no session file");
+        return Lookup::Missed("no session file");
     };
     let Ok(v) = serde_json::from_str::<Value>(file) else {
-        return Found::Nothing("session file unreadable");
+        return Lookup::Missed("session file unreadable");
     };
     let Some(session) = v["sessionId"].as_str() else {
-        return Found::Nothing("session file unreadable");
+        return Lookup::Missed("session file unreadable");
     };
     // Claude Code writes it as a string ("756754"); accept a number too.
     let start = v["procStart"]
         .as_u64()
         .or_else(|| v["procStart"].as_str().and_then(|s| s.trim().parse().ok()));
     if start.is_none() || start != p.proc_start {
-        return Found::Nothing("process start differs");
+        return Lookup::Missed("process start differs");
     }
     match p.claude_logs.as_slice() {
-        [] => Found::Empty {
+        [] => Lookup::Empty {
             session: session.to_owned(),
         },
-        [one] => Found::Log {
+        [one] => Lookup::Found {
             path: one.clone(),
             session: session.to_owned(),
         },
-        _ => Found::Nothing("several logs"),
+        _ => Lookup::Missed("several logs"),
     }
 }
 
@@ -135,7 +211,7 @@ fn thread_id(path: &str) -> Option<&str> {
     (stem.len() >= 36).then(|| &stem[stem.len() - 36..])
 }
 
-fn codex(p: &Probe) -> Found {
+fn codex(p: &Probe) -> Lookup {
     let rollouts: Vec<(&str, u64, &str)> = p
         .codex_open
         .iter()
@@ -153,7 +229,7 @@ fn codex(p: &Probe) -> Found {
         .filter(|id| newest_rollout_id.is_none_or(|n| *id > n))
         .max();
     if let Some(id) = fresh {
-        return Found::Empty {
+        return Lookup::Empty {
             session: id.to_owned(),
         };
     }
@@ -161,13 +237,13 @@ fn codex(p: &Probe) -> Found {
     // either thread in front (a resumed older thread beside the current one).
     let newest = rollouts.iter().map(|r| r.1).max();
     if rollouts.iter().filter(|r| Some(r.1) == newest).count() > 1 {
-        return Found::Nothing("two Codex sessions open, written in the same second");
+        return Lookup::Missed("two Codex sessions open, written in the same second");
     }
     match rollouts.iter().max_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(b.2))) {
-        Some((path, _, id)) => Found::Log {
+        Some((path, _, id)) => Lookup::Found {
             path: (*path).to_owned(),
             session: (*id).to_owned(),
         },
-        None => Found::Nothing("no rollout open"),
+        None => Lookup::Missed("no rollout open"),
     }
 }

@@ -126,6 +126,18 @@ scrolling and touch behaviour is checked on the phone. Robolectric Compose
 interaction tests are not used: two in the spike failed in about half of
 full-suite runs depending on test order.
 
+### D12. A chat is held as data, not as a drawn screen
+Each terminal's chat (the hub's `Chat`: parser, rows and keys, read offsets,
+health) and its screen state (scroll position, draft, photos, pending
+bubbles) live in a per-terminal holder for the app's run, least recently
+viewed dropped past 8, all but the shown one dropped on `onTrimMemory`.
+Coming back draws the held rows in one frame and reads from the held offset.
+*Over* keeping the chat composed but hidden behind the terminal: that keeps
+a second screen's layout and its polling alive for every open terminal, and
+the drawing it saves is one frame. *Over* writing it to storage: a restart
+reads the recent 2 MB in under 2 s anyway, and conversation text would sit
+on the phone.
+
 ## Risks / Trade-offs
 
 - [Private log formats that change weekly] → the guard falls back to

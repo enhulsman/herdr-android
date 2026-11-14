@@ -214,7 +214,9 @@ agent is blocked) is enough for both agents, multi-line included:
   the desk without the tag: `@/abs/file.md`, `read @/abs/file.md` and
   `say ok /abs/file.md` stuck; a missing file's path, `@note.txt` (relative)
   and plain text went through. A second Enter 1 s or more after the paste was
-  taken 9 of 9 times, at 0.6 s 2 of 3. Codex not tried yet.
+  taken 9 of 9 times, at 0.6 s 2 of 3. Codex not tried yet. A photo sent
+  from the phone (its uploaded path on the first line, text after) went
+  through on its own once; the rule covers it in case it does not.
 - **Two hazards, both seen.** A send while Codex showed a start-up update
   prompt (no status reported yet) answered the prompt: Codex updated itself
   from 0.166.0 to 0.169.0. A send to a terminal whose agent had exited ran the

@@ -2,39 +2,46 @@
 
 ## Plain summary
 
-**Decisions** (Ezra's; my pick for each):
-1. **A message sent while the agent works.** Both agents take it into the
-   running turn and answer only it (spike, section 4). (a) Send it at once
-   as a steer, and say so under the message box while the agent works:
-   "Steers the current turn". (b) Hold it in the chat until the agent is
-   idle, then send. *Pick (a)*: it is what the agent's own input box does
-   ("steer like the CLI"), and (b) needs a queue the desk never sees.
+**Decisions** (Ezra, 2026-11-14: OK with 1-7, with 1 and 4 changed as
+written here):
+1. **A message sent while the agent works.** Sent as the agent's own input
+   box takes it (pasted, then Enter); the app neither holds nor interrupts.
+   Claude Code queues it until it can take it in; Codex takes it into the
+   turn. No hint under the box; the bubble shows "Queued" while the agent
+   holds it (decision 4).
 2. **What is in this change.** In: everything the spike showed on the phone
    (reading, live updates, sending, `/` and `!` commands, images both ways,
    the tool sheet, the working line), plus three of your later ideas: new
    answers coming in as if typed, swiping between a message's images, and a
-   context gauge in the top bar (the session's context only). Later, each as
+   context gauge in the top bar (Codex: percent and tokens, both in its log;
+   Claude Code: tokens only, its log has no window size). Later, each as
    its own issue: plan limits in the gauge (5-hour, weekly, per model; Claude
    Code needs something on the desk to hand them over), verb themes,
    the terminal's bottom rows while a command waits, switching between an
    agent's sessions, and `/` command completion. *Pick: as listed*: the
    later ones need a desk-side piece, a settings screen, or a design of
    their own.
-3. **After the agent exits.** (a) Keep showing what was read, without the
-   message box, until the terminal starts another agent; opened fresh after
-   the exit, the terminal shows. (b) Also offer an optional start hook that
-   labels the terminal with its session, so the chat survives app restarts.
-   *Pick (a) now*, the hook as a 1.x issue: it is a desk setting, and
-   Codex's was never tested.
-4. **A sent message that never shows in the log.** (a) After 30 seconds it
-   reads "Not in the conversation yet" with a button to the terminal, and
-   stays until it arrives or you dismiss it. (b) It stays "Sending…" for
-   ever, as in the spike. *Pick (a)*: when the chat cannot follow, send the
-   person to the terminal.
-5. **Where the setting lives that turns the chat off.** (a) No setting: the
-   switch hides by itself when the log cannot be read. (b) A switch in
-   Settings as well. *Pick (a)*: the terminal stays the first view, and the
-   chat never opens unasked except where you left it open.
+3. **After the agent exits, or its log turns unreadable.** Keep showing
+   what was read, without the message box, with a button to the terminal;
+   opened fresh afterwards, the terminal shows. The optional start hook
+   that labels the terminal with its session is a 1.x issue: a desk
+   setting, and Codex's was never tested.
+4. **A sent message that does not show in the log.** It reads "Queued"
+   while the agent works and the terminal shows it waiting; otherwise
+   "Sending…". 30 seconds after sending (or after the agent stops working,
+   when it was queued) without arriving, it reads "Not in the conversation
+   yet" with a button to the terminal. A message queued behind a long
+   command never expires while the command runs.
+5. **No setting to turn the chat off.** The switch hides by itself when the
+   log cannot be read; the terminal stays the first view.
+6. **After a `/` command that may have opened a dialog.** While the
+   waiting line shows and the agent's status has not changed, the box
+   refuses with "Answer the dialog in the terminal first", until the
+   command shows up, the status changes, or you tap Dismiss: the spike saw
+   a dialog take the next sends.
+7. **Codex images whose file is gone** (over half of the month's): shown as
+   "Image not available". The log keeps a copy, but it pairs with its image
+   only by order within one tool call; that fallback is a 1.x issue.
 
 **What changes for you:** an agent's title bar gets a switch labelled
 Terminal and Chat. The chat shows the conversation as the Claude app does:
@@ -61,7 +68,9 @@ herdr-core already offers, and tried it on the phone over four rounds.
   when switching agents.
 - Finding the log: Claude Code's per-process session file (checked against
   the process start time) and Codex's open rollout, through one
-  `machine.exec` script; nothing to set up on the desk.
+  `machine.exec` script; nothing to set up on the desk. A new session shows
+  an empty chat before its first record; a session that cannot be read
+  shows the terminal.
 - Reading: a tail script over `machine.exec` (never `file.read`), from the
   end on first open, older messages on scrolling up, new lines after the
   terminal's events and every 0.5 s while the agent works.

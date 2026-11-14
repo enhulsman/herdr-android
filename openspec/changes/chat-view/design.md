@@ -10,19 +10,23 @@ rounds. Two independent reviews judged it sufficient and left a list for the
 spec (the note's "Reviews" section). herdr-core 0.1.20 offers everything
 needed: `terminal.get` (foreground process), `machine.exec` (scripts, 8 MB
 output), `terminal.send` (with an `if` status guard), `terminal.put` (files
-beside the terminal) and `events.subscribe`.
+beside the terminal) and `events.subscribe`. The proposal was reviewed in
+five rounds before Ezra's decisions; the fix plan is kept locally
+(`local/spec-research/chat-view-scrutiny-fix-plan.md`, not tracked).
 
 ## Goals / Non-Goals
 
 **Goals:** the spec's requirements, built on the spike's findings, with the
 reviews' leftovers fixed: a stable row identity, a send target that cannot
-change under a send, a guard that keeps running, oversized records skipped,
-an expiry for a pending message.
+change under a send, a guard that keeps running and catches a format change
+after messages were shown, oversized records skipped, a pending message
+whose state follows the agent.
 
 **Non-Goals:** plan limits in the gauge, verb themes, the terminal's rows
 while a command waits, switching sessions, `/` completion, a start hook on
-the desk (proposal, decision 2 and 3); streaming answers word by word (the
-logs hold finished blocks only); desks other than Linux.
+the desk, the Codex image fallback from the log's copy (proposal, decisions
+2, 3 and 7); streaming answers word by word (the logs hold finished blocks
+only); desks other than Linux.
 
 ## Decisions
 
@@ -41,37 +45,49 @@ desk logs are larger. The tail script reads byte ranges, prints whole lines
 only, drops records the chat never shows and replaces base64 over 300
 characters with `@<line offset>:<index>`. It now also prints each line's
 byte offset (for D3) and keeps the last Codex `token_count` record of each
-read (for the gauge). A read spans at most 7.5 MB; a single record over that
-is skipped by its offset and reported, so the live tail goes on (spike: it
+read (for D8). A read spans at most 7.5 MB; a single record over that is
+skipped by its offset and reported, so the live tail goes on (spike: it
 stopped for good).
 
-### D3. Rows keep the identity of the line that starts them
-A row's key is (byte offset of its first line, index within that line). The
-parser keeps it when a folded tool row gains older calls at its front after
-reading back (the key stays its newest line's, not its first), and when a
-queued copy and the later user record are merged (the earlier one's). The
-screen keys rows, thumbnails and the open detail by it. *Over* positional
-keys minus rows read back: both review cases shifted them.
+### D3. Rows keep the key they were first seen with
+Every row records the offsets of all its source lines. Its key (first line
+offset, index within the line) is set when the row is first seen and never
+derived again. A read-back parses all held text again in one parser, so
+tool results still meet their calls; afterwards each new row is matched to
+the held rows by those offsets: a new row containing a held key's line takes
+that key, the first if several; one containing none keys itself. *Over*
+positional keys minus rows read back, or keys derived per parse: both
+review cases (a folded row gaining older calls, a queued copy meeting its
+user record) shifted them.
 
 ### D4. The send target is fixed at the first check
 Pressing send records (process id, process start, session id). The check
-before photo uploads and the one right before typing compare against it, and
-`terminal.send` gets `if: idle|working` (its own guard; `done` has none, a
-known small window). An ambiguous Codex match is never sendable.
+before photo uploads and the one right before typing compare against it.
+`terminal.send` gets `if` with the exact status seen (idle or working); for
+done herdr-core has no guard, a known small window. Missed is never
+sendable. A message while working is sent like any other (decision 1).
 
 ### D5. Polling follows the terminal's events
-Each `status`, `turn` or `title` event triggers a read; between them, 0.5 s
-while working or a message waits, 5 s otherwise; only while the chat is on
-screen. The lookup runs when the foreground process changes, every 10 s, and
-on every poll for 3 s after a `/` command. With the terminal view showing,
-one lookup and one recent-window read decide the switch.
+With the chat on screen: each `status`, `turn` or `title` event triggers a
+read; between them, 0.5 s while working or a message waits, 5 s otherwise.
+The lookup runs when the foreground process changes, every 10 s, and on
+every poll for 5 s after a `/` command. With the terminal view showing:
+one lookup and one recent-window read decide the switch, repeated on each
+event while the result is Empty or Missed with an agent in front (one
+`machine.exec` per event; an ambiguous Codex match pays it for good,
+measured in task 5.6). An Empty session whose id was misread stays Empty
+until its first real turn ends; meanwhile sends still reach the right
+terminal, so the harm is an empty chat for a while.
 
-### D6. The health guard runs on every read
-`Parser::health` is computed on everything held after each read. The
-no-message rule only counts once the read reaches the start of the log or
-2 MB of history without a message, so a recent window of bookkeeping lines
-reads further back first. Broken flips the view to the terminal with a note;
-Degraded shows a note at the top of the chat.
+### D6. The health guard has two kinds of rule
+The whole-log rules (spec) cannot see a message record renamed after
+messages were shown: old lines dominate and unknown record types are
+ignored. The per-turn rule covers it: a turn that ran while the chat was
+open and brought no new row of any kind within 5 s of its end is Broken;
+turns started by `!` or `/` from the chat are skipped. Each Broken clears by
+its own rule: whole-log Broken when those rules read Ok; per-turn Broken
+only on a new row the agent produced, or a session change, so the person's
+own message never brings the box back into a log that cannot be read.
 
 ### D7. Codex commands are placed by turn
 Codex items carry the turn id; a `CommandExecution` written after its turn's
@@ -80,36 +96,54 @@ Codex items carry the turn id; a `CommandExecution` written after its turn's
 
 ### D8. The gauge reads what the log already holds
 Codex: the last `token_count`'s `last_token_usage.input_tokens` against
-`model_context_window`. Claude Code: input plus cache tokens of the last
-assistant record; the log names the model but not its window (a 1M window
-depends on the desk's settings), so the gauge shows tokens until a window is
-known. Plan limits are out (Non-Goals): Claude Code's log has none.
+`model_context_window` (desk check: 22k of 475k in a November rollout).
+Codex's own interface reckons its percentage with a fixed allowance for
+its instructions, so the two may differ by a few percent; the chat shows
+the plain ratio. Claude Code: input plus cache tokens of the last assistant
+record; the log names the model but not its window (a 1M window depends on
+the desk's settings), so the gauge shows tokens. Plan limits are out
+(Non-Goals): Claude Code's log has none.
 
 ### D9. Fading in only what arrives live
 A row first seen after the first read is marked live; only live rows fade in
 (alpha and a short reveal, at most 600 ms). Rows from the first open or read
 back show at once.
 
-### D10. Tests where they hold
-Pure functions (parsing, matching, health, row keys, send gating, pending
-expiry, verbs, stick rule, code boxes) get unit tests; screens get
-Roborazzi goldens in both themes; scrolling and touch behaviour is checked
-on the phone. Robolectric Compose interaction tests are not used: two in the
-spike failed in about half of full-suite runs depending on test order.
+### D10. A pending message's state comes from the log and the screen
+The terminal stays attached under the chat, so the app has its screen text.
+A pending message reads "Queued" while the agent works and that screen
+shows the message's first line in the agent's input area or queue (where
+each agent shows a queued message is looked up on the desk first, task
+2.8); otherwise "Sending…". The 30 s expiry starts at sending for a message
+not shown as queued, and when the agent stops working for one that was.
+Claude Code's queued command record ends the wait like a user record.
+
+### D11. Tests where they hold
+Pure functions (parsing, matching, lookup results, health, row keys, send
+gating, pending state and expiry, waiting line, verbs, stick rule, code
+boxes) get unit tests; screens get Roborazzi goldens in both themes;
+scrolling and touch behaviour is checked on the phone. Robolectric Compose
+interaction tests are not used: two in the spike failed in about half of
+full-suite runs depending on test order.
 
 ## Risks / Trade-offs
 
-- [Private log formats that change weekly] → the guard falls back to the
-  terminal; `examples/check.rs` runs against the desk's real logs at each
-  test round and its result goes in the tasks.
-- [0.5 s polling while working: desk and phone cost unmeasured] → measure on
-  the test phone (task 5.6); lower the rate while the screen is idle if large.
+- [Private log formats that change weekly] → the guard falls back to
+  read-only with the terminal button; `examples/check.rs` runs against the
+  desk's real logs at each test round and its result goes in the tasks.
+- [0.5 s polling and event lookups: desk and phone cost unmeasured] →
+  measure on the test phone (task 5.6); lower the rate while the screen is
+  idle if large.
 - [Codex shows a command only once it ends] → the working line still shows;
-  no shimmer for Codex, stated in the spec by omission.
+  the spec states the exception.
+- [A dialog opened at the desk, or after Dismiss, while the status reads
+  done] → a send may land in it; herdr-core has no guard for done. Stated
+  as a known limit in the spec.
 - [Exit loses the match; app restart after exit has no chat] → accepted for
   v1 (decision 3); a start hook is a 1.x issue.
-- [Steering surprises someone who expected a queue] → the hint under the
-  box while working (decision 1).
+- [Queued detection reads the screen] → a long or wrapped message may not
+  match its first line on screen; it then reads "Sending…" and expires 30 s
+  after sending, offering the terminal: the safe side.
 - [Live terminal under the chat] → the chat takes every touch and hides the
   terminal from accessibility; the terminal keeps running so the switch back
   is instant.
@@ -122,5 +156,6 @@ None: a new view. Rollback is a release without the switch.
 
 - Claude Code's context window per model (200k or 1M) is not in the log; the
   status line input has it. Settled with plan limits in 1.x.
+- Whether Codex slash commands open dialogs and what they write (task 5.5).
 - `/resume` inside either agent's own interface, and an image a person
-  attached in Codex, are untested; tasks 5.x try them.
+  attached in Codex, are untested; task 5.5 tries them.

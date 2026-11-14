@@ -1,7 +1,7 @@
 ## 1. Branch and carry-over
 
 - [x] 1.1 Branch `feat/chat-view` from `main`; bring `research/chat-view-spike-2026-11.md` and this change
-- [ ] 1.2 Carry `crates/herdr-chat` over from `spike/chat-view` with its tests and fixtures; all pass unchanged
+- [x] 1.2 Carry `crates/herdr-chat` over from `spike/chat-view` with its tests and fixtures; all pass unchanged
 
 ## 2. Tests first (Rust), and desk checks they rest on
 
@@ -24,7 +24,7 @@
 
 ## 4. Android (tests first in each)
 
-- [ ] 4.1 Pure functions: pending state (Sending…, Queued from the screen text, expiry 30 s after sending or after work stops, arrival by text or by the `!` command's shell call, also when added to the last folded row); the waiting line (3 s, Dismiss, ends on its row or a status change, refuses sends while the status is unchanged); lookup cadence (events, 10 s, 5 s after `/`, events while Empty or Missed); `busy`/`shimmers`/verbs; `nextStick`; code boxes; image swipe order within a row; live-row fade marking
+- [ ] 4.1 Pure functions: pending state (Sending…, Queued from the screen text, expiry 30 s after sending or after work stops, arrival by text or by the `!` command's shell call, also when added to the last folded row, and in the new log after a session switch (`/clear`) when older rows had been read back: the spike kept its read-back offset across the switch and left the first message after `/clear` on "Sending…"); the second Enter (message still in the agent's input box 1.5 s after sending and no row: Enter once, never twice; not when the box holds other text); the waiting line (3 s, Dismiss, ends on its row or a status change, refuses sends while the status is unchanged); lookup cadence (events, 10 s, 5 s after `/`, events while Empty or Missed); `busy`/`shimmers`/verbs; `nextStick`; code boxes; image swipe order within a row; live-row fade marking
 - [ ] 4.2 Chat screen in `ui/chat` from the spike's parts, keyed by row identity; goldens in paper and graphite for: conversation, no messages yet, sending, queued, not arrived, waiting line, refused send, working line, tool sheet and detail, viewer, image not available, degraded note, broken read-only, exited, gauge for each agent
 - [ ] 4.3 Switch in `TerminalRoute`: shown per the spec, chosen view remembered, the hand-opened "Looking for the conversation…" and "No conversation found" states
 - [ ] 4.4 Sending: refusal texts with terminal buttons, draft kept; photo attach with EXIF upright, scaling, JPEG re-encode

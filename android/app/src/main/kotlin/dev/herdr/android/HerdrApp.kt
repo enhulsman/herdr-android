@@ -106,6 +106,9 @@ class HerdrApp : Application() {
     /** Each terminal's chat as the screen holds it (draft, place, last poll), for this run of the app. */
     val chatStates = ChatStates()
 
+    /** Sends from a chat finish here, so leaving the chat mid-upload still records what happened. */
+    val chatScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     /** The phone's alert state; the push service and the silence check use it with the app closed. */
     lateinit var pushStore: PushStore
         private set

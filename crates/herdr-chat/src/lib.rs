@@ -10,7 +10,7 @@ pub mod send;
 pub mod tail;
 
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// A row's identity (design D3): the byte offset of the first log line it
 /// was seen with, and its index among the rows that line began.
@@ -129,6 +129,9 @@ pub struct Parser {
     title: Option<String>,
     version: Option<String>,
     gauge: Option<Gauge>,
+    /// Claude Code: the texts queued while the agent works, oldest first
+    /// (`queue-operation` records; an enqueue without text holds a place).
+    queue: VecDeque<String>,
 }
 
 impl Parser {
@@ -159,6 +162,7 @@ impl Parser {
             title: None,
             version: None,
             gauge: None,
+            queue: VecDeque::new(),
         }
     }
 
@@ -224,6 +228,12 @@ impl Parser {
     }
 
     /// The context gauge from the latest count read; none before one.
+    /// Claude Code: the texts typed while the agent worked that it has not
+    /// taken in yet, oldest first (design D10). Empty for Codex.
+    pub fn queued(&self) -> Vec<String> {
+        self.queue.iter().filter(|t| !t.is_empty()).cloned().collect()
+    }
+
     pub fn gauge(&self) -> Option<Gauge> {
         self.gauge
     }
@@ -418,6 +428,23 @@ impl Parser {
         }
         match kind {
             "user" | "assistant" => {}
+            "queue-operation" => {
+                let text = v["content"].as_str().map(unwrap_sent);
+                match (v["operation"].as_str(), text) {
+                    (Some("enqueue"), t) => self.queue.push_back(t.unwrap_or_default()),
+                    (Some("dequeue"), _) => {
+                        self.queue.pop_front();
+                    }
+                    (Some("remove"), Some(t)) => {
+                        if let Some(i) = self.queue.iter().position(|q| *q == t) {
+                            self.queue.remove(i);
+                        }
+                    }
+                    (Some("popAll"), _) => self.queue.clear(),
+                    _ => {}
+                }
+                return;
+            }
             "attachment" => {
                 let a = &v["attachment"];
                 if a["type"] == "queued_command" && v["isSidechain"] != true {

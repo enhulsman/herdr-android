@@ -42,11 +42,12 @@ fn main() {
         }
     }
     println!(
-        "{:>6.1} MB -> {:>6.2} MB sent ({:>3.0}%) in {ms} ms | user {u} (img {img}) said {s} tools {tools}/{calls} calls ({running} open) notes {notes} | v{} | {:?}",
+        "{:>6.1} MB -> {:>6.2} MB sent ({:>3.0}% of the bytes read) in {ms} ms | user {u} (img {img}) said {s} tools {tools}/{calls} calls ({running} open) notes {notes} | v{} | {:?} | {:?}",
         chunk.size as f64 / 1e6,
         chunk.text.len() as f64 / 1e6,
-        100.0 * chunk.text.len() as f64 / (chunk.size.max(1) as f64 - offset.trim_start_matches('-').parse::<f64>().map(|b| (chunk.size as f64 - b).max(0.0)).unwrap_or(0.0)).max(1.0),
+        100.0 * chunk.text.len() as f64 / (chunk.next.saturating_sub(chunk.from)).max(1) as f64,
         p.version().unwrap_or("?"),
-        p.health()
+        p.health(),
+        p.gauge()
     );
 }

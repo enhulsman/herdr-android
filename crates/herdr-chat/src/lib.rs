@@ -6,6 +6,7 @@
 
 pub mod image;
 pub mod locate;
+pub mod send;
 pub mod tail;
 
 use serde_json::Value;

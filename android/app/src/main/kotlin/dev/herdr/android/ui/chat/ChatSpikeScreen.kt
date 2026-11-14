@@ -245,6 +245,14 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
             if (state.stick && last >= 0) list.scrollToItem(last)
         }
     }
+    // A bubble growing at the bottom (the waiting line after a slash command) pushes
+    // the end out of view with no new row: follow it unless the person is scrolling.
+    LaunchedEffect(list) {
+        snapshotFlow { list.canScrollForward }.collect { more ->
+            val last = list.layoutInfo.totalItemsCount - 1
+            if (more && state.stick && !list.isScrollInProgress && last >= 0) list.scrollToItem(last)
+        }
+    }
     val end = rows.size - state.base + pending.size
     var settled by remember { mutableStateOf(false) }
     LaunchedEffect(end) {

@@ -130,7 +130,7 @@ and notes (a slash command, "Conversation compacted").
   were already shown (the no-message check only covers a log with none);
   the spec needs a check that keeps running.
 - **Against real logs**: twelve Claude Code logs from 2.1.292 to 2.1.323 (up
-  to 49 MB) and all 25 Codex rollouts of the month (0.166.0 and 0.169.0) parse with health Ok;
+  to 49 MB) and all Codex rollouts of the month (25, later 29; 0.166.0 and 0.169.0) parse with health Ok;
   a synthetic unknown Codex item gives Degraded, as tested.
 
 ## 3. Live updates
@@ -399,12 +399,18 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   the terminal (the owner's default: when the chat cannot follow, send the
   person to the terminal). After a slash command the log is looked up on
   every poll for 3 s; on the phone `/clear` showed the new, empty
-  conversation with its bubble within a few seconds. Not yet right: the
-  list does not scroll to the waiting line, so its button can be below the
-  fold. Idea for the spec: show the terminal's bottom rows in the chat
+  conversation with its bubble within a few seconds. The waiting line
+  grows the bubble without a new row; a list following the bottom now
+  scrolls along, so the button stays in view (one that was scrolled up
+  stays put). Checked in a Robolectric test run alone, not yet on a phone;
+  the test was not kept: in the full suite the list's first scroll to the
+  bottom did not happen in about half the runs, before the fix comes into
+  play (the same order trouble as the tap test). Idea for the spec: show the terminal's bottom rows in the chat
   while a command waits, instead of only a button. The Codex part was
-  tested in unit tests only, and the real-log check of Codex rollouts did
-  not run (the read script cannot open them on the Windows drive).
+  tested in unit tests only. The real-log check of Codex rollouts did run
+  in the end: all 29 November rollouts (0.166.0 and 0.169.0, up to 40 MB)
+  parse Ok, commands included. An earlier "cannot open" was a listing
+  alias that added a marker to the file names, not the read script.
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.

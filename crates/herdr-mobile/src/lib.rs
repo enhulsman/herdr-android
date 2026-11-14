@@ -135,6 +135,8 @@ pub trait HubListener: Send + Sync {
 pub struct Hub {
     core: Arc<hub::HubCore>,
     runtime: Mutex<Option<tokio::runtime::Runtime>>,
+    /// The chats held for the terminals viewed most recently (design D12).
+    chats: Mutex<hub::chat_core::Held<Arc<hub::chat::Chat>>>,
 }
 
 #[uniffi::export]
@@ -182,6 +184,7 @@ impl Hub {
         Ok(Arc::new(Hub {
             core,
             runtime: Mutex::new(Some(runtime)),
+            chats: Mutex::new(hub::chat_core::Held::new()),
         }))
     }
 
@@ -287,6 +290,26 @@ impl Hub {
         self.core
             .runtime()
             .block_on(async move { core.start_terminal(&machine, place, agent).await })
+    }
+
+    /// The chat of the terminal `address` on `machine`: the one held when it
+    /// was viewed lately (its rows and where reading stopped), else a new
+    /// one. Poll it off the main thread; call `leave` when it goes off
+    /// screen.
+    pub fn open_chat(&self, machine: String, address: String) -> Arc<hub::chat::Chat> {
+        let key = format!("{machine}/{address}");
+        let core = self.core.clone();
+        self.chats
+            .lock()
+            .unwrap()
+            .open(&key, || Arc::new(hub::chat::Chat::new(core, machine, address)))
+    }
+
+    /// Android asked to free memory: every held chat but the one on screen
+    /// goes.
+    pub fn trim_chats(&self, shown_machine: Option<String>, shown_address: Option<String>) {
+        let shown = shown_machine.zip(shown_address).map(|(m, a)| format!("{m}/{a}"));
+        self.chats.lock().unwrap().trim(shown.as_deref());
     }
 
     /// Opens a terminal, at the phone's size when `at_phone_size` (the app,

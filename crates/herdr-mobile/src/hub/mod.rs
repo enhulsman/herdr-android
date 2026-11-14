@@ -33,6 +33,8 @@ use tokio::time::Instant;
 use crate::link::{DialError, Dialer, Exit, Target};
 use crate::machines::{self, ListError, MachineList};
 
+pub mod chat;
+pub(crate) mod chat_core;
 pub mod push;
 pub mod start;
 

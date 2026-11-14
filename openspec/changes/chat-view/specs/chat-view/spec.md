@@ -153,6 +153,34 @@ make no reads.
 - **WHEN** the terminal view shows a Found agent that works for a minute
 - **THEN** the log is looked up and read once on opening, and not again until the foreground process changes
 
+### Requirement: A chat is held while the terminal view shows
+The app SHALL keep each chat it has shown (its rows, where reading stopped,
+its health and its scroll position) in memory while the app runs, for the
+8 terminals viewed most recently, so that switching to the terminal view
+and back, leaving the terminal and opening it again, or swiping between
+agents shows the chat at once, without reading it again. While a held chat
+is not on screen it SHALL make no reads beyond the terminal view's own.
+On its return the app SHALL show the held rows at the same scroll position,
+read only the lines written since, and look the log up again; when the
+session changed meanwhile, the new conversation SHALL replace it. When more
+than 2 MB was written since, the app SHALL read the last 2 MB as on a first
+open instead. Rows read back beyond the last 2 MB SHALL be dropped when the
+chat is left, and a scroll position inside them returns to the bottom.
+Nothing held SHALL be written to the phone's storage, and the app SHALL drop
+every held chat but the one on screen when Android asks it to free memory.
+
+#### Scenario: A look at the terminal and back
+- **WHEN** Ezra switches a chat with 200 rows to the terminal view for a minute while the agent writes two answers, then switches back
+- **THEN** the 200 rows show in the same frame at the same place, and the two answers follow from one read of the new lines
+
+#### Scenario: A /clear typed in the terminal meanwhile
+- **WHEN** Ezra runs `/clear` in the terminal view and switches back to the chat
+- **THEN** the chat shows the new, empty conversation, not the held one
+
+#### Scenario: A ninth terminal
+- **WHEN** Ezra has viewed the chats of eight terminals and opens a ninth
+- **THEN** the chat viewed longest ago is dropped and is read again when next opened
+
 ### Requirement: A health guard falls back without losing what was read
 The parser SHALL rate the log Ok, Degraded or Broken after every read:
 - **Whole-log rules.** A message record without role and content, fewer

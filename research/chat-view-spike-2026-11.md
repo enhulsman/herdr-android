@@ -429,6 +429,13 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   now scrolls to its true end: it showed the top of a long last message, so
   its end was hidden. Inline code draws its box behind the text, so a
   selection shows inside it (a span background had painted over it).
+- **Wrapped inline code** (same round, seen on the owner's phone): code that
+  wrapped after a `/` or `-` got a box over the whole line before it; boxes
+  are now measured by the code's own characters, with a test for that wrap.
+- **Ideas from the owner for the spec, not built:** a new answer appears in
+  one go; let it come in quickly, as if typed, fading in (new text only,
+  not history read back). In the image viewer, swipe to the other images
+  of the same message.
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.

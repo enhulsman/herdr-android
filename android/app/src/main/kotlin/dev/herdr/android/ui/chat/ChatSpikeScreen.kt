@@ -436,23 +436,31 @@ private fun MdText(text: AnnotatedString, style: androidx.compose.ui.text.TextSt
             val l = layout ?: return@drawBehind
             val pad = 2.dp.toPx()
             val r = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
-            for (a in codes) {
-                if (a.start >= a.end) continue
-                for (line in l.getLineForOffset(a.start)..l.getLineForOffset(a.end - 1)) {
-                    val from = maxOf(a.start, l.getLineStart(line))
-                    val to = minOf(a.end, l.getLineEnd(line, visibleEnd = true))
-                    if (from >= to) continue
-                    val x0 = l.getHorizontalPosition(from, usePrimaryDirection = true)
-                    val x1 = l.getHorizontalPosition(to, usePrimaryDirection = true)
-                    drawRoundRect(
-                        box, androidx.compose.ui.geometry.Offset(minOf(x0, x1) - pad, l.getLineTop(line)),
-                        androidx.compose.ui.geometry.Size(kotlin.math.abs(x1 - x0) + 2 * pad, l.getLineBottom(line) - l.getLineTop(line)), r,
-                    )
-                }
+            for (b in codeBoxes(l, codes)) {
+                drawRoundRect(box, androidx.compose.ui.geometry.Offset(b.left - pad, b.top), androidx.compose.ui.geometry.Size(b.width + 2 * pad, b.height), r)
             }
         },
     )
 }
+
+/**
+ * One box per line an inline code range covers, from its first character's
+ * left edge to its last one's right edge on that line. Measured by the
+ * characters themselves: the position of the offset after a wrapped line's
+ * last character is the next line's start, which drew a box backwards over
+ * the whole line before the code.
+ */
+internal fun codeBoxes(l: androidx.compose.ui.text.TextLayoutResult, codes: List<AnnotatedString.Range<String>>): List<androidx.compose.ui.geometry.Rect> =
+    codes.filter { it.start < it.end }.flatMap { a ->
+        (l.getLineForOffset(a.start)..l.getLineForOffset(a.end - 1)).mapNotNull { line ->
+            val from = maxOf(a.start, l.getLineStart(line))
+            val to = minOf(a.end, l.getLineEnd(line, visibleEnd = true))
+            if (from >= to) return@mapNotNull null
+            val first = l.getBoundingBox(from)
+            val last = l.getBoundingBox(to - 1)
+            androidx.compose.ui.geometry.Rect(minOf(first.left, last.left), l.getLineTop(line), maxOf(first.right, last.right), l.getLineBottom(line))
+        }
+    }
 
 /** Tool calls in a row, folded: "Ran 7 commands, read 2 files", or the one call's title. */
 fun toolLine(calls: List<ChatCall>): String {

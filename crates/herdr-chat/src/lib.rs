@@ -98,6 +98,13 @@ pub struct Parser {
     recognised: u32,
     unknown: u32,
     broken: Option<String>,
+    /// The log's first line has been read (no-message rule).
+    start_read: bool,
+    /// An open turn: where the log ended when it started, and whether it is
+    /// one the per-turn rule skips.
+    turn: Option<(u64, bool)>,
+    /// Broken by the per-turn rule: where the log ended when it was judged.
+    turn_broken: Option<u64>,
     title: Option<String>,
     version: Option<String>,
 }
@@ -122,6 +129,9 @@ impl Parser {
             recognised: 0,
             unknown: 0,
             broken: None,
+            start_read: false,
+            turn: None,
+            turn_broken: None,
             title: None,
             version: None,
         }
@@ -131,6 +141,9 @@ impl Parser {
     /// ended (the first feed starts at byte 0); a line without its newline
     /// waits for the rest.
     pub fn feed(&mut self, text: &str) {
+        if self.pos == 0 {
+            self.start_read = true;
+        }
         self.partial.push_str(text);
         while let Some(i) = self.partial.find('\n') {
             let line: String = self.partial.drain(..=i).collect();
@@ -148,6 +161,9 @@ impl Parser {
     /// Whole lines as the tail script gives them: `offsets` holds where each
     /// line of `text` starts in the log ([`tail::Chunk`]).
     pub fn feed_lines(&mut self, text: &str, offsets: &[u64]) {
+        if offsets.first() == Some(&0) {
+            self.start_read = true;
+        }
         for (line, &at) in text.lines().zip(offsets) {
             self.pos = at + line.len() as u64 + 1;
             let line = line.trim_end();
@@ -182,6 +198,33 @@ impl Parser {
         self.version.as_deref()
     }
 
+    /// The agent started working while the chat was open (design D6).
+    /// `skip`: the turn was started by a `!` or `/` command sent from the
+    /// chat. A turn starting before the last one was judged joins it.
+    pub fn turn_started(&mut self, skip: bool) {
+        let (mark, skipped) = self.turn.unwrap_or((self.pos, true));
+        self.turn = Some((mark, skipped && skip));
+    }
+
+    /// The open turn ended, and the lines written in the 5 s after it have
+    /// been read: a turn that changed no row at all means the agent's
+    /// records are no longer read, and the log is Broken until the agent
+    /// produces a row again.
+    pub fn turn_ended(&mut self) {
+        let Some((mark, skip)) = self.turn.take() else { return };
+        let changed = self.srcs.iter().flatten().any(|&at| at >= mark);
+        if !skip && !changed {
+            self.turn_broken.get_or_insert(self.pos);
+        }
+    }
+
+    /// A new parse of the same log (a read-back) keeps the per-turn state of
+    /// the parse it replaces; call before feeding it.
+    pub fn carry_from(&mut self, old: &Parser) {
+        self.turn = old.turn;
+        self.turn_broken = old.turn_broken;
+    }
+
     pub fn health(&self) -> Health {
         if let Some(reason) = &self.broken {
             return Health::Broken {
@@ -194,10 +237,16 @@ impl Parser {
             };
         }
         // A renamed message record leaves lines this agent writes but no
-        // message at all; meta records alone are never a conversation.
-        if self.lines >= NO_MESSAGE_LINES && self.items.is_empty() {
+        // message at all; meta records alone are never a conversation. Only
+        // judged from the start: the last 2 MB may be bookkeeping only.
+        if self.start_read && self.lines >= NO_MESSAGE_LINES && self.items.is_empty() {
             return Health::Broken {
                 reason: format!("no messages in {} lines", self.lines),
+            };
+        }
+        if self.turn_broken.is_some() {
+            return Health::Broken {
+                reason: "a turn ended with nothing readable".into(),
             };
         }
         if self.unknown > 0 {
@@ -234,10 +283,21 @@ impl Parser {
     }
 
     fn new_row(&mut self, item: Item) {
+        if matches!(item, Item::Assistant { .. } | Item::Note { .. }) {
+            self.agent_wrote();
+        }
         self.items.push(item);
         self.srcs.push(vec![self.at]);
         self.keys.push((self.at, self.k));
         self.k += 1;
+    }
+
+    /// The line being parsed holds something the agent produced: it clears
+    /// the per-turn Broken when written after it.
+    fn agent_wrote(&mut self) {
+        if self.turn_broken.is_some_and(|b| self.at >= b) {
+            self.turn_broken = None;
+        }
     }
 
     /// The line being parsed changed row `i` too.
@@ -249,8 +309,12 @@ impl Parser {
         }
     }
 
-    fn add_call(&mut self, id: Option<String>, call: ToolCall) {
+    /// A tool call; `own` is false for a `!` command the person ran.
+    fn add_call(&mut self, id: Option<String>, call: ToolCall, own: bool) {
         self.last_text_id = None;
+        if own {
+            self.agent_wrote();
+        }
         if matches!(self.items.last(), Some(Item::Tools { .. })) {
             self.touch(self.items.len() - 1);
         } else {
@@ -379,6 +443,7 @@ impl Parser {
                             text.push_str("\n\n");
                             text.push_str(t);
                             self.touch(self.items.len() - 1);
+                            self.agent_wrote();
                         }
                         _ => {
                             self.push(Item::Assistant { text: t.to_owned() });
@@ -401,6 +466,7 @@ impl Parser {
                             failed: false,
                             images: vec![],
                         },
+                        true,
                     );
                 }
                 _ => self.unknown += 1,
@@ -503,6 +569,7 @@ impl Parser {
                         failed: false,
                         images: vec![],
                     },
+                    false,
                 );
                 return;
             }
@@ -598,6 +665,11 @@ impl Parser {
                     self.cwd = cwd.to_owned();
                 }
             }
+            // Not seen in a log yet (task 2.8 checks it): assumed from Codex's
+            // own event name.
+            "event_msg" if p["type"] == "turn_aborted" => {
+                self.push(Item::Note { text: "Interrupted".into() });
+            }
             "event_msg" if p["type"] == "item_completed" => {
                 let item = &p["item"];
                 match item["type"].as_str() {
@@ -668,6 +740,7 @@ impl Parser {
                         failed: item["exit_code"].as_i64().is_some_and(|c| c != 0),
                         images: vec![],
                     },
+                    item["source"] != "user_shell",
                 );
             }
             "FileChange" => {
@@ -686,6 +759,7 @@ impl Parser {
                         failed: item["status"].as_str().is_some_and(|s| s != "completed"),
                         images: vec![],
                     },
+                    true,
                 );
             }
             "ImageView" => {
@@ -704,6 +778,7 @@ impl Parser {
                         failed: false,
                         images: vec![Image::File { path }],
                     },
+                    true,
                 );
             }
             "Extension" => {
@@ -719,6 +794,7 @@ impl Parser {
                         failed: false,
                         images: vec![],
                     },
+                    true,
                 );
             }
             _ => self.unknown += 1,

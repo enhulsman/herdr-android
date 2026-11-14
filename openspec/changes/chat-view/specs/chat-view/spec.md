@@ -205,7 +205,12 @@ out. Text the person sent SHALL be shown without herdr-core's `<hc>` wrapper
 or Claude Code's `<pasted_content>` wrapper. A message the agent queued
 (Claude Code's queued command) SHALL show once as the person's message.
 A long press on a message SHALL copy it; text SHALL be selectable, inline
-code included.
+code included. A single line break inside a paragraph SHALL show as a new
+line, as the agents' terminals show it, not be joined into one line.
+
+#### Scenario: Lines without a blank line between them
+- **WHEN** an answer ends with "**Done:** …", "**Running:** …" and "**Next:** …" on lines of their own, with no blank line between them
+- **THEN** the chat shows them on three lines
 
 #### Scenario: A queued message
 - **WHEN** Ezra types a message in the terminal while Claude Code works
@@ -308,7 +313,8 @@ message or takes it into the running turn is the agent's choice.
 ### Requirement: An Enter the agent dropped is pressed once more
 The app SHALL press Enter once more, once per message, when the terminal's
 screen still shows the sent message in the agent's input box 1.5 s after
-sending and no row for it has arrived. Claude Code drops an Enter that arrives
+sending and no row for it has arrived; for a photo send, its text after the
+placeholders the agent shows in place of the photo paths. Claude Code drops an Enter that arrives
 while it checks a pasted absolute path to a file that exists (seen on
 2.1.325, with or without `@`; an Enter 1 s or more later is taken).
 
@@ -395,6 +401,21 @@ person's bubble SHALL show the photos, not the paths.
 #### Scenario: A photo with a question
 - **WHEN** Ezra picks a photo and sends "What is on this screen?"
 - **THEN** the bubble shows the photo and the text, and the agent answers from the photo
+
+### Requirement: A draft is kept for each terminal while the app runs
+The message box's text, its attached photos and the pending bubbles SHALL be
+kept for each terminal while the app runs: switching to the terminal view
+and back, leaving the terminal and opening it again, or switching agents
+SHALL NOT lose them. They SHALL NOT be written to the phone's storage, so the
+app being closed or killed ends them.
+
+#### Scenario: A look at the terminal mid-message
+- **WHEN** Ezra has typed half a message and attached a photo, switches to the terminal view, and switches back
+- **THEN** the message box holds the same text and photo
+
+#### Scenario: Back to the agents list and in again
+- **WHEN** Ezra leaves a terminal with a draft in its chat and opens the same terminal later
+- **THEN** the draft is still there, and another terminal's chat does not show it
 
 ### Requirement: A working line shows for the whole turn
 The chat SHALL show a working line at the bottom while the agent's status

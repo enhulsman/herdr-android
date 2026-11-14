@@ -11,6 +11,10 @@ pub mod tail;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+/// A row's identity (design D3): the byte offset of the first log line it
+/// was seen with, and its index among the rows that line began.
+pub type Key = (u64, u32);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Agent {
     Claude,
@@ -71,14 +75,23 @@ const NO_MESSAGE_LINES: u32 = 30;
 pub struct Parser {
     agent: Agent,
     partial: String,
+    /// The byte offset in the log where [`Parser::partial`] starts.
+    pos: u64,
+    /// The line being parsed: its offset, and the rows it began so far.
+    at: u64,
+    k: u32,
     items: Vec<Item>,
+    /// Per item: the offsets of every line it came from, in the order seen.
+    srcs: Vec<Vec<u64>>,
+    /// Per item: its own first line and index within it.
+    keys: Vec<Key>,
     /// tool id -> (item index, call index)
     calls: HashMap<String, (usize, usize)>,
     /// subagent id -> the task it was started with
     agents: HashMap<String, String>,
-    /// Notices and peer messages already shown from a queued command: the
-    /// same text may come again as a user record.
-    injected: HashSet<String>,
+    /// Notices and peer messages already shown from a queued command, with
+    /// the row they made: the same text may come again as a user record.
+    injected: HashMap<String, Option<usize>>,
     last_text_id: Option<String>,
     cwd: String,
     lines: u32,
@@ -94,10 +107,15 @@ impl Parser {
         Parser {
             agent,
             partial: String::new(),
+            pos: 0,
+            at: 0,
+            k: 0,
             items: Vec::new(),
+            srcs: Vec::new(),
+            keys: Vec::new(),
             calls: HashMap::new(),
             agents: HashMap::new(),
-            injected: HashSet::new(),
+            injected: HashMap::new(),
             last_text_id: None,
             cwd: String::new(),
             lines: 0,
@@ -109,13 +127,33 @@ impl Parser {
         }
     }
 
-    /// New text from the log; a line without its newline waits for the rest.
+    /// New text from the log, which continues where the text fed before
+    /// ended (the first feed starts at byte 0); a line without its newline
+    /// waits for the rest.
     pub fn feed(&mut self, text: &str) {
         self.partial.push_str(text);
         while let Some(i) = self.partial.find('\n') {
             let line: String = self.partial.drain(..=i).collect();
+            let at = self.pos;
+            self.pos += line.len() as u64;
             let line = line.trim_end();
             if !line.is_empty() {
+                self.at = at;
+                self.k = 0;
+                self.line(line);
+            }
+        }
+    }
+
+    /// Whole lines as the tail script gives them: `offsets` holds where each
+    /// line of `text` starts in the log ([`tail::Chunk`]).
+    pub fn feed_lines(&mut self, text: &str, offsets: &[u64]) {
+        for (line, &at) in text.lines().zip(offsets) {
+            self.pos = at + line.len() as u64 + 1;
+            let line = line.trim_end();
+            if !line.is_empty() {
+                self.at = at;
+                self.k = 0;
                 self.line(line);
             }
         }
@@ -123,6 +161,17 @@ impl Parser {
 
     pub fn items(&self) -> &[Item] {
         &self.items
+    }
+
+    /// Per item: the offsets of every log line it came from.
+    pub fn sources(&self) -> &[Vec<u64>] {
+        &self.srcs
+    }
+
+    /// Per item: the key of its own first line in this parse. A chat keeps
+    /// the keys rows had when first seen: [`keep_keys`].
+    pub fn first_keys(&self) -> &[Key] {
+        &self.keys
     }
 
     pub fn title(&self) -> Option<&str> {
@@ -181,13 +230,31 @@ impl Parser {
 
     fn push(&mut self, item: Item) {
         self.last_text_id = None;
+        self.new_row(item);
+    }
+
+    fn new_row(&mut self, item: Item) {
         self.items.push(item);
+        self.srcs.push(vec![self.at]);
+        self.keys.push((self.at, self.k));
+        self.k += 1;
+    }
+
+    /// The line being parsed changed row `i` too.
+    fn touch(&mut self, i: usize) {
+        if let Some(s) = self.srcs.get_mut(i)
+            && !s.contains(&self.at)
+        {
+            s.push(self.at);
+        }
     }
 
     fn add_call(&mut self, id: Option<String>, call: ToolCall) {
         self.last_text_id = None;
-        if !matches!(self.items.last(), Some(Item::Tools { .. })) {
-            self.items.push(Item::Tools { calls: Vec::new() });
+        if matches!(self.items.last(), Some(Item::Tools { .. })) {
+            self.touch(self.items.len() - 1);
+        } else {
+            self.new_row(Item::Tools { calls: Vec::new() });
         }
         let at = self.items.len() - 1;
         if let Some(Item::Tools { calls }) = self.items.last_mut() {
@@ -198,8 +265,10 @@ impl Parser {
         }
     }
 
+    /// The call with this id, its row marked as changed by this line.
     fn call_mut(&mut self, id: &str) -> Option<&mut ToolCall> {
         let (i, c) = *self.calls.get(id)?;
+        self.touch(i);
         match self.items.get_mut(i)? {
             Item::Tools { calls } => calls.get_mut(c),
             _ => None,
@@ -265,7 +334,10 @@ impl Parser {
         if v["isSidechain"] == true {
             return;
         }
-        if content.as_str().is_some_and(|t| self.injected.contains(t.trim())) {
+        if let Some(row) = content.as_str().and_then(|t| self.injected.get(t.trim()).copied()) {
+            if let Some(i) = row {
+                self.touch(i);
+            }
             return;
         }
         if let Some(text) = content.as_str().filter(|t| kind == "user" && t.contains("<agent-message from=\"")) {
@@ -306,6 +378,7 @@ impl Parser {
                         (Some(Item::Assistant { text }), Some(last)) if Some(last) == id.as_ref() => {
                             text.push_str("\n\n");
                             text.push_str(t);
+                            self.touch(self.items.len() - 1);
                         }
                         _ => {
                             self.push(Item::Assistant { text: t.to_owned() });
@@ -381,14 +454,20 @@ impl Parser {
             ("human", Some(_)) | ("human", None) if prompt.is_string() || prompt.is_array() => self.claude_user(prompt),
             (_, Some(s)) => {
                 let t = s.trim();
-                if !self.injected.insert(t.to_owned()) {
+                if let Some(row) = self.injected.get(t).copied() {
+                    if let Some(i) = row {
+                        self.touch(i);
+                    }
                     return;
                 }
+                let before = self.items.len();
                 if t.contains("<agent-message from=\"") {
                     self.claude_agent_message(t);
                 } else if t.starts_with("<task-notification>") {
                     self.claude_user(prompt);
                 }
+                let row = (self.items.len() > before).then_some(before);
+                self.injected.insert(t.to_owned(), row);
             }
             _ => {}
         }
@@ -791,4 +870,43 @@ pub fn unwrap_sent(s: &str) -> String {
             return t;
         }
     }
+}
+
+/// The keys for rows parsed again after a read-back (design D3), given the
+/// keys the held rows had (`held`, in row order) and the new parse's
+/// [`Parser::first_keys`] and [`Parser::sources`]. A held key goes to the row
+/// that begins with it, else to the first row containing its line; each held
+/// key to one row only. A row with none keys itself by its first line.
+pub fn keep_keys(held: &[Key], first: &[Key], sources: &[Vec<u64>]) -> Vec<Key> {
+    let held_set: HashSet<Key> = held.iter().copied().collect();
+    let mut used: HashSet<Key> = HashSet::new();
+    let mut got: Vec<Option<Key>> = vec![None; first.len()];
+    for (i, k) in first.iter().enumerate() {
+        if held_set.contains(k) && used.insert(*k) {
+            got[i] = Some(*k);
+        }
+    }
+    for (i, slot) in got.iter_mut().enumerate() {
+        if slot.is_none()
+            && let Some(k) = held.iter().find(|k| !used.contains(*k) && sources[i].contains(&k.0))
+        {
+            used.insert(*k);
+            *slot = Some(*k);
+        }
+    }
+    got.into_iter()
+        .zip(first)
+        .map(|(slot, own)| {
+            slot.unwrap_or_else(|| {
+                // Never two rows with one key: a row whose own key a held row
+                // already took moves to a free index of its line.
+                let mut k = *own;
+                while used.contains(&k) {
+                    k.1 += 1 << 16;
+                }
+                used.insert(k);
+                k
+            })
+        })
+        .collect()
 }

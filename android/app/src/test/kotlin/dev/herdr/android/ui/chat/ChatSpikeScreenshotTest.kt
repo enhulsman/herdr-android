@@ -256,6 +256,10 @@ class ChatSpikeScreenshotTest {
     @Test
     fun chatGraphite() = capture("chat-spike-graphite", poll, ChatSpikeState(), dark = true)
 
+    /** A live turn: the running command shimmers and the working line sits at the bottom. */
+    @Test
+    fun working() = capture("chat-spike-working", poll.copy(status = "working"), ChatSpikeState(), dark = true)
+
     @Test
     fun chatPaper() = capture("chat-spike-paper", poll, ChatSpikeState(), dark = false)
 

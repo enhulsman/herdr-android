@@ -35,6 +35,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -241,23 +243,30 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
     // The keyboard opening shrinks the list: keep the bottom in view.
     LaunchedEffect(list) {
         snapshotFlow { list.layoutInfo.viewportSize.height }.collect {
-            val last = list.layoutInfo.totalItemsCount - 1
-            if (state.stick && last >= 0) list.scrollToItem(last)
+            if (state.stick) list.toEnd()
         }
     }
     // A bubble growing at the bottom (the waiting line after a slash command) pushes
     // the end out of view with no new row: follow it unless the person is scrolling.
     LaunchedEffect(list) {
         snapshotFlow { list.canScrollForward }.collect { more ->
-            val last = list.layoutInfo.totalItemsCount - 1
-            if (more && state.stick && !list.isScrollInProgress && last >= 0) list.scrollToItem(last)
+            if (more && state.stick && !list.isScrollInProgress) list.toEnd()
         }
     }
+    val working = busy(poll.status, pending)
     val end = rows.size - state.base + pending.size
     var settled by remember { mutableStateOf(false) }
     LaunchedEffect(end) {
-        if (state.stick || !settled) list.scrollToItem(rows.size + pending.size - 1)
+        if (state.stick || !settled) list.toEnd(rows.size + pending.size - 1 + if (working) 1 else 0)
         settled = true
+    }
+    // Opening a tool's detail or an image puts it in front of everything: the keyboard closes first.
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    fun front(open: () -> Unit) {
+        keyboard?.hide()
+        focus.clearFocus()
+        open()
     }
     // The top row in view reads the part before it, back to the start.
     // Not "index 0 in view": a row with nothing to show has no height and never counts as visible.
@@ -268,18 +277,20 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
         LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(rows, key = { i, _ -> i - state.base }) { _, row ->
                 when (row.kind) {
-                    "user" -> UserBubble(row, images) { state.viewer = it }
+                    "user" -> UserBubble(row, images) { key -> front { state.viewer = key } }
                     "said" -> Copyable(row.text) { Said(row.text) }
                     "agent" -> AgentCard(row)
                     "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ToolLine(row.calls) { state.openTools(row.calls) }
+                        ToolLine(row.calls, live = shimmers(row.calls, working)) { front { state.openTools(row.calls) } }
                         val shots = row.calls.flatMap { it.images }
-                        if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { state.viewer = it }
+                        if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { key -> front { state.viewer = key } }
                     }
                     else -> Note(row.text)
                 }
             }
             itemsIndexed(pending, key = { i, p -> "pending ${p.at} $i" }) { _, p -> PendingBubble(p, onTerminal) }
+            // For the whole turn, thinking or running a command alike, until the turn ends.
+            if (working) item(key = "working") { WorkingLine() }
         }
         if (poll.reason.isNotEmpty()) {
             BasicText(
@@ -298,6 +309,14 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
             )
         }
     }
+}
+
+/** The very end: the last item's bottom, also when it is taller than the list (a long answer). */
+private suspend fun androidx.compose.foundation.lazy.LazyListState.toEnd(last: Int = layoutInfo.totalItemsCount - 1) {
+    if (last < 0) return
+    scrollToItem(last)
+    // scrollToItem shows an item's top; the rest of a tall one stays below. Scrolling stops at the end.
+    scrollBy(1_000_000f)
 }
 
 /** A message on its way: dimmed until the log holds it. */
@@ -389,17 +408,50 @@ private fun Said(text: String, maxBlocks: Int = Int.MAX_VALUE) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (b in markdownBlocks(text).take(maxBlocks)) {
             when (b) {
-                is MdBlock.Heading -> BasicText(inline(b.text, c.raised), style = HerdrType.body.copy(color = c.fg, fontWeight = FontWeight.SemiBold))
-                is MdBlock.Para -> BasicText(inline(b.text, c.raised), style = HerdrType.body.copy(color = c.fg))
+                is MdBlock.Heading -> MdText(inline(b.text), HerdrType.body.copy(color = c.fg, fontWeight = FontWeight.SemiBold))
+                is MdBlock.Para -> MdText(inline(b.text), HerdrType.body.copy(color = c.fg))
                 is MdBlock.Item -> Row(Modifier.padding(start = (12 * b.depth).dp)) {
                     BasicText(b.marker, style = HerdrType.body.copy(color = c.fg), modifier = Modifier.widthIn(min = 18.dp).padding(end = 4.dp))
-                    BasicText(inline(b.text, c.raised), style = HerdrType.body.copy(color = c.fg))
+                    MdText(inline(b.text), HerdrType.body.copy(color = c.fg))
                 }
                 is MdBlock.Code -> CodeBlock(b.text)
                 is MdBlock.Table -> MdTable(b)
             }
         }
     }
+}
+
+/**
+ * Text with inline code: each [CODE_TAG] range gets its box drawn behind the
+ * text, line by line, so a selection highlight still shows on top of it.
+ */
+@Composable
+private fun MdText(text: AnnotatedString, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
+    val box = HerdrTheme.colors.raised
+    val codes = remember(text) { text.getStringAnnotations(CODE_TAG, 0, text.length) }
+    var layout by remember(text) { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    BasicText(
+        text, style = style, onTextLayout = { layout = it },
+        modifier = if (codes.isEmpty()) modifier else modifier.drawBehind {
+            val l = layout ?: return@drawBehind
+            val pad = 2.dp.toPx()
+            val r = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+            for (a in codes) {
+                if (a.start >= a.end) continue
+                for (line in l.getLineForOffset(a.start)..l.getLineForOffset(a.end - 1)) {
+                    val from = maxOf(a.start, l.getLineStart(line))
+                    val to = minOf(a.end, l.getLineEnd(line, visibleEnd = true))
+                    if (from >= to) continue
+                    val x0 = l.getHorizontalPosition(from, usePrimaryDirection = true)
+                    val x1 = l.getHorizontalPosition(to, usePrimaryDirection = true)
+                    drawRoundRect(
+                        box, androidx.compose.ui.geometry.Offset(minOf(x0, x1) - pad, l.getLineTop(line)),
+                        androidx.compose.ui.geometry.Size(kotlin.math.abs(x1 - x0) + 2 * pad, l.getLineBottom(line) - l.getLineTop(line)), r,
+                    )
+                }
+            }
+        },
+    )
 }
 
 /** Tool calls in a row, folded: "Ran 7 commands, read 2 files", or the one call's title. */
@@ -438,10 +490,11 @@ private fun toolKinds(calls: List<ChatCall>): String {
 }
 
 @Composable
-private fun ToolLine(calls: List<ChatCall>, onOpen: () -> Unit) {
+private fun ToolLine(calls: List<ChatCall>, live: Boolean, onOpen: () -> Unit) {
     val c = HerdrTheme.colors
     Row(Modifier.clip(RoundedCornerShape(HerdrRadius.row)).clickable(onClick = onOpen).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        BasicText(toolLine(calls), style = HerdrType.settingRow.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        // While it runs, a light sweeps over it, as the desk's agent shows a running command.
+        BasicText(toolLine(calls), style = HerdrType.settingRow.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).shimmer(live, c.fg))
         ChevronIcon(Chevron.Right, 16.dp, c.dimText)
     }
 }
@@ -519,9 +572,9 @@ private fun MdTable(t: MdBlock.Table) {
         for ((r, cellsRow) in (listOf(t.header) + t.rows).withIndex()) {
             Row(Modifier.background(if (r == 0) c.raised else c.bg)) {
                 for (col in 0 until n) {
-                    BasicText(
-                        inline(cellsRow.getOrElse(col) { "" }, c.raised),
-                        style = HerdrType.secondary.copy(color = c.fg, fontWeight = if (r == 0) FontWeight.SemiBold else FontWeight.Normal),
+                    MdText(
+                        inline(cellsRow.getOrElse(col) { "" }),
+                        HerdrType.secondary.copy(color = c.fg, fontWeight = if (r == 0) FontWeight.SemiBold else FontWeight.Normal),
                         modifier = Modifier.width(widths[col]).padding(horizontal = 10.dp, vertical = 7.dp),
                     )
                 }

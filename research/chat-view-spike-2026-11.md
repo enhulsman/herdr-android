@@ -411,6 +411,24 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   in the end: all 29 November rollouts (0.166.0 and 0.169.0, up to 40 MB)
   parse Ok, commands included. An earlier "cannot open" was a listing
   alias that added a marker to the file names, not the read script.
+- **Working line and running command** (the owner's request after the
+  Pixel round): for the whole turn, thinking or running alike, a line at
+  the bottom shows three sheep hopping a fence and a herd verb that changes
+  every 4 s ("Herding…", "Rounding up…"); it shows while the status is
+  `working` or a plain message is on its way, not for a `/` or `!` command
+  or while blocked. A running command's tool line has a light sweeping over
+  it as well. Checked on the test phone: Claude Code shows both at once;
+  Codex writes a command to its rollout only once it finished, so its
+  running command has no line to sweep (the working line still shows). The
+  same Codex turn listed `sleep 20` twice under "Ran 2 commands": not looked
+  into. Idea for the spec: verb themes to pick from, as the desk agent's
+  own spinner verbs can be set.
+- **Keyboard and taps** (same round): tapping a tool line or an image
+  closes the keyboard first, so the detail is in front; closing it leaves
+  the keyboard closed and the draft kept. When the keyboard opens, the list
+  now scrolls to its true end: it showed the top of a long last message, so
+  its end was hidden. Inline code draws its box behind the text, so a
+  selection shows inside it (a span background had painted over it).
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.

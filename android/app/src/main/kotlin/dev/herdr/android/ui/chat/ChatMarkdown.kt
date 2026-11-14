@@ -6,7 +6,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.graphics.Color
 
 // Spike for issue 17 (never merged): just enough Markdown for agent answers.
 
@@ -80,8 +79,15 @@ fun markdownBlocks(src: String): List<MdBlock> {
     return out
 }
 
-/** `code`, **bold**, *italic*, [text](url) as the text. */
-fun inline(src: String, codeBg: Color): AnnotatedString = buildAnnotatedString {
+/** Marks inline `code`; [MdText] paints its box behind the text, under any selection. */
+const val CODE_TAG = "code"
+
+/**
+ * `code`, **bold**, *italic*, [text](url) as the text. Code is marked with
+ * [CODE_TAG], not given a span background: Compose paints span backgrounds
+ * over the selection highlight, which then vanished inside code.
+ */
+fun inline(src: String): AnnotatedString = buildAnnotatedString {
     var i = 0
     while (i < src.length) {
         when {
@@ -92,7 +98,7 @@ fun inline(src: String, codeBg: Color): AnnotatedString = buildAnnotatedString {
             }
             src[i] == '`' && src.indexOf('`', i + 1) > i -> {
                 val end = src.indexOf('`', i + 1)
-                pushStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBg)); append(src.substring(i + 1, end)); pop()
+                pushStringAnnotation(CODE_TAG, ""); pushStyle(SpanStyle(fontFamily = FontFamily.Monospace)); append(src.substring(i + 1, end)); pop(); pop()
                 i = end + 1
             }
             src[i] == '*' && i + 1 < src.length && src[i + 1] != ' ' && src.indexOf('*', i + 1) > i -> {

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -217,8 +218,13 @@ interface TerminalInputHandle {
 
 // --- Title bar and queue strip ---------------------------------------------
 
+/**
+ * The terminal's title bar, also the chat's: back, icon, name, status pill,
+ * then [trailing] (the chat's gauge, the view switch); swipes step through
+ * the agents.
+ */
 @Composable
-private fun TitleBar(header: TerminalHeader, actions: TerminalActions) {
+internal fun TitleBar(header: TerminalHeader, actions: TerminalActions, trailing: @Composable RowScope.() -> Unit = {}) {
     val c = HerdrTheme.colors
     val view = LocalView.current
     val threshold = with(LocalDensity.current) { SWIPE_STEP.toPx() }
@@ -276,6 +282,7 @@ private fun TitleBar(header: TerminalHeader, actions: TerminalActions) {
             BasicText(header.lineTwo, style = HerdrType.secondary.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (header.state != null && header.tone != SheetTone.None) StatePill(header.state, header.tone)
+        trailing()
     }
 }
 

@@ -441,7 +441,16 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
 - **Ideas from the owner for the spec, not built:** a new answer appears in
   one go; let it come in quickly, as if typed, fading in (new text only,
   not history read back). In the image viewer, swipe to the other images
-  of the same message.
+  of the same message. A usage gauge in the top bar, as the Claude app has:
+  at least the session's context, and the plan's 5-hour, weekly and
+  per-model weekly limits. Where the numbers are (looked up, not built):
+  the context from the log (above); Codex rollouts carry `rate_limits`
+  events (used percent, window, reset time; on a Team seat only the weekly
+  window was present); Claude Code's log has no plan limits: its status
+  line input carries the 5-hour and weekly windows, and the per-model
+  window only comes from Anthropic's usage endpoint, which a status line
+  tool on the desk caches. So plan limits for Claude Code need something on
+  the desk to hand them over.
 - **Untested:** `/resume` inside either agent's interface, other leading
   characters the input boxes treat specially, a person-attached image in a
   Codex log, mirrored EXIF.

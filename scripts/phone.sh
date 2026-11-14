@@ -65,9 +65,27 @@ status_note() {
 case "$1" in
   unlock)
     if a shell dumpsys window | grep -q 'isKeyguardShowing=true'; then
-      # The lock screen falls back to always-on display within seconds: one shell, no pauses between.
-      a shell "input keyevent KEYCODE_WAKEUP; sleep 0.6; input swipe 720 1900 720 500 200; sleep 0.9; input text $(pin); input keyevent KEYCODE_ENTER"
-      sleep 1.5
+      # The lock screen falls back to always-on display within seconds: wake
+      # and swipe in one shell. The PIN goes in only once the PIN pad shows:
+      # typed blind, enter presses whatever lock screen button has focus (at
+      # night the Do Not Disturb shortcut). The last try asks for the pad
+      # without a swipe, for when swipes are ignored.
+      p=${PHONE_UNLOCK_PAUSE:-1}
+      for open in "input swipe 720 1900 720 500 200" "input swipe 720 1900 720 500 200" "wm dismiss-keyguard"; do
+        a shell "input keyevent KEYCODE_WAKEUP; sleep 0.6; $open; sleep 0.9"
+        a shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
+        if a shell cat /sdcard/ui.xml 2>/dev/null | grep -qE 'keyguard_pin_view|id/pinEntry'; then
+          a shell "input text $(pin); input keyevent KEYCODE_ENTER"
+          sleep "$(awk "BEGIN{print 1.5*$p}")"
+          break
+        fi
+        sleep "$p"
+      done
+      if a shell dumpsys window | grep -q 'isKeyguardShowing=true'; then
+        f=$(mktemp "${TMPDIR:-/tmp}/phone-unlock-XXXXXX.png")
+        a exec-out screencap -p > "$f" 2>/dev/null || true
+        echo "still locked: no PIN pad after three tries; screen in $f" >&2; exit 1
+      fi
     else
       a shell input keyevent KEYCODE_WAKEUP
     fi

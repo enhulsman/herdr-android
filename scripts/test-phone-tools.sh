@@ -33,6 +33,39 @@ else
   check "no PIN is an error" "1" "$(grep -c 'Test phone PIN' <<<"$out")"
 fi
 
+# unlock against a fake adb: the PIN goes in only once the PIN pad shows, so
+# no PIN or enter lands on a lock screen button (a night-time Do Not Disturb
+# shortcut opened its dialog that way).
+mkdir -p "$tmp/bin"
+cat > "$tmp/bin/adb" <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >> "$FAKE_DIR/adb.log"
+case "$*" in
+  *"dumpsys window"*) if [ -f "$FAKE_DIR/unlocked" ]; then echo "isKeyguardShowing=false"; else echo "isKeyguardShowing=true"; fi ;;
+  *"cat /sdcard/ui.xml"*) cat "$FAKE_DIR/ui.xml" ;;
+  *"input text"*) [ "$FAKE_PAD" = yes ] && touch "$FAKE_DIR/unlocked" ;;
+esac
+exit 0
+EOF
+chmod +x "$tmp/bin/adb"
+unlock() { # pad shows: yes|no
+  rm -f "$tmp/adb.log" "$tmp/unlocked"
+  if [ "$1" = yes ]; then
+    echo '<hierarchy><node resource-id="com.android.systemui:id/keyguard_pin_view"/></hierarchy>' > "$tmp/ui.xml"
+  else
+    echo '<hierarchy><node resource-id="com.android.systemui:id/keyguard_long_press"/></hierarchy>' > "$tmp/ui.xml"
+  fi
+  PATH="$tmp/bin:$PATH" FAKE_DIR="$tmp" FAKE_PAD=$1 PHONE_UNLOCK_PAUSE=0 \
+    HERDR_LOCAL_SETUP="$tmp/setup.md" "$here/phone.sh" unlock >/dev/null 2>&1
+}
+if unlock yes; then r=ok; else r=failed; fi
+check "unlock with the PIN pad showing" "ok" "$r"
+check "unlock types the PIN on the pad" "1" "$(grep -c 'input text 908172' "$tmp/adb.log")"
+if unlock no; then r=ok; else r=failed; fi
+check "unlock without a PIN pad fails" "failed" "$r"
+check "no PIN typed without a PIN pad" "0" "$(grep -c 'input text' "$tmp/adb.log" || true)"
+check "no enter pressed without a PIN pad" "0" "$(grep -c 'KEYCODE_ENTER' "$tmp/adb.log" || true)"
+
 check "working signal" "$(printf '\033]7501;state=working:app=claude\033\\')" \
   "$("$here/fake-agent.sh" --print working)"
 check "needs-you signal is a permission block" "$(printf '\033]7501;state=blocked:kind=permission:app=claude\033\\')" \

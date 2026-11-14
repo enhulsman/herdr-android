@@ -18,9 +18,12 @@
 ## 3. Build (Rust)
 
 - [x] 3.1 Tail script changes (2.1) and their desk test in `tests/desk.rs`
-- [ ] 3.2 Parser: row keys and source offsets, both health rules with their clearing, Codex turn order, gauge numbers, local command notes
+- [x] 3.2 Parser: row keys and source offsets, both health rules with their clearing, Codex turn order, gauge numbers, local command notes
 - [ ] 3.3 `Chat` in `herdr-mobile` from `ChatSpike`: lookup results, polling and lookups by events (D5), the send target (D4), oversized-record notes, failed-read state; held per terminal (D12): no reads while not shown, on return the new lines only (the last 2 MB past a 2 MB gap) and a lookup, at most 8 held, rows read back beyond the last 2 MB dropped on leaving, all but the shown one dropped on a memory trim
-- [ ] 3.4 Real-log check: `examples/check.rs` over the desk's Claude Code and Codex logs, all Ok; record the counts here
+- [x] 3.4 Real-log check: `examples/check.rs` over the desk's Claude Code and Codex logs, all Ok; record the counts here (2026-11-14, logs of the last 30 days; the example now reads on past each read's end as the phone does, since one read stops at the 7.5 MB cap or a skipped record)
+  - Claude Code, 2,699 logs (3.0 GB, largest 88.7 MB): all Ok read whole and as the last 2 MB; whole: 5,515 person rows, 14,143 agent rows, 2,960 notes, a gauge in 2,666 (the rest have no assistant record with tokens); last 2 MB at most 192 ms
+  - Codex, 30 rollouts (228 MB, largest 40.1 MB): all Ok both ways; whole: 38 person rows, 88 agent rows, 6 records over 7.5 MB skipped, a gauge in 28; last 2 MB at most 106 ms
+  - no panics
 
 ## 4. Android (tests first in each)
 

@@ -10,8 +10,11 @@ import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +51,8 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -147,16 +153,41 @@ private fun Thumb(key: String, source: ChatImageSource, onOpen: (String) -> Unit
 }
 
 /** One image full screen: pinch to zoom, drag when zoomed, double tap to zoom in or out. */
+/** How far a finger moves sideways in the viewer to show the next image. */
+private val SWIPE = 64.dp
+
 @Composable
-fun ImageViewer(key: String, source: ChatImageSource, onClose: () -> Unit) {
+fun ImageViewer(key: String, keys: List<String>, source: ChatImageSource, onShow: (String) -> Unit, onClose: () -> Unit) {
     var scale by remember(key) { mutableFloatStateOf(1f) }
     var offset by remember(key) { mutableStateOf(Offset.Zero) }
+    val threshold = with(LocalDensity.current) { SWIPE.toPx() }
+    val images by rememberUpdatedState(keys)
+    val show by rememberUpdatedState(onShow)
     Box(
         Modifier.fillMaxSize().background(Color.Black)
             .pointerInput(key) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 6f)
-                    offset = if (scale == 1f) Offset.Zero else offset + pan
+                // Two fingers zoom, one pans a zoomed image; at its normal size a
+                // sideways swipe moves to the row's next or previous image.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var dx = 0f
+                    var dy = 0f
+                    var pinched = false
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.count { it.pressed } > 1) pinched = true
+                        if (pinched || scale > 1f) {
+                            scale = (scale * event.calculateZoom()).coerceIn(1f, 6f)
+                            offset = if (scale == 1f) Offset.Zero else offset + event.calculatePan()
+                        } else {
+                            val pan = event.calculatePan()
+                            dx += pan.x
+                            dy += pan.y
+                        }
+                        event.changes.forEach { if (it.positionChanged()) it.consume() }
+                    } while (event.changes.any { it.pressed })
+                    val step = if (pinched || scale > 1f) 0 else swipeStep(dx, dy, threshold)
+                    if (step != 0) stepImage(images, key, step)?.let(show)
                 }
             }
             .pointerInput(key) {

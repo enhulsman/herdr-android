@@ -24,7 +24,9 @@ const IMAGE_CACHE: usize = 48_000_000;
 /// An image in the conversation, fetched with [`Chat::image`] when shown.
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ChatImage {
-    /// `log:<session>:<line>:<n>`, `file:<path>`, `inline:<base64>` or `missing`.
+    /// `log:<session>:<line>:<n>`, `file:<line>:<path>` (the row's line: a
+    /// reused path in a later row is another image), `inline:<base64>` or
+    /// `missing`.
     pub key: String,
     pub media_type: String,
 }
@@ -132,6 +134,8 @@ pub struct Chat {
     state: Mutex<ChatCore>,
     /// Fetched images by key, for scrolling back and forth.
     images: Mutex<HashMap<String, Vec<u8>>>,
+    /// Codex image files by path, with the file time they were read at.
+    files: Mutex<HashMap<String, (String, Vec<u8>)>>,
     /// This terminal's events, subscribed on the first wait.
     events: tokio::sync::Mutex<Option<Stream>>,
 }
@@ -144,6 +148,7 @@ impl Chat {
             address,
             state: Mutex::new(ChatCore::new()),
             images: Mutex::new(HashMap::new()),
+            files: Mutex::new(HashMap::new()),
             events: tokio::sync::Mutex::new(None),
         }
     }
@@ -167,7 +172,8 @@ fn term_of(t: &Value) -> Term {
 
 /// `session` is the log's: a `log:` key names its session, so an image of an
 /// earlier session (after `/clear`) is never fetched from the current log.
-fn chat_images(images: &[Image], session: &str) -> Vec<ChatImage> {
+/// `line` is the row's first line, which a file image's key carries.
+fn chat_images(images: &[Image], session: &str, line: u64) -> Vec<ChatImage> {
     images
         .iter()
         .map(|m| match m {
@@ -175,7 +181,7 @@ fn chat_images(images: &[Image], session: &str) -> Vec<ChatImage> {
                 ChatImage { key: format!("log:{session}:{line}:{n}"), media_type: media_type.clone() }
             }
             Image::Inline { media_type, data } => ChatImage { key: format!("inline:{data}"), media_type: media_type.clone() },
-            Image::File { path } => ChatImage { key: format!("file:{path}"), media_type: String::new() },
+            Image::File { path } => ChatImage { key: format!("file:{line}:{path}"), media_type: String::new() },
             Image::Missing => ChatImage { key: "missing".into(), media_type: String::new() },
         })
         .collect()
@@ -191,7 +197,7 @@ fn chat_row(r: &Row, session: &str) -> ChatRow {
         calls: vec![],
     };
     match &r.item {
-        Item::User { text, images } => ChatRow { images: chat_images(images, session), ..row("user", text) },
+        Item::User { text, images } => ChatRow { images: chat_images(images, session, r.key.0), ..row("user", text) },
         Item::Assistant { text } => row("said", text),
         Item::AgentMessage { from, text } => ChatRow { from: from.clone(), ..row("agent", text) },
         Item::Note { text } => row("note", text),
@@ -205,7 +211,7 @@ fn chat_row(r: &Row, session: &str) -> ChatRow {
                     output: c.output.clone(),
                     done: c.done,
                     failed: c.failed,
-                    images: chat_images(&c.images, session),
+                    images: chat_images(&c.images, session, r.key.0),
                 })
                 .collect(),
             ..row("tools", "")
@@ -222,8 +228,9 @@ fn with_images(paths: &[String], text: &str) -> String {
 }
 
 /// The `machine.exec` argv that prints the image behind `key`; a `log:` key
-/// only for the open log (`session`, `path`).
-fn image_argv(key: &str, log: Option<(&str, &str)>) -> Option<Value> {
+/// only for the open log (`session`, `path`); a file's with the time of the
+/// copy `held` ("" for none).
+fn image_argv(key: &str, log: Option<(&str, &str)>, held: &str) -> Option<Value> {
     if let Some(r) = key.strip_prefix("log:") {
         let mut parts = r.rsplitn(3, ':');
         let (n, line, session) = (parts.next()?, parts.next()?, parts.next()?);
@@ -233,8 +240,38 @@ fn image_argv(key: &str, log: Option<(&str, &str)>) -> Option<Value> {
         }
         Some(json!(["sh", "-c", image::LOG_SCRIPT, "sh", path, line, n]))
     } else {
-        let path = key.strip_prefix("file:")?;
-        Some(json!(["sh", "-c", image::FILE_SCRIPT, "sh", path]))
+        let path = file_path(key)?;
+        Some(json!(["sh", "-c", image::FILE_SCRIPT, "sh", path, held]))
+    }
+}
+
+/// The path of a `file:<line>:<path>` key.
+fn file_path(key: &str) -> Option<&str> {
+    key.strip_prefix("file:")?.split_once(':').map(|(_, p)| p)
+}
+
+/// The time of the copy of `path` held, "" for none.
+fn held_time(held: &HashMap<String, (String, Vec<u8>)>, path: &str) -> String {
+    held.get(path).map(|(t, _)| t.clone()).unwrap_or_default()
+}
+
+/// [`image::FILE_SCRIPT`]'s reply taken into the files held by path and
+/// time: the bytes sent, or the copy held when only its time came back.
+fn file_image(
+    held: &mut HashMap<String, (String, Vec<u8>)>,
+    path: &str,
+    reply: Option<(String, Option<Vec<u8>>)>,
+) -> Option<Vec<u8>> {
+    match reply {
+        Some((time, Some(bytes))) => {
+            held.insert(path.to_owned(), (time, bytes.clone()));
+            Some(bytes)
+        }
+        Some((time, None)) => held.get(path).filter(|(t, _)| *t == time).map(|(_, b)| b.clone()),
+        None => {
+            held.remove(path);
+            None
+        }
     }
 }
 
@@ -642,7 +679,9 @@ impl Chat {
             };
             session.zip(path)
         };
-        let argv = image_argv(key, log.as_ref().map(|(s, p)| (s.as_str(), p.as_str())))?;
+        let file = file_path(key);
+        let held = file.map(|p| held_time(&self.files.lock().unwrap(), p)).unwrap_or_default();
+        let argv = image_argv(key, log.as_ref().map(|(s, p)| (s.as_str(), p.as_str())), &held)?;
         let c = self.core.live_conn(&self.machine)?.client;
         let got = c
             .call_timeout("machine.exec", json!({"argv": argv, "timeout": 30}), Duration::from_secs(40))
@@ -652,7 +691,16 @@ impl Chat {
             return None;
         }
         let out = b64.decode(got["stdout"].as_str()?).ok()?;
-        if key.starts_with("log:") { image::decode(&out) } else { Some(out).filter(|b| !b.is_empty()) }
+        match file {
+            Some(path) => {
+                let mut files = self.files.lock().unwrap();
+                if files.values().map(|(_, b)| b.len()).sum::<usize>() > IMAGE_CACHE {
+                    files.clear();
+                }
+                file_image(&mut files, path, image::file_reply(&out))
+            }
+            None => image::decode(&out),
+        }
     }
 }
 
@@ -678,25 +726,43 @@ mod tests {
     #[test]
     fn an_image_key_names_what_to_run() {
         let open = Some(("s1", "/logs/s.jsonl"));
-        let a = image_argv("log:s1:2048:1", open).unwrap();
+        let a = image_argv("log:s1:2048:1", open, "").unwrap();
         assert_eq!(a[4], "/logs/s.jsonl");
         assert_eq!((a[5].as_str(), a[6].as_str()), (Some("2048"), Some("1")));
         assert_eq!(a[2], image::LOG_SCRIPT);
-        let f = image_argv("file:/work/a b.png", None).unwrap();
-        assert_eq!((f[2].as_str(), f[4].as_str()), (Some(image::FILE_SCRIPT), Some("/work/a b.png")));
-        assert!(image_argv("log:s1:2048:1", None).is_none(), "no log open yet");
-        assert!(image_argv("missing", None).is_none());
+        let f = image_argv("file:812:/work/a b:c.png", None, "1731590000 2048").unwrap();
+        assert_eq!(
+            (f[2].as_str(), f[4].as_str(), f[5].as_str()),
+            (Some(image::FILE_SCRIPT), Some("/work/a b:c.png"), Some("1731590000 2048"))
+        );
+        assert!(image_argv("log:s1:2048:1", None, "").is_none(), "no log open yet");
+        assert!(image_argv("missing", None, "").is_none());
         let keys = chat_images(
             &[Image::InLog { line: 9, n: 0, media_type: "image/png".into() }, Image::File { path: "/x.png".into() }],
             "s1",
+            812,
         );
-        assert!(image_argv(&keys[0].key, open).is_some() && image_argv(&keys[1].key, None).is_some());
+        assert_eq!(keys[1].key, "file:812:/x.png", "each row's own key: a reused path is a new image");
+        assert!(image_argv(&keys[0].key, open, "").is_some() && image_argv(&keys[1].key, None, "").is_some());
+    }
+
+    #[test]
+    fn a_codex_image_is_held_by_path_and_file_time() {
+        let mut held = HashMap::new();
+        let got = |t: &str, b: Option<&[u8]>| Some((t.to_owned(), b.map(<[u8]>::to_vec)));
+        assert_eq!(file_image(&mut held, "/s.png", got("1 3", Some(b"old"))), Some(b"old".to_vec()));
+        assert_eq!(held_time(&held, "/s.png"), "1 3");
+        assert_eq!(file_image(&mut held, "/s.png", got("1 3", None)), Some(b"old".to_vec()), "unchanged: only its time came");
+        assert_eq!(file_image(&mut held, "/s.png", got("2 3", Some(b"new"))), Some(b"new".to_vec()), "written again");
+        assert_eq!(file_image(&mut held, "/s.png", None), None, "gone");
+        assert_eq!(held_time(&held, "/s.png"), "");
+        assert_eq!(file_image(&mut HashMap::new(), "/t.png", got("1 3", None)), None, "a time not held, no bytes");
     }
 
     #[test]
     fn an_image_of_an_earlier_session_is_not_read_from_the_current_log() {
         // After /clear the new log can have a line at the same offset.
-        assert!(image_argv("log:s1:2048:1", Some(("s2", "/logs/s2.jsonl"))).is_none());
+        assert!(image_argv("log:s1:2048:1", Some(("s2", "/logs/s2.jsonl")), "").is_none());
     }
 
     fn get(name: &str, argv: &[&str], state: Option<&str>) -> Value {

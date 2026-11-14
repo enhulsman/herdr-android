@@ -149,7 +149,7 @@ fun ChatScreen(
         }
         val rows = poll?.rows.orEmpty()
         sheetCalls(rows, state.sheet)?.let { calls -> ToolSheet(calls, state, images) }
-        state.viewer?.let { v -> ImageViewer(v.image, images) { state.viewer = null } }
+        state.viewer?.let { v -> ImageViewer(v.image, viewerImages(rows, v), images, onShow = { state.viewer = v.copy(image = it) }) { state.viewer = null } }
     }
 }
 

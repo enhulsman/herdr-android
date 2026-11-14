@@ -54,6 +54,17 @@ fun stepImage(keys: List<String>, key: String, step: Int): String? {
     return keys.getOrNull(at + step)
 }
 
+/** The images the open viewer swipes through: those of its row, or the one image when the row is gone. */
+fun viewerImages(rows: List<ChatRow>, viewer: Viewer): List<String> =
+    rows.firstOrNull { it.key == viewer.row }?.let(::imageKeys)?.takeIf { viewer.image in it } ?: listOf(viewer.image)
+
+/** A drag in the viewer at its normal size: +1 (left, the next image), -1 (right), or 0. */
+fun swipeStep(dx: Float, dy: Float, threshold: Float): Int = when {
+    kotlin.math.abs(dx) < threshold || kotlin.math.abs(dx) <= kotlin.math.abs(dy) -> 0
+    dx < 0 -> 1
+    else -> -1
+}
+
 /** How long a row that arrives live takes to come in. */
 const val FADE_MS = 600L
 

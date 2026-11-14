@@ -50,7 +50,7 @@ fn main() {
         let t = Instant::now();
         let got = match m {
             Image::InLog { line, n, .. } => image::decode(&sh(image::LOG_SCRIPT, &[path, &line.to_string(), &n.to_string()])),
-            Image::File { path } => Some(sh(image::FILE_SCRIPT, &[path])).filter(|b| !b.is_empty()),
+            Image::File { path } => image::file_reply(&sh(image::FILE_SCRIPT, &[path, ""])).and_then(|(_, b)| b),
             Image::Inline { .. } => {
                 inline += 1;
                 continue;

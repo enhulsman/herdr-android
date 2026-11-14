@@ -261,10 +261,15 @@ agent is blocked) is enough for both agents, multi-line included:
   `event_msg` `turn_aborted` with `reason: "interrupted"`, `turn_id`,
   `started_at`, `completed_at` and `duration_ms`. The parser reads it as one
   person row and an "Interrupted" note, health Ok.
-- **The Codex CLI on the desk could not start** with the shared Codex home:
-  its state database "migration 1 was previously applied but has been
-  modified", so another Codex build had migrated it. The check ran with a
-  scratch Codex home holding a link to the login and a copy of the config.
+- **Starting Codex for a desk check.** A program started directly by
+  `herdr-core run` or `machine.exec` gets none of the shell's startup
+  settings. Where the desk shares one Codex home with another OS's Codex
+  build and keeps the state databases apart with `CODEX_SQLITE_HOME` set in
+  the shell's startup file, a Codex started that way opens the other
+  build's database and stops ("migration 1 was previously applied but has
+  been modified"); it changes nothing. Start it through the interactive
+  shell (`zsh -ic codex`), as the app's New sheet does. This check ran with a
+  scratch Codex home instead.
 - **Two hazards, both seen.** A send while Codex showed a start-up update
   prompt (no status reported yet) answered the prompt: Codex updated itself
   from 0.166.0 to 0.169.0. A send to a terminal whose agent had exited ran the

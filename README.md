@@ -31,9 +31,15 @@ changes between releases.
   path.
 - **Stay connected** (optional): keeps the connection open in the background,
   with a quiet notification that counts the agents that need you, have
-  finished or are working, so the app opens at once. It uses more battery; how
-  much depends on the phone and how busy your agents are. On GrapheneOS, the
-  counts show on the lock screen only if it shows silent notifications.
+  finished or are working, so the app opens at once. It uses more battery. On
+  our test phone, with the screen off, it drew about 22 mA more on average
+  (22 mAh an hour; phone batteries hold around 4000–5000 mAh). That phone was
+  kept awake by other apps anyway: on a phone that would otherwise sleep, or
+  with busier agents, it can be more. While the app is open the connection is
+  there either way
+  ([measurements](https://github.com/enhulsman/herdr-android/issues/16)). On
+  GrapheneOS, the counts show on the lock screen only if it shows silent
+  notifications.
 - **Security:** the SSH key is made in the phone's secure hardware and never
   leaves it. It works for 30 minutes after you unlock the phone or use your
   fingerprint. You confirm each machine's host key once,

@@ -305,6 +305,17 @@ message or takes it into the running turn is the agent's choice.
 - **WHEN** Ezra sends a message while Claude Code runs a command that takes a minute
 - **THEN** the message is typed into Claude Code at once, and the chat shows it as queued until Claude Code takes it in
 
+### Requirement: An Enter the agent dropped is pressed once more
+The app SHALL press Enter once more, once per message, when the terminal's
+screen still shows the sent message in the agent's input box 1.5 s after
+sending and no row for it has arrived. Claude Code drops an Enter that arrives
+while it checks a pasted absolute path to a file that exists (seen on
+2.1.325, with or without `@`; an Enter 1 s or more later is taken).
+
+#### Scenario: A message with a file path
+- **WHEN** Ezra sends `@/work/website/notes/plan.md` to an idle Claude Code
+- **THEN** the message is sent without a trip to the terminal, and its bubble does not stay on "Sending…"
+
 ### Requirement: A sent message shows at once and its state is followed
 A sent message SHALL show at once as a dimmed bubble until a person's row
 with the same text (or, for a `!` command, a shell call with that command)

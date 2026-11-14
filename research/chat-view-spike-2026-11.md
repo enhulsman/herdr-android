@@ -208,6 +208,13 @@ agent is blocked) is enough for both agents, multi-line included:
 - Sent through the API without a terminal (as the phone does) there is no
   `<hc>` tag; slash commands such as `/clear` then work. Sent from inside a
   terminal, the tag turns them into plain text.
+- **A dropped Enter (2026-11-14, Claude Code 2.1.325).** A message holding an
+  absolute path to a file that exists stays in Claude Code's input box: the
+  Enter is lost, the chat stays on "Sending…". Seen from the phone and from
+  the desk without the tag: `@/abs/file.md`, `read @/abs/file.md` and
+  `say ok /abs/file.md` stuck; a missing file's path, `@note.txt` (relative)
+  and plain text went through. A second Enter 1 s or more after the paste was
+  taken 9 of 9 times, at 0.6 s 2 of 3. Codex not tried yet.
 - **Two hazards, both seen.** A send while Codex showed a start-up update
   prompt (no status reported yet) answered the prompt: Codex updated itself
   from 0.166.0 to 0.169.0. A send to a terminal whose agent had exited ran the

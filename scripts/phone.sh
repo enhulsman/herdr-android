@@ -56,6 +56,17 @@ dump() {
   a shell cat /sdcard/ui.xml
 }
 
+pin_pad_shows() { # the lock screen's PIN pad is open
+  local i
+  for i in 1 2 3; do
+    a shell dumpsys activity service com.android.systemui/.SystemUIService 2>/dev/null \
+      | grep -q 'currentOverlays=.*bouncer' && return 0
+    sleep "$(awk "BEGIN{print 0.25*${PHONE_UNLOCK_PAUSE:-1}}")"
+  done
+  a shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
+  a shell cat /sdcard/ui.xml 2>/dev/null | grep -qE 'keyguard_pin_view|id/pinEntry'
+}
+
 status_note() {
   a shell dumpsys notification --noredact |
     grep -A40 "NotificationRecord(.*pkg=$app user=UserHandle{0} id=2 " |
@@ -68,13 +79,14 @@ case "$1" in
       # The lock screen falls back to always-on display within seconds: wake
       # and swipe in one shell. The PIN goes in only once the PIN pad shows:
       # typed blind, enter presses whatever lock screen button has focus (at
-      # night the Do Not Disturb shortcut). The last try asks for the pad
-      # without a swipe, for when swipes are ignored.
+      # night the Do Not Disturb shortcut). The newer lock screen opens the
+      # pad as a SystemUI overlay that a screen dump misses while the screen
+      # animates (Face Unlock without camera access keeps it animating), so
+      # that overlay is asked first and the dump is the older lock screen's.
       p=${PHONE_UNLOCK_PAUSE:-1}
-      for open in "input swipe 720 1900 720 500 200" "input swipe 720 1900 720 500 200" "wm dismiss-keyguard"; do
-        a shell "input keyevent KEYCODE_WAKEUP; sleep 0.6; $open; sleep 0.9"
-        a shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
-        if a shell cat /sdcard/ui.xml 2>/dev/null | grep -qE 'keyguard_pin_view|id/pinEntry'; then
+      for try in 1 2 3; do
+        a shell "input keyevent KEYCODE_WAKEUP; sleep 0.6; input swipe 720 1900 720 500 200; sleep 0.3"
+        if pin_pad_shows; then
           a shell "input text $(pin); input keyevent KEYCODE_ENTER"
           sleep "$(awk "BEGIN{print 1.5*$p}")"
           break

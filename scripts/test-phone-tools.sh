@@ -43,24 +43,33 @@ echo "$*" >> "$FAKE_DIR/adb.log"
 case "$*" in
   *"dumpsys window"*) if [ -f "$FAKE_DIR/unlocked" ]; then echo "isKeyguardShowing=false"; else echo "isKeyguardShowing=true"; fi ;;
   *"cat /sdcard/ui.xml"*) cat "$FAKE_DIR/ui.xml" ;;
+  *SystemUIService*) cat "$FAKE_DIR/sui.txt" ;;
   *"input text"*) [ "$FAKE_PAD" = yes ] && touch "$FAKE_DIR/unlocked" ;;
 esac
 exit 0
 EOF
 chmod +x "$tmp/bin/adb"
-unlock() { # pad shows: yes|no
+unlock() { # how the PIN pad shows: dump (older lock screen: in the screen
+  # dump), overlay (newer lock screen: a SystemUI overlay, not in the dump
+  # while it animates) or no
   rm -f "$tmp/adb.log" "$tmp/unlocked"
-  if [ "$1" = yes ]; then
-    echo '<hierarchy><node resource-id="com.android.systemui:id/keyguard_pin_view"/></hierarchy>' > "$tmp/ui.xml"
-  else
-    echo '<hierarchy><node resource-id="com.android.systemui:id/keyguard_long_press"/></hierarchy>' > "$tmp/ui.xml"
-  fi
-  PATH="$tmp/bin:$PATH" FAKE_DIR="$tmp" FAKE_PAD=$1 PHONE_UNLOCK_PAUSE=0 \
+  echo '<hierarchy><node resource-id="com.android.systemui:id/keyguard_long_press"/></hierarchy>' > "$tmp/ui.xml"
+  echo '        currentScene=lockscreen' > "$tmp/sui.txt"
+  pad=yes
+  case $1 in
+    dump) echo '<hierarchy><node resource-id="com.android.systemui:id/keyguard_pin_view"/></hierarchy>' > "$tmp/ui.xml" ;;
+    overlay) printf '        currentScene=lockscreen\n        currentOverlays=bouncer\n' > "$tmp/sui.txt" ;;
+    *) pad=no ;;
+  esac
+  PATH="$tmp/bin:$PATH" FAKE_DIR="$tmp" FAKE_PAD=$pad PHONE_UNLOCK_PAUSE=0 \
     HERDR_LOCAL_SETUP="$tmp/setup.md" "$here/phone.sh" unlock >/dev/null 2>&1
 }
-if unlock yes; then r=ok; else r=failed; fi
-check "unlock with the PIN pad showing" "ok" "$r"
+if unlock dump; then r=ok; else r=failed; fi
+check "unlock with the PIN pad in the screen dump" "ok" "$r"
 check "unlock types the PIN on the pad" "1" "$(grep -c 'input text 908172' "$tmp/adb.log")"
+if unlock overlay; then r=ok; else r=failed; fi
+check "unlock with the PIN pad as a lock screen overlay" "ok" "$r"
+check "unlock types the PIN on the overlay pad" "1" "$(grep -c 'input text 908172' "$tmp/adb.log")"
 if unlock no; then r=ok; else r=failed; fi
 check "unlock without a PIN pad fails" "failed" "$r"
 check "no PIN typed without a PIN pad" "0" "$(grep -c 'input text' "$tmp/adb.log" || true)"

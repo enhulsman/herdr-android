@@ -431,3 +431,11 @@ fn a_memory_trim_keeps_only_the_chat_on_screen() {
     h.trim(None);
     assert!(h.keys().is_empty());
 }
+
+#[test]
+fn the_view_names_what_claude_code_holds_queued() {
+    let t0 = Instant::now();
+    let q = "{\"type\":\"queue-operation\",\"operation\":\"enqueue\",\"sessionId\":\"s\",\"content\":\"Say SECOND\"}".to_string();
+    let (c, _) = opened(&[asked("Hi"), q], t0);
+    assert_eq!(c.view().queued, ["Say SECOND"]);
+}

@@ -104,6 +104,9 @@ pub struct ChatPoll {
     pub gauge_used: Option<u64>,
     pub gauge_window: Option<u64>,
     pub gauge_percent: Option<u32>,
+    /// Claude Code: the texts it holds queued, not taken in yet (design
+    /// D10): a pending message among them reads "Queued".
+    pub queued: Vec<String>,
     /// Milliseconds per stage, for the log: "get 40 locate 50 tail 61 total 151".
     pub timings: String,
 }
@@ -574,6 +577,7 @@ impl Chat {
             gauge_used: v.gauge.map(|g| g.used),
             gauge_window: v.gauge.and_then(|g| g.window),
             gauge_percent: v.gauge.and_then(|g| g.percent()),
+            queued: v.queued.clone(),
             timings: times.0,
         }
     }

@@ -78,6 +78,8 @@ pub(crate) struct View {
     /// Older rows exist: a read back may fetch them.
     pub cut: bool,
     pub gauge: Option<Gauge>,
+    /// Claude Code: texts typed while the agent works, not taken in yet.
+    pub queued: Vec<String>,
     pub title: Option<String>,
     pub version: Option<String>,
 }
@@ -387,6 +389,7 @@ impl ChatCore {
                 exited: false,
                 cut: false,
                 gauge: None,
+                queued: vec![],
                 title: None,
                 version: None,
             };
@@ -409,6 +412,7 @@ impl ChatCore {
             exited: found == Kind::None,
             cut: o.from > 0 && !o.older_blocked,
             gauge: o.parser.gauge(),
+            queued: o.parser.queued(),
             title: o.parser.title().map(str::to_owned),
             version: o.parser.version().map(str::to_owned),
         }

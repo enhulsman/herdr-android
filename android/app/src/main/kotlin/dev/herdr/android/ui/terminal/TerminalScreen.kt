@@ -74,6 +74,7 @@ import dev.herdr.android.ui.agents.ProgramIcon
 import dev.herdr.android.ui.agents.ProgramMark
 import dev.herdr.android.ui.agents.SheetTone
 import dev.herdr.android.ui.agents.StatePill
+import dev.herdr.android.ui.chat.ViewSwitch
 import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
 import dev.herdr.android.ui.theme.HerdrBorder
@@ -152,6 +153,8 @@ fun TerminalScreen(
     modifier: Modifier = Modifier,
     /** The compose field takes focus (and the keyboard) when the sheet opens; off for screenshots. */
     composeFocus: Boolean = true,
+    /** The switch to the chat view; null hides it (no log the chat can follow). */
+    onChat: (() -> Unit)? = null,
 ) {
     val c = HerdrTheme.colors
     val phase = session.state?.phase
@@ -160,7 +163,7 @@ fun TerminalScreen(
     val keyboardUp = WindowInsets.isImeVisible
     Box(modifier.fillMaxSize().background(c.chrome)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            TitleBar(ui.header, actions)
+            TitleBar(ui.header, actions) { onChat?.let { ViewSwitch("Chat", it) } }
             ui.queue?.let { QueueStripRow(it) { actions.onOpen(it.next) } }
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 TerminalArea(session, screen, actions, input, keysShown, ui.key.machine)

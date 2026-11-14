@@ -178,7 +178,7 @@ class ChatScreenshotTest {
     fun broken() = capture("broken", poll(health = ChatHealth.Broken("message records renamed")))
 
     @Test
-    fun exited() = capture("exited", poll(exited = true, status = ""))
+    fun exited() = capture("exited", poll(exited = true, status = "", found = ChatFound.NONE))
 
     @Test
     fun failedRead() = capture("problem", poll(problem = "Can't read new messages; retrying"))

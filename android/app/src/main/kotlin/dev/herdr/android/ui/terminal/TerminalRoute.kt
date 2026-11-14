@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -27,6 +28,9 @@ import dev.herdr.android.ui.agents.ProgramIcon
 import dev.herdr.android.ui.agents.SheetTone
 import dev.herdr.android.ui.agents.agentSheet
 import dev.herdr.android.ui.agents.agentsUi
+import dev.herdr.android.ui.chat.ChatPolling
+import dev.herdr.android.ui.chat.ChatRoute
+import dev.herdr.android.ui.chat.rememberChatVisit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import uniffi.herdr_mobile.HubSnapshot
@@ -154,9 +158,31 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             onWatchView = { app.terminalZoom[key] = it.zoom },
         )
     }
+    // The chat view (issue 17): over the live terminal, so switching back is instant.
+    val chat = rememberChatVisit(app, key)
+    val switch = chat.switch
+    ChatPolling(chat, app) { (0 until session.grid.rows).map(session.grid::rowText) }
     Box {
         val input = TerminalKeyboard(key, sink)
-        TerminalScreen(ui, session, screen, actions, input)
+        // Under the chat the terminal is left out of accessibility: its keys are covered.
+        Box(if (switch.chat) Modifier.clearAndSetSemantics {} else Modifier) {
+            TerminalScreen(
+                ui, session, screen, actions, input,
+                onChat = if (switch.offered) ({
+                    // The keyboard was the terminal's: it must not type there under the chat.
+                    input.hide()
+                    screen.inputOpen = false
+                    app.chatView.choose(chat = true)
+                    switch.toChat()
+                }) else null,
+            )
+        }
+        if (switch.chat) {
+            ChatRoute(chat, ui.header, actions) {
+                app.chatView.choose(chat = false)
+                switch.toTerminal()
+            }
+        }
     }
 }
 

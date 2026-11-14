@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,11 +32,13 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -118,7 +119,8 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
 ) {
     val c = HerdrTheme.colors
-    val found = poll != null && (poll.found == ChatFound.FOUND || poll.found == ChatFound.EMPTY)
+    // An exited agent's conversation stays, read-only (its lookup reads None).
+    val found = poll != null && (poll.found == ChatFound.FOUND || poll.found == ChatFound.EMPTY || poll.exited)
     val broken = poll?.health is ChatHealth.Broken
     Box(modifier.fillMaxSize().background(c.bg).coversBelow()) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
@@ -216,13 +218,19 @@ private fun Bottom(text: String, onTerminal: (() -> Unit)?) {
 
 @Composable
 private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, now: Long, animate: Boolean, onOlder: () -> Unit, onTerminal: () -> Unit) {
-    val list = rememberLazyListState()
     val rows = poll.rows
     val pending = state.pending
     if (rows.isEmpty() && pending.isEmpty()) {
         // The recent part may hold no message (one huge record): read further back.
         LaunchedEffect(poll.cut, state.olderLoads) { if (poll.cut && !state.loadingOlder) onOlder() }
         return Centered(if (poll.cut) "Loading earlier messages…" else NO_MESSAGES)
+    }
+    // Back from the terminal view or another agent: the place it was left at (design D12).
+    val start = remember { state.startAt(rows) }
+    val list = remember { start?.let { LazyListState(it.first, it.second) } ?: LazyListState() }
+    val shownRows by rememberUpdatedState(rows)
+    DisposableEffect(list) {
+        onDispose { state.keep(shownRows, list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset) }
     }
     // Follow the bottom unless the person scrolled up; back at the bottom, follow again.
     // Only their own drag and the fling after it count: the app's scroll to the end
@@ -247,7 +255,7 @@ private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, 
     }
     val live = !poll.exited && poll.health !is ChatHealth.Broken
     val working = live && busy(poll.status, pending, now)
-    var settled by remember { mutableStateOf(false) }
+    var settled by remember { mutableStateOf(start != null) }
     LaunchedEffect(rows.lastOrNull()?.key, pending.size) {
         if (state.stick || !settled) list.toEnd()
         settled = true

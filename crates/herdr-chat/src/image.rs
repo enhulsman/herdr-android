@@ -25,14 +25,27 @@ tail -c +$((o + 1)) "$f" | head -n 1 | LC_ALL=C awk -v want="$want" '
 /// The largest file [`FILE_SCRIPT`] prints (`machine.exec` keeps 8 MB).
 pub const FILE_MAX: u64 = 8_000_000;
 
-/// `sh -c FILE_SCRIPT sh <path>`: the file's bytes; nothing when it is gone,
-/// not a plain file, or over [`FILE_MAX`].
-pub const FILE_SCRIPT: &str = r#"f=$1
+/// `sh -c FILE_SCRIPT sh <path> <held>`: the file's time (modification
+/// second and size) on a line, then its bytes unless that time is `held`;
+/// nothing when it is gone, not a plain file, or over [`FILE_MAX`]. Codex
+/// reuses a screenshot's path, so an image is held by path and time.
+pub const FILE_SCRIPT: &str = r#"f=$1; held=$2
 [ -f "$f" ] && [ -r "$f" ] || exit 0
 s=$(wc -c < "$f" | tr -d ' ')
 [ "$s" -le 8000000 ] || exit 0
-cat "$f"
+t="$(stat -c %Y "$f") $s"
+printf '%s\n' "$t"
+[ "$t" = "$held" ] || cat "$f"
 "#;
+
+/// [`FILE_SCRIPT`]'s output: the file's time, and its bytes when they were
+/// sent; `None` when the file was not there.
+pub fn file_reply(out: &[u8]) -> Option<(String, Option<Vec<u8>>)> {
+    let nl = out.iter().position(|&b| b == b'\n')?;
+    let tag = std::str::from_utf8(&out[..nl]).ok()?.to_owned();
+    let rest = &out[nl + 1..];
+    Some((tag, (!rest.is_empty()).then(|| rest.to_vec())))
+}
 
 /// The image bytes from [`LOG_SCRIPT`]'s output; `None` when it found nothing.
 pub fn decode(out: &[u8]) -> Option<Vec<u8>> {

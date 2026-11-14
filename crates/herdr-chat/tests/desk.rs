@@ -356,11 +356,29 @@ fn an_image_reference_past_the_line_gives_nothing() {
 }
 
 #[test]
-fn an_image_file_is_read_whole_and_a_missing_one_is_none() {
+fn an_image_file_is_read_whole_after_its_time_and_a_missing_one_is_none() {
     let (bytes, _) = blob(20000, 3);
     let f = temp("i3.png", &bytes);
-    assert_eq!(run_bytes(image::FILE_SCRIPT, &[f.to_str().unwrap()]), bytes);
-    assert!(run_bytes(image::FILE_SCRIPT, &["/nonexistent/x.png"]).is_empty());
+    let (tag, got) = image::file_reply(&run_bytes(image::FILE_SCRIPT, &[f.to_str().unwrap(), ""])).unwrap();
+    assert_eq!(got, Some(bytes));
+    assert!(!tag.is_empty());
+    let out = run_bytes(image::FILE_SCRIPT, &["/nonexistent/x.png", ""]);
+    assert!(out.is_empty());
+    assert_eq!(image::file_reply(&out), None);
+}
+
+#[test]
+fn an_image_file_already_held_at_its_time_is_not_sent_again() {
+    let (bytes, _) = blob(20000, 5);
+    let f = temp("i4.png", &bytes);
+    let p = f.to_str().unwrap();
+    let (tag, _) = image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, ""])).unwrap();
+    assert_eq!(image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, &tag])), Some((tag.clone(), None)));
+    // The same path written again (a Codex screenshot reused): sent again.
+    std::fs::write(&f, b"another image").unwrap();
+    let (again, got) = image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, &tag])).unwrap();
+    assert_ne!(again, tag);
+    assert_eq!(got.as_deref(), Some(&b"another image"[..]));
 }
 
 fn run_bytes(script: &str, args: &[&str]) -> Vec<u8> {

@@ -81,6 +81,27 @@ class ChatRowsTest {
         assertEquals(listOf("p1", "p2"), imageKeys(row("1:0", "user", "look", images = listOf("p1", "p2"))))
     }
 
+    @Test
+    fun aSwipeStepsOnlyWhenLongAndMostlySideways() {
+        assertEquals("a swipe left: the next image", +1, swipeStep(dx = -200f, dy = 20f, threshold = 100f))
+        assertEquals(-1, swipeStep(dx = 200f, dy = 0f, threshold = 100f))
+        assertEquals("too short", 0, swipeStep(dx = -60f, dy = 0f, threshold = 100f))
+        assertEquals("mostly down", 0, swipeStep(dx = -150f, dy = 300f, threshold = 100f))
+    }
+
+    @Test
+    fun theViewerSwipesThroughTheImagesOfItsOwnRow() {
+        val rows = listOf(
+            row("0:0", "tools", calls = listOf(call("Read", "a"), call("View image", "b", "c"))),
+            row("5:0", "user", "look", images = listOf("p1")),
+        )
+        // Spec: the second of three thumbnails, a swipe left, the third.
+        val keys = viewerImages(rows, Viewer("0:0", "b"))
+        assertEquals(listOf("a", "b", "c"), keys)
+        assertEquals("c", stepImage(keys, "b", swipeStep(dx = -200f, dy = 0f, threshold = 100f)))
+        assertEquals("its row gone: only the image open", listOf("x"), viewerImages(rows, Viewer("9:0", "x")))
+    }
+
     // --- fading in what arrives live ---
 
     @Test

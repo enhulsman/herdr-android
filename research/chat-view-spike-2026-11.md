@@ -221,6 +221,50 @@ agent is blocked) is enough for both agents, multi-line included:
   taken 9 of 9 times, at 0.6 s 2 of 3. Codex not tried yet. A photo sent
   from the phone (its uploaded path on the first line, text after) went
   through on its own once; the rule covers it in case it does not.
+- **Why the Enter is lost (desk check 2.8, 2026-11-14, Claude Code 2.1.325,
+  throwaway terminal, sent without the tag).** The owner's reading holds:
+  `@` opens Claude Code's file picker, and an Enter that reaches it while a
+  path to an existing file is typed selects the file, writes it back with a
+  space after it and closes the picker; the message stays in the box. Of 17
+  sends:
+  - a message ending in `@<existing file>`: lost 6 of 8 (absolute 3 of
+    3, `@./notes.md`, `@../desk/notes.md`); `@notes.md` went through 2 of 2.
+    After the loss the box holds the text with a trailing space (a typed
+    marker landed after a space), and one more Enter sent it, every time.
+  - the picker can rewrite the path: `@./notes.md` came back as `@notes.md`,
+    and the log kept the rewritten text. Absolute and `../` paths were kept.
+  - the same message with a trailing space: went through 3 of 3, the log
+    holding it without the space and `@./notes.md` unchanged.
+  - an `@` path followed by more words, or to a missing file: went through.
+  - an absolute path without `@`: went through 3 of 3 today. The earlier
+    `say ok /abs/file.md` loss is not explained; it may have been an `@`
+    case or a slower picker (unknown).
+  - an Enter on an empty box does nothing, also when Claude Code shows its
+    dimmed suggested next prompt there (text never sent, such as "Say only:
+    ok-B4 notes.md" after "ok-B3"): the turn count stayed the same. A screen
+    read without colours cannot tell that suggestion from typed text.
+- **Where a message sent while the agent works shows (2.8).** Claude Code
+  puts it above the input box, after a `❯`, with "ctrl+enter to send now";
+  the box then reads "Press up to edit queued messages". Its log gets a
+  `queue-operation` `enqueue` record (with the text) within 0.3 s, but the
+  person's record (`attachment` `queued_command`) only when the message is
+  taken in, 25 s later at the end of the running command, with the earlier
+  queue time as its timestamp, next to a `queue-operation` `remove` with
+  reason `absorbed_mid_turn`. Codex 0.169 shows it at once in its transcript
+  as `› <text>` above the "Working" line, with an empty box and no queue
+  line, and writes its `UserMessage` item at the next tool-call boundary
+  (1 s here); the command it was waiting on went on in a background
+  terminal and its `CommandExecution` was written 22 s after
+  `task_complete`, the D7 case.
+- **A Codex interrupt before any text (2.8).** Esc 1.5 s into a turn: Codex
+  writes a developer `message` holding `<turn_aborted>` (not shown) and an
+  `event_msg` `turn_aborted` with `reason: "interrupted"`, `turn_id`,
+  `started_at`, `completed_at` and `duration_ms`. The parser reads it as one
+  person row and an "Interrupted" note, health Ok.
+- **The Codex CLI on the desk could not start** with the shared Codex home:
+  its state database "migration 1 was previously applied but has been
+  modified", so another Codex build had migrated it. The check ran with a
+  scratch Codex home holding a link to the login and a copy of the config.
 - **Two hazards, both seen.** A send while Codex showed a start-up update
   prompt (no status reported yet) answered the prompt: Codex updated itself
   from 0.166.0 to 0.169.0. A send to a terminal whose agent had exited ran the

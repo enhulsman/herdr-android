@@ -41,11 +41,33 @@ enum class LineIcon(val strokeWidth: Float, val paths: List<String>) {
     // The Agents top bar's "New" (`ico.plus`) and the sheet's Terminal (`ico.shell`).
     Plus(1.8f, listOf("M12 5v14", "M5 12h14")),
     Shell(2f, listOf("M4 17l6-6-6-6", "M12 19h8")),
+    // The chat's copy button: lucide copy (ISC), the square as a path.
+    Copy(
+        2f,
+        listOf(
+            "M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z",
+            "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2",
+        ),
+    ),
     Eye(
         1.8f,
         listOf(
             "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z",
             "M15 12a3 3 0 1 1-6 0a3 3 0 1 1 6 0z",
+        ),
+    ),
+    // The chat's tool sheet, lucide (ISC): search, file, x, arrow-left, a
+    // check-and-circle list for agents, wrench; circles as two arcs.
+    Search(2f, listOf("M19 11a8 8 0 1 1-16 0a8 8 0 1 1 16 0z", "m21 21-4.3-4.3")),
+    File(2f, listOf("M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z", "M14 2v4a2 2 0 0 0 2 2h4")),
+    Close(2f, listOf("M18 6 6 18", "m6 6 12 12")),
+    Back(2f, listOf("m12 19-7-7 7-7", "M19 12H5")),
+    Tasks(2f, listOf("m3 7 2 2 4-4", "M8 17a2 2 0 1 1-4 0a2 2 0 1 1 4 0z", "M13 7h8", "M13 17h8")),
+    Wrench(
+        2f,
+        listOf(
+            "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91" +
+                "a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
         ),
     ),
 }

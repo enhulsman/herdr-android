@@ -416,3 +416,26 @@ fn a_few_meta_lines_before_the_first_message_are_fine() {
     let p = parse(Agent::Claude, "{\"type\":\"permission-mode\",\"sessionId\":\"s\"}\n{\"type\":\"file-history-snapshot\",\"messageId\":\"m\"}\n");
     assert_eq!(p.health(), Health::Ok);
 }
+
+#[test]
+fn local_command_output_is_a_note_without_colour_codes_and_empty_output_is_none() {
+    // As Claude Code 2.1.3xx writes `/usage` and `/fork` (118 records on the
+    // desk, all one line); a coloured, multi-line output loses its escapes.
+    let mut p = Parser::new(Agent::Claude);
+    p.feed(&claude_line("system", "\"subtype\":\"local_command\",\"level\":\"info\",", "<local-command-stdout></local-command-stdout>"));
+    p.feed(&claude_line("system", "\"subtype\":\"local_command\",\"level\":\"info\",", "<local-command-stdout>⑂ forked plan-review (4cf8)</local-command-stdout>"));
+    p.feed(&claude_line(
+        "system",
+        "\"subtype\":\"local_command\",",
+        "<local-command-stdout>\u{1b}[1mContext\u{1b}[22m\n\u{1b}[38;2;136;136;136m⛁ 61k / 1M\u{1b}[39m (6%)\n</local-command-stdout>",
+    ));
+    // A subagent's command is not this conversation's.
+    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<local-command-stdout>Not mine</local-command-stdout>").replace("\"isSidechain\":false", "\"isSidechain\":true"));
+    assert_eq!(
+        p.items(),
+        &[
+            Item::Note { text: "⑂ forked plan-review (4cf8)".into() },
+            Item::Note { text: "Context\n⛁ 61k / 1M (6%)".into() },
+        ]
+    );
+}

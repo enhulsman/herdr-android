@@ -14,6 +14,9 @@ import uniffi.herdr_mobile.ChatRow
 /** An image open full screen: the row it belongs to (its swipe set) and the image. */
 data class Viewer(val row: String, val image: String)
 
+/** A message on its way out: its bubble, the draft it came from, the text to type and the photos to upload. */
+class Outgoing(val pending: Pending, val draft: String, val typed: String, val attached: List<Attachment>)
+
 /** Why a send typed nothing, and whether a button to the terminal helps. */
 data class Refusal(val text: String, val terminal: Boolean)
 
@@ -101,6 +104,47 @@ class ChatState {
         stick = true
         refusal = null
         return p
+    }
+
+    /**
+     * The send button: the draft and photos leave the box as a pending
+     * bubble, to be typed as [Outgoing.typed]. Null when there is nothing to
+     * send, or while a slash command's waiting line refuses sends (the draft
+     * stays and the refusal says so).
+     */
+    fun send(rows: List<ChatRow>, status: String, now: Long): Outgoing? {
+        val text = draft
+        if (text.isBlank() && attached.isEmpty()) return null
+        sendRefusal(pending, now)?.let {
+            refusal = Refusal(it, terminal = true)
+            return null
+        }
+        val out = Outgoing(sent(text, attached.size, rows, status, now), text, typedText(text), attached)
+        draft = ""
+        attached = emptyList()
+        return out
+    }
+
+    /** Nothing was typed: the bubble goes, the draft and photos come back (with anything typed meanwhile), and why shows. */
+    fun refused(out: Outgoing, r: ChatRefusal) {
+        drop(out.pending.id)
+        draft = listOf(out.draft, draft).filter { it.isNotBlank() }.joinToString("\n")
+        attached = out.attached + attached
+        refusal = refusalOf(r)
+    }
+
+    /** `terminal.send` took it. */
+    fun typed(id: Long, now: Long) = update(id) { it.typed(now) }
+
+    /**
+     * The message the agent's input box still holds 1.5 s after it was typed
+     * ([lines]: the terminal's screen), with no row for it: Enter is pressed
+     * once more for it, once. Its id, or null.
+     */
+    fun enterAgain(agent: String, lines: List<String>, now: Long): Long? {
+        val p = pending.firstOrNull { it.needsEnter(now, boxHolds(agent, lines, it.text, it.images)) } ?: return null
+        update(p.id) { it.enteredAgain() }
+        return p.id
     }
 
     fun update(id: Long, change: (Pending) -> Pending) {

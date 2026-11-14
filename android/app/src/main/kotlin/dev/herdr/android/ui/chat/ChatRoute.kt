@@ -2,7 +2,11 @@ package dev.herdr.android.ui.chat
 
 import android.os.SystemClock
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +31,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uniffi.herdr_mobile.Chat
 import uniffi.herdr_mobile.ChatPoll
+import uniffi.herdr_mobile.ChatRefusal
+import uniffi.herdr_mobile.ChatUpload
 
 // The chat view over the live terminal (issue 17). The terminal route keeps
 // a ChatVisit per terminal it shows; the chat's poll loop runs while the chat
@@ -65,10 +71,11 @@ private fun queuedBy(poll: ChatPoll, screen: () -> List<String>): (Pending) -> B
  * Polls while the chat shows (after each event of the terminal, 0.5 s while
  * the agent works or a message waits, else 5 s) and watches while the
  * terminal shows, to decide the switch. [screen] is the terminal's text, for
- * Codex's queued messages.
+ * Codex's queued messages and the agent's input box; [enter] presses Enter
+ * in the terminal, for a message whose Enter the agent dropped.
  */
 @Composable
-fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>) {
+fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>, enter: () -> Unit) {
     val chat = visit.chat ?: return
     val state = visit.state
     val switch = visit.switch
@@ -87,6 +94,7 @@ fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>) {
                     val now = SystemClock.uptimeMillis()
                     if (showing) {
                         state.pending = followPending(state.pending, p.rows, p.status, now, queuedBy(p, screen))
+                        if (state.enterAgain(p.agent, screen(), now) != null) enter()
                         // Rows first seen now arrived live; the first read and rows read back are history.
                         state.live.saw(p.rows, now, live = state.poll != null)
                     } else {
@@ -108,10 +116,20 @@ fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>) {
 
 /** The chat over the terminal, while [ChatVisit.switch] shows it. */
 @Composable
-fun ChatRoute(visit: ChatVisit, header: TerminalHeader, actions: TerminalActions, onTerminal: () -> Unit) {
+fun ChatRoute(visit: ChatVisit, app: HerdrApp, header: TerminalHeader, actions: TerminalActions, onTerminal: () -> Unit) {
     val context = LocalContext.current
     val state = visit.state
     val scope = rememberCoroutineScope()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        app.chatScope.launch {
+            val picked = withContext(Dispatchers.IO) {
+                uris.mapIndexedNotNull { i, uri -> runCatching { prepareAttachment(context, uri, i) }.getOrNull() }
+            }
+            if (picked.size < uris.size) Toast.makeText(context, "Some photos couldn't be read", Toast.LENGTH_LONG).show()
+            state.attached = state.attached + picked
+        }
+    }
     val images = remember(visit) { DeskImages(visit.chat) }
     val animate = remember(context) {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
@@ -141,8 +159,23 @@ fun ChatRoute(visit: ChatVisit, header: TerminalHeader, actions: TerminalActions
         images = images,
         now = now,
         onTerminal = onTerminal,
-        onPick = {},
-        onSend = {},
+        onPick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        onSend = {
+            val poll = state.poll
+            val out = state.send(poll?.rows.orEmpty(), poll?.status.orEmpty(), SystemClock.uptimeMillis())
+            val chat = visit.chat
+            if (out != null) {
+                if (chat == null) {
+                    state.refused(out, ChatRefusal.Failed("Not connected"))
+                } else {
+                    app.chatScope.launch {
+                        val ups = out.attached.map { ChatUpload(it.name, it.bytes) }
+                        val refusal = withContext(Dispatchers.IO) { chat.sendWithImages(out.typed, ups) }
+                        if (refusal != null) state.refused(out, refusal) else state.typed(out.pending.id, SystemClock.uptimeMillis())
+                    }
+                }
+            }
+        },
         onOlder = {
             val chat = visit.chat
             if (chat != null && !state.loadingOlder) {

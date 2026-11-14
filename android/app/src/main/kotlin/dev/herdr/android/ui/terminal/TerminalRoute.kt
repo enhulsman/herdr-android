@@ -34,6 +34,7 @@ import dev.herdr.android.ui.chat.rememberChatVisit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import uniffi.herdr_mobile.HubSnapshot
+import uniffi.herdr_mobile.RowKeyTap
 import uniffi.herdr_mobile.TerminalViewInterface
 
 /**
@@ -161,7 +162,11 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     // The chat view (issue 17): over the live terminal, so switching back is instant.
     val chat = rememberChatVisit(app, key)
     val switch = chat.switch
-    ChatPolling(chat, app) { (0 until session.grid.rows).map(session.grid::rowText) }
+    ChatPolling(
+        chat, app,
+        screen = { (0 until session.grid.rows).map(session.grid::rowText) },
+        enter = { session.tap(RowKeyTap.Enter) },
+    )
     Box {
         val input = TerminalKeyboard(key, sink)
         // Under the chat the terminal is left out of accessibility: its keys are covered.
@@ -178,7 +183,7 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             )
         }
         if (switch.chat) {
-            ChatRoute(chat, ui.header, actions) {
+            ChatRoute(chat, app, ui.header, actions) {
                 app.chatView.choose(chat = false)
                 switch.toTerminal()
             }

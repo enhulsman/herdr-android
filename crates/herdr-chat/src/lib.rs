@@ -92,6 +92,10 @@ pub struct Parser {
     /// Notices and peer messages already shown from a queued command, with
     /// the row they made: the same text may come again as a user record.
     injected: HashMap<String, Option<usize>>,
+    /// Codex: per turn id, the row of its latest answer, and the turns past
+    /// their `task_complete` (design D7).
+    answers: HashMap<String, usize>,
+    completed: HashSet<String>,
     last_text_id: Option<String>,
     cwd: String,
     lines: u32,
@@ -123,6 +127,8 @@ impl Parser {
             calls: HashMap::new(),
             agents: HashMap::new(),
             injected: HashMap::new(),
+            answers: HashMap::new(),
+            completed: HashSet::new(),
             last_text_id: None,
             cwd: String::new(),
             lines: 0,
@@ -327,6 +333,30 @@ impl Parser {
                 self.calls.insert(id, (at, calls.len() - 1));
             }
         }
+    }
+
+    /// An agent's call written after its turn ended, placed before that
+    /// turn's answer (row `answer`): folded into a tool row just before it,
+    /// else a new row there. Rows after it move down one.
+    fn add_call_before(&mut self, answer: usize, call: ToolCall) {
+        self.agent_wrote();
+        if let Some(Item::Tools { calls }) = answer.checked_sub(1).and_then(|i| self.items.get_mut(i)) {
+            calls.push(call);
+            self.touch(answer - 1);
+            return;
+        }
+        self.items.insert(answer, Item::Tools { calls: vec![call] });
+        self.srcs.insert(answer, vec![self.at]);
+        self.keys.insert(answer, (self.at, self.k));
+        self.k += 1;
+        let shift = |i: &mut usize| {
+            if *i >= answer {
+                *i += 1;
+            }
+        };
+        self.answers.values_mut().for_each(shift);
+        self.calls.values_mut().for_each(|(i, _)| shift(i));
+        self.injected.values_mut().flatten().for_each(shift);
     }
 
     /// The call with this id, its row marked as changed by this line.
@@ -670,10 +700,15 @@ impl Parser {
             "event_msg" if p["type"] == "turn_aborted" => {
                 self.push(Item::Note { text: "Interrupted".into() });
             }
+            "event_msg" if p["type"] == "task_complete" => {
+                if let Some(turn) = p["turn_id"].as_str() {
+                    self.completed.insert(turn.to_owned());
+                }
+            }
             "event_msg" if p["type"] == "item_completed" => {
                 let item = &p["item"];
                 match item["type"].as_str() {
-                    Some(t) => self.codex_item(t, item),
+                    Some(t) => self.codex_item(t, item, p["turn_id"].as_str()),
                     None => self.break_with(format!("line {}: item without type", self.lines)),
                 }
             }
@@ -681,7 +716,7 @@ impl Parser {
         }
     }
 
-    fn codex_item(&mut self, t: &str, item: &Value) {
+    fn codex_item(&mut self, t: &str, item: &Value, turn: Option<&str>) {
         let text = || {
             item["content"]
                 .as_array()
@@ -708,7 +743,12 @@ impl Parser {
                     images: sent,
                 })
             }
-            "AgentMessage" => self.push(Item::Assistant { text: text() }),
+            "AgentMessage" => {
+                if let Some(turn) = turn {
+                    self.answers.insert(turn.to_owned(), self.items.len());
+                }
+                self.push(Item::Assistant { text: text() })
+            }
             "Reasoning" => {}
             "CommandExecution" => {
                 let cmd = item["parsed_cmd"][0]["cmd"]
@@ -722,26 +762,31 @@ impl Parser {
                             .map(str::to_owned)
                     })
                     .unwrap_or_default();
+                let own = item["source"] != "user_shell";
+                let call = ToolCall {
+                    name: "Shell".into(),
+                    title: cmd.lines().next().unwrap_or("").to_owned(),
+                    input: cmd.clone(),
+                    output: item["aggregated_output"].as_str().unwrap_or("").to_owned(),
+                    done: true,
+                    failed: item["exit_code"].as_i64().is_some_and(|c| c != 0),
+                    images: vec![],
+                };
+                // A command left running, written after its turn ended.
+                let late = turn
+                    .filter(|t| own && self.completed.contains(*t))
+                    .and_then(|t| self.answers.get(t).copied());
+                if let Some(answer) = late {
+                    return self.add_call_before(answer, call);
+                }
                 // A `!` command the person ran: their message, then the command.
-                if item["source"] == "user_shell" {
+                if !own {
                     self.push(Item::User {
                         text: format!("!{cmd}"),
                         images: vec![],
                     });
                 }
-                self.add_call(
-                    None,
-                    ToolCall {
-                        name: "Shell".into(),
-                        title: cmd.lines().next().unwrap_or("").to_owned(),
-                        input: cmd,
-                        output: item["aggregated_output"].as_str().unwrap_or("").to_owned(),
-                        done: true,
-                        failed: item["exit_code"].as_i64().is_some_and(|c| c != 0),
-                        images: vec![],
-                    },
-                    item["source"] != "user_shell",
-                );
+                self.add_call(None, call, own);
             }
             "FileChange" => {
                 let paths: Vec<String> = item["changes"]

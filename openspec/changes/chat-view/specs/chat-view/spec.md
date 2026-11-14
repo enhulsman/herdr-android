@@ -339,12 +339,20 @@ message or takes it into the running turn is the agent's choice.
 - **THEN** the message is typed into Claude Code at once, and the chat shows it as queued until Claude Code takes it in
 
 ### Requirement: An Enter the agent dropped is pressed once more
-The app SHALL press Enter once more, once per message, when the terminal's
-screen still shows the sent message in the agent's input box 1.5 s after
-sending and no row for it has arrived; for a photo send, its text after the
-placeholders the agent shows in place of the photo paths. Claude Code drops an Enter that arrives
-while it checks a pasted absolute path to a file that exists (seen on
-2.1.325, with or without `@`; an Enter 1 s or more later is taken).
+A message whose last word starts with `@` SHALL be typed with a space after
+it. Claude Code's file picker takes an Enter that arrives while a path to an
+existing file is typed: it writes the path back with a space and keeps the
+message in its box (seen on 2.1.325: lost 6 of 8 times, 0 of 3 with the
+space; the log holds the message without it). The app SHALL also press
+Enter once more, once per message, when the terminal's screen still shows
+the sent message in the agent's input box 1.5 s after sending and no row for
+it has arrived, spaces at its end ignored; for a photo send, its text after
+the placeholders the agent shows in place of the photo paths. An Enter 1 s
+or more after the paste is taken.
+
+#### Scenario: A message ending in a file path
+- **WHEN** Ezra sends `Read @/work/website/notes/plan.md` to an idle Claude Code
+- **THEN** it is typed with a space at its end, sent by the first Enter, and its bubble turns into the row
 
 #### Scenario: A message with a file path
 - **WHEN** Ezra sends `@/work/website/notes/plan.md` to an idle Claude Code
@@ -354,8 +362,10 @@ while it checks a pasted absolute path to a file that exists (seen on
 A sent message SHALL show at once as a dimmed bubble until a person's row
 with the same text (or, for a `!` command, a shell call with that command)
 arrives. While it waits, the bubble SHALL read:
-- "Queued" while the agent works and the terminal's screen shows the
-  message waiting in the agent's input area or queue;
+- "Queued" while the agent works and the message waits: for Claude Code,
+  its log holds an `enqueue` record with the message's text (written within
+  0.3 s of the send) and no `remove` for it yet; for Codex, the terminal's
+  screen shows it in the agent's input area or queue;
 - "Sending…" otherwise.
 A bubble SHALL turn to "Not in the conversation yet", with a button to the
 terminal and a way to dismiss it, when it has not arrived 30 s after it was

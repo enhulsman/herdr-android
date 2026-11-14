@@ -110,13 +110,16 @@ A row first seen after the first read is marked live; only live rows fade in
 back show at once.
 
 ### D10. A pending message's state comes from the log and the screen
-The terminal stays attached under the chat, so the app has its screen text.
-A pending message reads "Queued" while the agent works and that screen
-shows the message's first line in the agent's input area or queue (where
-each agent shows a queued message is looked up on the desk first, task
-2.8); otherwise "Sending…". The 30 s expiry starts at sending for a message
-not shown as queued, and when the agent stops working for one that was.
-Claude Code's queued command record ends the wait like a user record.
+A pending message reads "Queued" while the agent works and it waits:
+Claude Code writes a `queue-operation` `enqueue` record with the text within
+0.3 s of the send and a `remove` when it takes the message in (desk check
+2.8), so the parser reports the texts queued; Codex shows a message sent
+mid-turn in its transcript and takes it at the next tool-call boundary, so
+for Codex the screen text (the terminal stays attached under the chat)
+decides. Otherwise "Sending…". The 30 s expiry starts at sending for a
+message not shown as queued, and when the agent stops working for one that
+was. Claude Code's queued command record (written when the message is taken
+in, with the earlier queue time) ends the wait like a user record.
 
 ### D11. Tests where they hold
 Pure functions (parsing, matching, lookup results, health, row keys, send
@@ -153,9 +156,9 @@ on the phone.
   as a known limit in the spec.
 - [Exit loses the match; app restart after exit has no chat] → accepted for
   v1 (decision 3); a start hook is a 1.x issue.
-- [Queued detection reads the screen] → a long or wrapped message may not
-  match its first line on screen; it then reads "Sending…" and expires 30 s
-  after sending, offering the terminal: the safe side.
+- [Codex's queued detection reads the screen] → a long or wrapped message
+  may not match its first line on screen; it then reads "Sending…" and
+  expires 30 s after sending, offering the terminal: the safe side.
 - [Live terminal under the chat] → the chat takes every touch and hides the
   terminal from accessibility; the terminal keeps running so the switch back
   is instant.

@@ -1,6 +1,10 @@
 package dev.herdr.android.ui.chat
 
+import android.os.SystemClock
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,6 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -281,17 +288,7 @@ private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, 
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(rows, key = { it.key }) { row ->
-                when (row.kind) {
-                    "user" -> UserBubble(row, images) { key -> front { state.viewer = Viewer(row.key, key) } }
-                    "said" -> Copyable(row.text) { Said(row.text) }
-                    "agent" -> AgentCard(row)
-                    "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ToolLine(row.calls, live = shimmers(row.calls, working), animate) { front { state.openTools(row) } }
-                        val shots = row.calls.flatMap { it.images }
-                        if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { key -> front { state.viewer = Viewer(row.key, key) } }
-                    }
-                    else -> Note(row.text)
-                }
+                Arrives(state.live.since(row.key), animate) { RowContent(row, state, images, working, animate, ::front) }
             }
             items(pending, key = { "pending ${it.id}" }) { p ->
                 PendingBubble(p, now, onTerminal, onDismiss = { state.drop(p.id) }, onDismissWait = { state.update(p.id) { it.dismissWait() } })
@@ -302,6 +299,41 @@ private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, 
         if (poll.problem.isNotEmpty()) Chip(poll.problem, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
         if (state.loadingOlder) Chip("Loading earlier messages…", Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
     }
+}
+
+/** One row of the conversation; [front] closes the keyboard before a sheet or the viewer opens. */
+@Composable
+private fun RowContent(row: ChatRow, state: ChatState, images: ChatImageSource, working: Boolean, animate: Boolean, front: (() -> Unit) -> Unit) {
+    when (row.kind) {
+        "user" -> UserBubble(row, images) { key -> front { state.viewer = Viewer(row.key, key) } }
+        "said" -> Copyable(row.text) { Said(row.text) }
+        "agent" -> AgentCard(row)
+        "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolLine(row.calls, live = shimmers(row.calls, working), animate) { front { state.openTools(row) } }
+            val shots = row.calls.flatMap { it.images }
+            if (shots.isNotEmpty()) Thumbs(shots, images, end = false) { key -> front { state.viewer = Viewer(row.key, key) } }
+        }
+        else -> Note(row.text)
+    }
+}
+
+/**
+ * A row that arrived while the chat was open ([since], design D9) fades in
+ * and is revealed from its top, as if typed, ending [FADE_MS] after it was
+ * seen. History, and still screens ([animate] false), show at once. Only the
+ * drawing changes: the row takes its full height at once, so following the
+ * bottom is not thrown off.
+ */
+@Composable
+private fun Arrives(since: Long?, animate: Boolean, content: @Composable () -> Unit) {
+    val left = remember(since) { if (animate) fadeLeftMs(since, SystemClock.uptimeMillis()) else 0L }
+    if (left <= 0L) return content()
+    val shown = remember(since) { Animatable(1f - left.toFloat() / FADE_MS) }
+    LaunchedEffect(since) { shown.animateTo(1f, tween(left.toInt(), easing = LinearOutSlowInEasing)) }
+    Box(
+        Modifier.graphicsLayer { alpha = shown.value }
+            .drawWithContent { clipRect(bottom = size.height * shown.value) { this@drawWithContent.drawContent() } },
+    ) { content() }
 }
 
 @Composable

@@ -35,8 +35,8 @@
 - [x] 4.3 Switch in `TerminalRoute`: shown per the spec, chosen view remembered, the held chat shown at once at its scroll position on return (D12), the hand-opened "Looking for the conversation…" and "No conversation found" states
 - [x] 4.4 Sending: refusal texts with terminal buttons, draft kept; draft, photos and pending bubbles held per terminal for the app's run (view switch, leaving and reopening, another agent's chat never shows them), never written to storage; photo attach with EXIF upright, scaling, JPEG re-encode
 - [x] 4.5 Viewer with swipe across a message's images; Codex images cached by path and file time; "Image not available" placeholder
-- [ ] 4.6 Fade-in for live rows; context gauge in the title bar with its tap detail
-- [ ] 4.7 Remove the debug-only spike entry and names
+- [x] 4.6 Fade-in for live rows; context gauge in the title bar with its tap detail
+- [x] 4.7 Remove the debug-only spike entry and names (none came over: the screen was rebuilt in `ui/chat`; checked 2026-11-14)
 
 ## 5. Review and phone check
 

@@ -90,6 +90,9 @@ class LiveRows {
 fun fadeIn(since: Long?, now: Long): Float =
     if (since == null) 1f else ((now - since).toFloat() / FADE_MS).coerceIn(0f, 1f)
 
+/** How long a row's fade still runs when it is drawn at [now]: it ends [FADE_MS] after the row was seen. */
+fun fadeLeftMs(since: Long?, now: Long): Long = if (since == null) 0L else (since + FADE_MS - now).coerceIn(0L, FADE_MS)
+
 /** Following the bottom changes only on the person's own scroll: off when they leave the end, on when back. */
 internal fun nextStick(stick: Boolean, byPerson: Boolean, more: Boolean): Boolean = if (byPerson) !more else stick
 

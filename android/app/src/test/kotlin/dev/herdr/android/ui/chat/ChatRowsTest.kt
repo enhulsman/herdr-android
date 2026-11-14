@@ -144,6 +144,14 @@ class ChatRowsTest {
         assertEquals(1f, fadeIn(since = 1_000, now = 9_000), 0f)
     }
 
+    @Test
+    fun aRowDrawnLateFinishesItsFadeOnTime() {
+        assertEquals("history: no fade", 0L, fadeLeftMs(since = null, now = 0))
+        assertEquals(FADE_MS, fadeLeftMs(since = 1_000, now = 1_000))
+        assertEquals("drawn 200 ms after it was seen", 400L, fadeLeftMs(since = 1_000, now = 1_200))
+        assertEquals(0L, fadeLeftMs(since = 1_000, now = 5_000))
+    }
+
     // --- following the bottom ---
 
     @Test

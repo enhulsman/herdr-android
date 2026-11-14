@@ -60,4 +60,15 @@ class ChatWorkingTest {
         val code = s.getStringAnnotations(CODE_TAG, 0, s.length).map { s.text.substring(it.start, it.end) }
         assertEquals(listOf("cargo test", "ls"), code)
     }
+
+    @Test
+    fun onlyThePersonsOwnScrollChangesFollowing() {
+        // The app's scroll to the end passes a moment with more below: following stays on.
+        assertTrue(nextStick(stick = true, byPerson = false, more = true))
+        // The person scrolls up: off; back at the end: on again.
+        assertFalse(nextStick(stick = true, byPerson = true, more = true))
+        assertTrue(nextStick(stick = false, byPerson = true, more = false))
+        // Off stays off while the app moves things.
+        assertFalse(nextStick(stick = false, byPerson = false, more = false))
+    }
 }

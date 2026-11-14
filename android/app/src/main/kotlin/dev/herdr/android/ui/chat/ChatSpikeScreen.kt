@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -237,8 +238,16 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
         return Centered(if (poll.cut) "Loading earlier messages…" else "No messages yet.")
     }
     // Follow the bottom unless the person scrolled up; back at the bottom, follow again.
+    // Only their own drag and the fling after it count: the app's scroll to the end
+    // passes a moment with more below, which turned following off mid-turn.
+    val dragged = list.interactionSource.collectIsDraggedAsState()
     LaunchedEffect(list) {
-        snapshotFlow { list.isScrollInProgress to list.canScrollForward }.collect { (moving, more) -> if (moving) state.stick = !more }
+        var byPerson = false
+        snapshotFlow { Triple(dragged.value, list.isScrollInProgress, list.canScrollForward) }.collect { (drag, moving, more) ->
+            if (drag) byPerson = true
+            state.stick = nextStick(state.stick, byPerson, more)
+            if (!drag && !moving) byPerson = false
+        }
     }
     // The keyboard opening shrinks the list: keep the bottom in view.
     LaunchedEffect(list) {
@@ -310,6 +319,9 @@ private fun Messages(poll: ChatPoll, state: ChatSpikeState, images: ChatImageSou
         }
     }
 }
+
+/** Following the bottom changes only on the person's own scroll: off when they leave the end, on when back. */
+internal fun nextStick(stick: Boolean, byPerson: Boolean, more: Boolean): Boolean = if (byPerson) !more else stick
 
 /** The very end: the last item's bottom, also when it is taller than the list (a long answer). */
 private suspend fun androidx.compose.foundation.lazy.LazyListState.toEnd(last: Int = layoutInfo.totalItemsCount - 1) {

@@ -432,6 +432,12 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
 - **Wrapped inline code** (same round, seen on the owner's phone): code that
   wrapped after a `/` or `-` got a box over the whole line before it; boxes
   are now measured by the code's own characters, with a test for that wrap.
+- **Following the bottom** (same round): the keyboard covered the end of the
+  chat again in a live session. Likely cause (not reproduced on the test
+  phone): any scroll, the app's own included, decided whether the list
+  follows the bottom, and the scroll to the end passes a moment with more
+  below, which turned following off. Now only the person's own drag and its
+  fling change it. Check on the owner's phone in a working session.
 - **Ideas from the owner for the spec, not built:** a new answer appears in
   one go; let it come in quickly, as if typed, fading in (new text only,
   not history read back). In the image viewer, swipe to the other images

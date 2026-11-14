@@ -108,7 +108,11 @@ and notes (a slash command, "Conversation compacted").
   "started" item, so a running command shows only once it ends, and it can
   end after the turn: in the steering test (section 4) the steered turn's
   `sleep 8` was written after the turn's `task_complete`, so in the chat it
-  shows below the answer.
+  shows below the answer. Why (2026-11-14, from that rollout): the agent
+  started it through `exec_command` with a 1 s wait, the call returned while
+  `sleep` went on, and Codex writes the `CommandExecution` item when the
+  process ends. It is the only such item in the November rollouts; the chat
+  places it before the turn's answer (design D7).
 - **Sent text comes back wrapped.** herdr-core puts `<hc from="t…">` around a
   message sent from inside a terminal (not one sent through the API without a
   terminal, as the phone does); Claude Code stores a paste of three or more
@@ -429,8 +433,10 @@ sufficient in round 3. What they left for the spec, not fixed in the spike:
   it as well. Checked on the test phone: Claude Code shows both at once;
   Codex writes a command to its rollout only once it finished, so its
   running command has no line to sweep (the working line still shows). The
-  same Codex turn listed `sleep 20` twice under "Ran 2 commands": not looked
-  into. Idea for the spec: verb themes to pick from, as the desk agent's
+  same Codex turn listed `sleep 20` twice under "Ran 2 commands": it ran
+  twice (looked into 2026-11-14). The agent first ran it with a 1 s wait,
+  then again with a 30 s wait: two processes, two items with their own ids.
+  No item id appears twice in the November rollouts (794 items). Idea for the spec: verb themes to pick from, as the desk agent's
   own spinner verbs can be set.
 - **Keyboard and taps** (same round): tapping a tool line or an image
   closes the keyboard first, so the detail is in front; closing it leaves

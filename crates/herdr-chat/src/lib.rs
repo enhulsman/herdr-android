@@ -69,6 +69,22 @@ pub enum Health {
     Broken { reason: String },
 }
 
+/// How full the session's context is (design D8): the tokens the last
+/// request sent, and the model's window where the log names it (Codex).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Gauge {
+    pub used: u64,
+    pub window: Option<u64>,
+}
+
+impl Gauge {
+    /// The share of the window used, rounded; none without a window.
+    pub fn percent(&self) -> Option<u32> {
+        let w = self.window.filter(|w| *w > 0)?;
+        Some(((self.used * 100 + w / 2) / w) as u32)
+    }
+}
+
 /// This many lines with no message means the format changed.
 const NO_MESSAGE_LINES: u32 = 30;
 
@@ -111,6 +127,7 @@ pub struct Parser {
     turn_broken: Option<u64>,
     title: Option<String>,
     version: Option<String>,
+    gauge: Option<Gauge>,
 }
 
 impl Parser {
@@ -140,6 +157,7 @@ impl Parser {
             turn_broken: None,
             title: None,
             version: None,
+            gauge: None,
         }
     }
 
@@ -202,6 +220,11 @@ impl Parser {
 
     pub fn version(&self) -> Option<&str> {
         self.version.as_deref()
+    }
+
+    /// The context gauge from the latest count read; none before one.
+    pub fn gauge(&self) -> Option<Gauge> {
+        self.gauge
     }
 
     /// The agent started working while the chat was open (design D6).
@@ -427,6 +450,18 @@ impl Parser {
         }
         if v["isSidechain"] == true {
             return;
+        }
+        if kind == "assistant" {
+            // Input plus cache tokens: what the request sent. A record with
+            // none (an error the harness wrote) is not a request.
+            let u = &msg["usage"];
+            let used: u64 = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
+                .iter()
+                .filter_map(|k| u[k].as_u64())
+                .sum();
+            if used > 0 {
+                self.gauge = Some(Gauge { used, window: None });
+            }
         }
         if let Some(row) = content.as_str().and_then(|t| self.injected.get(t.trim()).copied()) {
             if let Some(i) = row {
@@ -699,6 +734,13 @@ impl Parser {
             // own event name.
             "event_msg" if p["type"] == "turn_aborted" => {
                 self.push(Item::Note { text: "Interrupted".into() });
+            }
+            "event_msg" if p["type"] == "token_count" => {
+                let info = &p["info"];
+                if let Some(used) = info["last_token_usage"]["input_tokens"].as_u64() {
+                    let window = info["model_context_window"].as_u64();
+                    self.gauge = Some(Gauge { used, window });
+                }
             }
             "event_msg" if p["type"] == "task_complete" => {
                 if let Some(turn) = p["turn_id"].as_str() {

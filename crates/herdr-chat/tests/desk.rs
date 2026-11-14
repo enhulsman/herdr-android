@@ -40,7 +40,154 @@ fn tail_gives_only_whole_new_lines_and_where_to_go_on() {
     assert_eq!(c.next, (a.len() + b.len()) as u64, "the partial line waits");
 
     let c2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &c.next.to_string()])).unwrap();
-    assert_eq!(c2, Chunk { text: String::new(), from: c.next, next: c.next, size: c.size });
+    assert_eq!(
+        c2,
+        Chunk { text: String::new(), offsets: vec![], skipped: None, from: c.next, next: c.next, size: c.size }
+    );
+}
+
+#[test]
+fn tail_gives_each_kept_line_its_byte_offset() {
+    let (text, at) = ten_lines();
+    let f = temp("t8.jsonl", text.as_bytes());
+    let path = f.to_str().unwrap();
+    let c = tail::parse_chunk(&run(tail::SCRIPT, &[path, "0"])).unwrap();
+    assert_eq!(c.offsets, at, "one offset per line, where the line starts in the file");
+    assert_eq!(c.text, text, "the text is the lines alone, without their offsets");
+    // A read from the middle of line 3 to line 8: lines 4 to 7, their own offsets.
+    let c = tail::parse_chunk(&run(tail::SCRIPT, &[path, &(at[3] + 5).to_string(), &at[8].to_string()])).unwrap();
+    assert_eq!(c.offsets, at[4..8]);
+}
+
+#[test]
+fn tail_offsets_skip_the_lines_it_drops() {
+    let kept1 = "{\"type\":\"user\",\"n\":1}\n";
+    let dropped = "{\"type\":\"api-request\",\"id\":\"r\"}\n";
+    let kept2 = "{\"type\":\"user\",\"n\":2}\n";
+    let f = temp("t9.jsonl", format!("{kept1}{dropped}{kept2}").as_bytes());
+    let c = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), "0"])).unwrap();
+    assert_eq!(c.text, format!("{kept1}{kept2}"));
+    assert_eq!(c.offsets, vec![0, (kept1.len() + dropped.len()) as u64]);
+}
+
+fn token_count(n: u32) -> String {
+    format!(
+        "{{\"timestamp\":\"t\",\"type\":\"event_msg\",\"payload\":{{\"type\":\"token_count\",\"info\":{{\"total_token_usage\":{{\"input_tokens\":{n}}},\"model_context_window\":475000}}}}}}\n"
+    )
+}
+
+#[test]
+fn tail_keeps_only_the_last_codex_token_count_of_a_read() {
+    let msg = |n: u32| format!("{{\"timestamp\":\"t\",\"type\":\"event_msg\",\"payload\":{{\"type\":\"agent_message\",\"message\":\"m{n}\"}}}}\n");
+    let lines = [msg(1), token_count(100), msg(2), token_count(200), msg(3), token_count(300), msg(4)];
+    let mut at = vec![0u64];
+    for l in &lines {
+        at.push(at.last().unwrap() + l.len() as u64);
+    }
+    let f = temp("t10.jsonl", lines.concat().as_bytes());
+    let c = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), "0"])).unwrap();
+    assert!(!c.text.contains("\"input_tokens\":100") && !c.text.contains("\"input_tokens\":200"), "{}", c.text);
+    assert!(c.text.contains("\"input_tokens\":300"), "the last one stays: {}", c.text);
+    for m in ["m1", "m2", "m3", "m4"] {
+        assert!(c.text.contains(m));
+    }
+    // Every kept line still carries its own offset, the token count included.
+    let kept: Vec<&str> = c.text.lines().collect();
+    assert_eq!(kept.len(), 5);
+    let tc = kept.iter().position(|l| l.contains("token_count")).unwrap();
+    assert_eq!(c.offsets[tc], at[5]);
+    let mut msgs: Vec<u64> = c.offsets.iter().enumerate().filter(|(i, _)| *i != tc).map(|(_, o)| *o).collect();
+    msgs.sort();
+    assert_eq!(msgs, vec![at[0], at[2], at[4], at[6]]);
+    assert_eq!(c.next, *at.last().unwrap());
+}
+
+#[test]
+fn tail_with_no_token_count_keeps_everything_as_before() {
+    let (text, _) = ten_lines();
+    let f = temp("t11.jsonl", text.as_bytes());
+    let c = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), "0"])).unwrap();
+    assert_eq!(c.text, text);
+}
+
+/// A user line of about `bytes` bytes (plain text, no image data).
+fn big_line(bytes: usize, tag: &str) -> String {
+    let pad = bytes.saturating_sub(40);
+    format!("{{\"type\":\"user\",\"tag\":\"{tag}\",\"pad\":\"{}\"}}\n", "x".repeat(pad))
+}
+
+#[test]
+fn tail_spans_at_most_the_read_limit() {
+    let line = big_line(1 << 20, "mb");
+    let f = temp("t12.jsonl", line.repeat(9).as_bytes());
+    let c = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), "0"])).unwrap();
+    let per = line.len() as u64;
+    assert_eq!(c.next, per * (tail::READ_MAX / per), "whole lines up to the limit, no more");
+    assert_eq!(c.offsets.len() as u64, tail::READ_MAX / per);
+    assert!(c.skipped.is_none());
+}
+
+#[test]
+fn tail_skips_a_record_over_the_read_limit_and_goes_on_after_it() {
+    let a = big_line(100, "a");
+    let b = big_line(tail::READ_MAX as usize + (1 << 20), "b");
+    let c_line = big_line(100, "c");
+    let f = temp("t13.jsonl", format!("{a}{b}{c_line}").as_bytes());
+    let path = f.to_str().unwrap();
+    let (at_b, at_c) = (a.len() as u64, (a.len() + b.len()) as u64);
+
+    let r1 = tail::parse_chunk(&run(tail::SCRIPT, &[path, "0"])).unwrap();
+    assert_eq!(r1.text, a);
+    assert_eq!(r1.next, at_b);
+    assert!(r1.skipped.is_none());
+
+    let r2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &at_b.to_string()])).unwrap();
+    assert_eq!(r2.skipped, Some((at_b, b.len() as u64)), "the record is reported by offset and length");
+    assert_eq!(r2.text, "");
+    assert_eq!((r2.from, r2.next), (at_b, at_c), "the next read goes on after it");
+
+    let r3 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &r2.next.to_string()])).unwrap();
+    assert_eq!(r3.text, c_line);
+}
+
+#[test]
+fn tail_waits_for_an_oversized_record_still_being_written() {
+    let a = big_line(100, "a");
+    let mut b = big_line(tail::READ_MAX as usize + (1 << 20), "b");
+    b.pop(); // no newline yet: the agent is mid-write
+    let f = temp("t14.jsonl", format!("{a}{b}").as_bytes());
+    let at_b = a.len() as u64;
+    let r = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), &at_b.to_string()])).unwrap();
+    assert!(r.skipped.is_none(), "not skipped before it is whole");
+    assert_eq!(r.next, at_b);
+}
+
+#[test]
+fn tail_starting_inside_an_oversized_record_moves_past_it_without_a_note() {
+    // A first open or read-back that lands inside a huge record: its cut
+    // remainder is not a record of its own, so no note, but reading goes on.
+    let a = big_line(100, "a");
+    let b = big_line(tail::READ_MAX as usize + (2 << 20), "b");
+    let c_line = big_line(100, "c");
+    let f = temp("t15.jsonl", format!("{a}{b}{c_line}").as_bytes());
+    let path = f.to_str().unwrap();
+    let at_c = (a.len() + b.len()) as u64;
+    let inside = (a.len() + 1000).to_string();
+    let r = tail::parse_chunk(&run(tail::SCRIPT, &[path, &inside])).unwrap();
+    assert!(r.skipped.is_none());
+    assert!(r.next >= at_c && r.next <= at_c + c_line.len() as u64, "past the cut record: {}", r.next);
+    let all = if r.next == at_c {
+        tail::parse_chunk(&run(tail::SCRIPT, &[path, &r.next.to_string()])).unwrap().text
+    } else {
+        r.text.clone()
+    };
+    assert_eq!(all, c_line);
+}
+
+#[test]
+fn tail_script_and_rust_agree_on_the_read_limit() {
+    assert!(tail::SCRIPT.contains(&format!("max={}", tail::READ_MAX)));
+    assert_eq!(tail::READ_MAX, 7_864_320, "7.5 MB, as the spec says");
 }
 
 /// Ten lines of different lengths, and where each one starts.

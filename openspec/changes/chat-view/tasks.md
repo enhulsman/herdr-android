@@ -5,7 +5,7 @@
 
 ## 2. Tests first (Rust), and desk checks they rest on
 
-- [ ] 2.1 Tail script: prints each line's byte offset; keeps the last Codex `token_count` of a read; skips a record over 7.5 MB by offset and reports it, and the next read goes on after it
+- [x] 2.1 Tail script: prints each line's byte offset; keeps the last Codex `token_count` of a read; skips a record over 7.5 MB by offset and reports it, and the next read goes on after it
 - [ ] 2.2 Row identity (D3): every row records all its source line offsets; (a) a folded tool row gaining older calls on read-back keeps its key and place; (b) a person's row on screen meeting its older queued copy on read-back: one row, the on-screen key; (c) a log read in one go and read back in pieces gives the same rows in the same order; a merged row keeps its key and both offsets
 - [ ] 2.3 Health (D6): whole-log rules per the spec; a recent window of 40 bookkeeping lines is not Broken before reading back. Per-turn rule must trip: message records renamed after messages were shown; stays Broken across five later reads with no new row; a person's row leaves it Broken; an agent row clears it. Must not trip: an interrupt before any text, `/compact`, a turn of tool calls only ending in a failure, a Codex `!` command, a `/` command from the chat
 - [ ] 2.4 Codex order: a command written after `task_complete` sits before that turn's answer; a `user_shell` command is a person's row with its output. Find why a Codex turn listed `sleep 20` twice under "Ran 2 commands" and test the fix
@@ -17,16 +17,16 @@
 
 ## 3. Build (Rust)
 
-- [ ] 3.1 Tail script changes (2.1) and their desk test in `tests/desk.rs`
+- [x] 3.1 Tail script changes (2.1) and their desk test in `tests/desk.rs`
 - [ ] 3.2 Parser: row keys and source offsets, both health rules with their clearing, Codex turn order, gauge numbers, local command notes
-- [ ] 3.3 `Chat` in `herdr-mobile` from `ChatSpike`: lookup results, polling and lookups by events (D5), the send target (D4), oversized-record notes, failed-read state
+- [ ] 3.3 `Chat` in `herdr-mobile` from `ChatSpike`: lookup results, polling and lookups by events (D5), the send target (D4), oversized-record notes, failed-read state; held per terminal (D12): no reads while not shown, on return the new lines only (the last 2 MB past a 2 MB gap) and a lookup, at most 8 held, rows read back beyond the last 2 MB dropped on leaving, all but the shown one dropped on a memory trim
 - [ ] 3.4 Real-log check: `examples/check.rs` over the desk's Claude Code and Codex logs, all Ok; record the counts here
 
 ## 4. Android (tests first in each)
 
 - [ ] 4.1 Pure functions: pending state (Sending…, Queued from the screen text, expiry 30 s after sending or after work stops, arrival by text or by the `!` command's shell call, also when added to the last folded row, and in the new log after a session switch (`/clear`) when older rows had been read back: the spike kept its read-back offset across the switch and left the first message after `/clear` on "Sending…"); the second Enter (message still in the agent's input box 1.5 s after sending and no row: Enter once, never twice; not when the box holds other text); the waiting line (3 s, Dismiss, ends on its row or a status change, refuses sends while the status is unchanged); lookup cadence (events, 10 s, 5 s after `/`, events while Empty or Missed); `busy`/`shimmers`/verbs; `nextStick`; code boxes; a single line break inside a paragraph kept as a new line; image swipe order within a row; live-row fade marking
 - [ ] 4.2 Chat screen in `ui/chat` from the spike's parts, keyed by row identity; goldens in paper and graphite for: conversation, no messages yet, sending, queued, not arrived, waiting line, refused send, working line, tool sheet and detail, viewer, image not available, degraded note, broken read-only, exited, gauge for each agent
-- [ ] 4.3 Switch in `TerminalRoute`: shown per the spec, chosen view remembered, the hand-opened "Looking for the conversation…" and "No conversation found" states
+- [ ] 4.3 Switch in `TerminalRoute`: shown per the spec, chosen view remembered, the held chat shown at once at its scroll position on return (D12), the hand-opened "Looking for the conversation…" and "No conversation found" states
 - [ ] 4.4 Sending: refusal texts with terminal buttons, draft kept; draft, photos and pending bubbles held per terminal for the app's run (view switch, leaving and reopening, another agent's chat never shows them), never written to storage; photo attach with EXIF upright, scaling, JPEG re-encode
 - [ ] 4.5 Viewer with swipe across a message's images; Codex images cached by path and file time; "Image not available" placeholder
 - [ ] 4.6 Fade-in for live rows; context gauge in the title bar with its tap detail

@@ -115,6 +115,8 @@ pub(crate) struct ChatCore {
     /// Left and not back yet: look up and check the log's size first.
     returned: bool,
     probe_size: bool,
+    /// The status the terminal view saw last, for Empty's first turn only.
+    watch_status: Option<String>,
 }
 
 impl Log {
@@ -221,6 +223,37 @@ impl ChatCore {
             Lookup::None => {}
         }
         self.lookup = Some(l);
+    }
+
+    /// Whether the terminal view looks the log up (design D5): on opening,
+    /// when another process is in front, and on an event while Empty or
+    /// Missed with an agent in front. Never on a timer: a Found agent's log
+    /// is not read again while the terminal shows.
+    pub fn needs_watch(&self, t: &Term, event: bool) -> bool {
+        let Some((pid, _)) = self.located else { return true };
+        let waiting = matches!(self.lookup, Some(Lookup::Empty { .. } | Lookup::Missed(_)));
+        pid != t.pid || (event && waiting && t.agent.is_some())
+    }
+
+    /// A lookup made for the terminal view: a chat left meanwhile still
+    /// looks up again on its return.
+    pub fn take_watch_lookup(&mut self, t: &Term, l: Option<Lookup>, now: Instant) {
+        let returned = self.returned;
+        self.take_lookup(t, l, now);
+        self.returned = returned;
+    }
+
+    /// The terminal's status while the terminal view shows: only Empty's
+    /// first turn is followed; the per-turn rule judges turns the chat saw.
+    pub fn watch_see(&mut self, t: &Term) {
+        let was = self.watch_status.as_deref() == Some("working");
+        if was
+            && matches!(t.status.as_deref(), Some("idle" | "done"))
+            && let Some(l) = &self.lookup
+        {
+            self.guard.turn_ended(l);
+        }
+        self.watch_status = t.status.clone();
     }
 
     /// The terminal's status at a poll: follows turns for the per-turn rule

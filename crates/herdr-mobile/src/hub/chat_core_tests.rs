@@ -357,6 +357,79 @@ fn turns_unseen_while_the_chat_was_away_are_not_judged() {
     assert_eq!(c.view().health, Health::Ok);
 }
 
+// --- The terminal view (D5; spec "Live updates follow the agent": terminal view on screen) ---
+
+#[test]
+fn the_terminal_view_looks_up_on_opening_and_again_only_for_another_process() {
+    let t0 = Instant::now();
+    let mut c = ChatCore::new();
+    assert!(c.needs_watch(&term("idle"), false), "on opening");
+    c.take_watch_lookup(&term("idle"), Some(found(S1)), t0);
+    assert!(!c.needs_watch(&term("working"), true), "an event while Found");
+    assert!(!c.needs_watch(&term("working"), false), "no lookup every 10 s");
+    let mut other = term("idle");
+    other.pid = Some(5150);
+    assert!(c.needs_watch(&other, false), "another process in front");
+    c.take_watch_lookup(&other, Some(Lookup::None), t0);
+    assert!(!c.needs_watch(&other, true), "a shell in front: an event looks up nothing");
+}
+
+#[test]
+fn the_terminal_view_looks_up_on_each_event_while_empty_or_missed_with_an_agent_in_front() {
+    let t0 = Instant::now();
+    let mut c = ChatCore::new();
+    c.take_watch_lookup(&term("idle"), Some(Lookup::Empty { session: S1.into() }), t0);
+    assert!(c.needs_watch(&term("working"), true));
+    assert!(!c.needs_watch(&term("working"), false), "only on an event");
+    c.take_watch_lookup(&term("idle"), Some(Lookup::Missed("no session file")), t0);
+    assert!(c.needs_watch(&term("idle"), true));
+    let shell = Term { agent: None, ..term("idle") };
+    assert!(!c.needs_watch(&shell, true), "no agent in front");
+}
+
+#[test]
+fn empty_turns_missed_when_its_first_turn_ends_in_the_terminal_view() {
+    let t0 = Instant::now();
+    let mut c = ChatCore::new();
+    let empty = || Some(Lookup::Empty { session: S1.into() });
+    c.take_watch_lookup(&term("idle"), empty(), t0);
+    c.watch_see(&term("idle"));
+    c.watch_see(&term("working"));
+    c.take_watch_lookup(&term("working"), empty(), t0);
+    assert_eq!(c.view().found, Kind::Empty, "still in its first turn");
+    c.watch_see(&term("idle"));
+    c.take_watch_lookup(&term("idle"), empty(), t0);
+    assert_eq!(c.view().found, Kind::Missed);
+}
+
+#[test]
+fn a_turn_watched_from_the_terminal_view_is_not_judged_by_the_chat() {
+    let t0 = Instant::now();
+    let (mut c, first) = opened(&[asked("Hi")], t0);
+    let at = end_of(&first);
+    c.leave();
+    c.watch_see(&term("working"));
+    c.watch_see(&term("idle"));
+    // Back in the chat: the turn ended unseen by it and brought no row.
+    c.take_lookup(&term("idle"), Some(found(S1)), t0 + Duration::from_secs(30));
+    c.see(&term("idle"), t0 + Duration::from_secs(30));
+    while c.take_read(Ok(chunk(&[], at, 0)), t0 + Duration::from_secs(30)) {}
+    c.see(&term("idle"), t0 + Duration::from_secs(40));
+    c.take_read(Ok(chunk(&[], at, 0)), t0 + Duration::from_secs(40));
+    assert_eq!(c.view().health, Health::Ok);
+}
+
+#[test]
+fn a_lookup_from_the_terminal_view_leaves_the_chat_its_own_lookup_on_return() {
+    let t0 = Instant::now();
+    let (mut c, _) = opened(&[asked("Hi")], t0);
+    c.leave();
+    let mut other = term("idle");
+    other.pid = Some(5150);
+    c.take_watch_lookup(&other, Some(found(S1)), t0 + Duration::from_secs(1));
+    assert!(c.needs_lookup(&other, false, t0 + Duration::from_secs(2)), "a lookup on return");
+}
+
 // --- Held chats (D12; spec: "A chat is held while the terminal view shows") ---
 
 #[test]

@@ -1,10 +1,13 @@
 package dev.herdr.android.ui.chat
 
+import android.content.ComponentCallbacks2
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.herdr.android.ui.agents.AgentKey
 import uniffi.herdr_mobile.ChatCall
+import uniffi.herdr_mobile.ChatPoll
 import uniffi.herdr_mobile.ChatRefusal
 import uniffi.herdr_mobile.ChatRow
 
@@ -28,6 +31,8 @@ fun refusalOf(r: ChatRefusal): Refusal = when (r) {
  * by key, so they follow a row as the log grows and is read back.
  */
 class ChatState {
+    /** The last poll: drawn at once when the chat comes back (design D12). */
+    var poll by mutableStateOf<ChatPoll?>(null)
     var draft by mutableStateOf("")
     var attached by mutableStateOf<List<Attachment>>(emptyList())
     var pending by mutableStateOf<List<Pending>>(emptyList())
@@ -47,6 +52,30 @@ class ChatState {
     var gaugeOpen by mutableStateOf(false)
     val live = LiveRows()
     private var ids = 0L
+
+    /** Where the chat was left: the first row in view and how far it was scrolled; null at the bottom. */
+    private var topKey: String? = null
+    private var topOffset = 0
+
+    /** The chat leaves the screen with [firstIndex] the first item in view (pending bubbles follow the rows). */
+    fun keep(rows: List<ChatRow>, firstIndex: Int, firstOffset: Int) {
+        topKey = if (stick) null else rows.getOrNull(firstIndex)?.key
+        topOffset = firstOffset
+    }
+
+    /**
+     * Where the list starts on return: the row it was left at, wherever the
+     * rows dropped on leaving moved it; null for the bottom, which follows
+     * new rows again (the row is gone, or it was left at the bottom).
+     */
+    fun startAt(rows: List<ChatRow>): Pair<Int, Int>? {
+        val at = topKey?.let { k -> rows.indexOfFirst { it.key == k } }?.takeIf { it >= 0 }
+        if (at == null) {
+            stick = true
+            return null
+        }
+        return at to topOffset
+    }
 
     /** A tap on a folded line: one call opens straight to its detail. */
     fun openTools(row: ChatRow) {
@@ -82,6 +111,32 @@ class ChatState {
         pending = pending.filterNot { it.id == id }
     }
 }
+
+/**
+ * Each terminal's [ChatState] for the app's run (design D12), never written
+ * to storage: the 8 viewed last, as the hub holds their chats. Main thread.
+ */
+class ChatStates(private val max: Int = 8) {
+    private val held = LinkedHashMap<AgentKey, ChatState>(16, 0.75f, true)
+
+    /** The terminal whose chat is on screen, kept by [trim]. */
+    var shown: AgentKey? = null
+
+    fun open(key: AgentKey): ChatState {
+        val s = held.getOrPut(key) { ChatState() }
+        while (held.size > max) held.remove(held.keys.first())
+        return s
+    }
+
+    /** Android asked to free memory: every held chat but the one on screen goes. */
+    fun trim() {
+        held.keys.retainAll(setOfNotNull(shown))
+    }
+}
+
+/** Android asks to free memory: not the plain move to the background, which every return would pay for. */
+fun trimsChats(level: Int): Boolean =
+    level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW && level != ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
 
 /** The calls of the open sheet's row; null when that row is gone. */
 fun sheetCalls(rows: List<ChatRow>, key: String?): List<ChatCall>? =

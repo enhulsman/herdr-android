@@ -25,6 +25,9 @@ import dev.herdr.android.stay.StayConnectedService
 import dev.herdr.android.stay.StayConnectedSetting
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.NewTerminal
+import dev.herdr.android.ui.chat.ChatStates
+import dev.herdr.android.ui.chat.ChatViewSetting
+import dev.herdr.android.ui.chat.trimsChats
 import dev.herdr.android.ui.terminal.TerminalCache
 import dev.herdr.android.ui.terminal.ZoomMemory
 import dev.herdr.android.ui.theme.ContrastSetting
@@ -96,6 +99,13 @@ class HerdrApp : Application() {
     /** The zoom each terminal was left at while watching, for this run of the app. */
     val terminalZoom = ZoomMemory()
 
+    /** Terminal or Chat, the view chosen last, in its own preferences file. */
+    lateinit var chatView: ChatViewSetting
+        private set
+
+    /** Each terminal's chat as the screen holds it (draft, place, last poll), for this run of the app. */
+    val chatStates = ChatStates()
+
     /** The phone's alert state; the push service and the silence check use it with the app closed. */
     lateinit var pushStore: PushStore
         private set
@@ -113,6 +123,7 @@ class HerdrApp : Application() {
         super.onCreate()
         contrast = ContrastSetting.open(this)
         stayConnected = StayConnectedSetting.open(this)
+        chatView = ChatViewSetting.open(this)
         pushStore = PushStore.open(this)
         val sink = AndroidAlertSink(this).apply { createChannels() }
         alerts = Alerts(pushStore, sink, resources) { ms -> timeOfDay(this)(ms) }
@@ -179,6 +190,14 @@ class HerdrApp : Application() {
      * person uses (asking which when there are several), then a registration;
      * its endpoint arrives in HerdrPushService.
      */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (!trimsChats(level)) return
+        val shown = chatStates.shown
+        chatStates.trim()
+        if (::hubHost.isInitialized) hubHost.hub?.trimChats(shown?.machine, shown?.address)
+    }
+
     fun turnOnAlerts(activity: Activity) {
         pushStore.setup = AlertSetup.Waiting
         UnifiedPush.tryUseCurrentOrDefaultDistributor(activity) { ok ->

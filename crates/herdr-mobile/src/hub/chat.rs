@@ -322,6 +322,52 @@ impl Chat {
         core.runtime().block_on(self.poll_async(event))
     }
 
+    /// For the terminal view (design D5): looks the log up and reads its
+    /// recent part only when [`ChatCore::needs_watch`] says so, to decide the
+    /// switch; otherwise one `terminal.get`. Blocks.
+    pub fn watch(&self, event: bool) -> ChatPoll {
+        let core = self.core.clone();
+        core.runtime().block_on(async {
+            let began = Instant::now();
+            let mut times = Times::default();
+            let Some(conn) = self.core.live_conn(&self.machine) else {
+                return self.view("", false, Times("not connected".into()));
+            };
+            let c = conn.client;
+            let Ok(t) = c.call("terminal.get", json!({"terminal": self.address})).await.map(|t| term_of(&t)) else {
+                return self.view("", false, times);
+            };
+            self.state.lock().unwrap().watch_see(&t);
+            if self.state.lock().unwrap().needs_watch(&t, event) {
+                let at = Instant::now();
+                let (l, _) = look_up(&c, &t).await;
+                times.mark("locate", at);
+                self.state.lock().unwrap().take_watch_lookup(&t, l, Instant::now());
+                for _ in 0..2 {
+                    let Some(r) = self.state.lock().unwrap().plan_read() else { break };
+                    let at = Instant::now();
+                    let got = read_chunk(&c, &r).await;
+                    times.mark("tail", at);
+                    if !self.state.lock().unwrap().take_read(got, Instant::now()) {
+                        break;
+                    }
+                }
+            }
+            times.mark("total", began);
+            let status = t.status.clone().unwrap_or_default();
+            self.view(&status, may_send(&t), times)
+        })
+    }
+
+    /// What is held, with no call: the last view drawn at once on return
+    /// (design D12); `None` before the first lookup.
+    pub fn held(&self) -> Option<ChatPoll> {
+        if self.state.lock().unwrap().lookup().is_none() {
+            return None;
+        }
+        Some(self.view("", false, Times::default()))
+    }
+
     /// Reads the part of the log before the oldest row held and parses it
     /// together with what is held. Blocks.
     pub fn older(&self) -> ChatPoll {

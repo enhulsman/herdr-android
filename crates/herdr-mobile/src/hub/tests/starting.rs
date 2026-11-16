@@ -7,9 +7,10 @@ use crate::hub::start::{AgentsView, PlaceNote, StartPlace, StartView};
 use base64::Engine;
 use herdr_proto::start as proto;
 
-/// The start sheet's reads: the desk's layout and the installed-agents check.
+/// The start sheet's reads: the desk's layout and the installed-agents check
+/// (a `sh` line; the Changes view's calls run `git`).
 pub(super) fn is_start_read(req: &Value) -> bool {
-    req["method"] == "machine.exec"
+    (req["method"] == "machine.exec" && req["params"]["argv"][0] == "sh")
         || (req["method"] == "doc.get" && req["params"]["name"] == "herdr-app")
 }
 
@@ -67,19 +68,19 @@ impl Core {
         }
     }
 
-    async fn reply(&mut self, req: &Value, result: Value) {
+    pub(super) async fn reply(&mut self, req: &Value, result: Value) {
         let reply = json!({"jsonrpc": "2.0", "id": req["id"], "result": result});
         self.send(0, wire::DATA, reply.to_string().as_bytes()).await;
     }
 
-    async fn refuse(&mut self, req: &Value, kind: &str, message: &str) {
+    pub(super) async fn refuse(&mut self, req: &Value, kind: &str, message: &str) {
         let reply = json!({"jsonrpc": "2.0", "id": req["id"],
                            "error": {"code": -32000, "message": message, "data": {"kind": kind}}});
         self.send(0, wire::DATA, reply.to_string().as_bytes()).await;
     }
 
     /// The next request, which must be this method.
-    async fn expect(&mut self, method: &str) -> Value {
+    pub(super) async fn expect(&mut self, method: &str) -> Value {
         let req = self.request().await;
         assert_eq!(req["method"], method, "{req}");
         req

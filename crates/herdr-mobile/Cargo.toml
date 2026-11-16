@@ -16,6 +16,7 @@ vt = []
 [dependencies]
 herdr-proto = { path = "../herdr-proto" }
 herdr-chat = { path = "../herdr-chat" }
+herdr-changes = { path = "../herdr-changes" }
 base64 = "0.22"
 p256 = { version = "0.14.0", default-features = false, features = ["ecdsa", "std"] }
 russh = { version = "0.65.0", default-features = false, features = ["ring"] }

@@ -17,6 +17,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
 
+mod changes;
 mod starting;
 #[cfg(feature = "vt")]
 mod term;

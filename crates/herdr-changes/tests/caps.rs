@@ -193,3 +193,56 @@ fn diff_outcomes() {
         Outcome::Failed(Some("fatal: took too long".into()))
     );
 }
+
+#[test]
+fn a_diff_of_many_short_lines_is_held_only_up_to_the_line_cap() {
+    // 8 MB of near-empty lines would be about four million records on the phone (review 2026-11-16).
+    use herdr_changes::diff::LINES_MAX;
+    assert_eq!(LINES_MAX, 50_000);
+    let mut out = b"diff --git a/blank.txt b/blank.txt\nnew file mode 100644\nindex 0000000..1111111\n--- /dev/null\n+++ b/blank.txt\n@@ -0,0 +1,3000000 @@\n".to_vec();
+    out.extend(std::iter::repeat_n(b"+\n".as_slice(), 3_000_000).flatten());
+    let Outcome::Ok(d) = parse_diff(Kind::New, ran(&out, 1, false)) else {
+        panic!()
+    };
+    assert!(d.too_large, "past the line cap reads 'Too large to show on the phone'");
+    assert_eq!(d.body_len(), LINES_MAX);
+    assert!(!d.is_long());
+    assert_eq!(d.headers, 5);
+}
+
+#[test]
+fn a_diff_at_the_line_cap_is_whole() {
+    use herdr_changes::diff::LINES_MAX;
+    let mut out = b"diff --git a/a b/a\nindex 1..2 100644\n--- a/a\n+++ b/a\n@@ -1 +1,49999 @@\n".to_vec();
+    out.extend(std::iter::repeat_n(b"+x\n".as_slice(), LINES_MAX - 1).flatten());
+    let Outcome::Ok(d) = parse_diff(Kind::Changed, ran(&out, 0, false)) else {
+        panic!()
+    };
+    assert!(!d.too_large);
+    assert_eq!(d.body_len(), LINES_MAX);
+    assert!(d.is_long());
+}
+
+/// The cwd the reader asks for after `rev-parse --show-toplevel` printed `out`.
+fn top_after(out: &[u8]) -> Result<String, Outcome<herdr_changes::List>> {
+    let mut r = Reader::new("/work/website/app");
+    let Step::Run(_) = r.start() else { panic!() };
+    match r.feed(ran(out, 0, false)) {
+        Step::Run(call) => Ok(call.cwd),
+        Step::Done(o) => Err(o),
+    }
+}
+
+#[test]
+fn a_repository_top_keeps_a_newline_in_its_name() {
+    assert_eq!(top_after(b"/work/site\nother\n--\n"), Ok("/work/site\nother".into()));
+    assert_eq!(top_after(b"/work/website\n--\n"), Ok("/work/website".into()));
+    // Without the echoed `--` (older git), the last line feed alone ends it.
+    assert_eq!(top_after(b"/work/website\n"), Ok("/work/website".into()));
+}
+
+#[test]
+fn a_repository_top_that_is_not_utf8_cannot_be_read() {
+    assert_eq!(top_after(b"/work/caf\xe9\n--\n"), Err(Outcome::Failed(None)));
+    assert_eq!(top_after(b"\n--\n"), Err(Outcome::Failed(None)));
+}

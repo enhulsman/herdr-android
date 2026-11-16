@@ -80,6 +80,37 @@ class ChangesLoopTest {
         assertEquals(setOf("read", "wait", "leave"), f.calls.toSet())
     }
 
+    /** A read the hub is still running when the screen goes off: the hub hears at once, not after it. */
+    @Test
+    fun leavingDoesNotWaitForARunningRead() {
+        val inRead = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val calls = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val slow = object : ChangesInterface {
+            override fun read(): ChangesView {
+                calls += "read"
+                inRead.countDown()
+                release.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                calls += "read done"
+                return listed
+            }
+            override fun open(path: String?): ChangesView = listed
+            override fun waitChange(timeoutMs: UInt): Boolean = false
+            override fun leave() { calls += "leave" }
+        }
+        runBlocking {
+            val job = launch(Dispatchers.Default) { followChanges(slow) {} }
+            inRead.await()
+            job.cancel()
+            val deadline = System.currentTimeMillis() + 5_000
+            while ("leave" !in calls && System.currentTimeMillis() < deadline) Thread.sleep(10)
+            assertEquals(listOf("read", "leave"), calls.toList())
+            release.countDown()
+            job.join()
+        }
+        assertEquals(listOf("read", "leave", "read done"), calls.toList())
+    }
+
     // --- Back and taps, drawn before the hub answers ---
 
     @Test

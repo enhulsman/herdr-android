@@ -26,6 +26,6 @@
 ## 5. Review and phone check
 
 - [x] 5.1 `openspec validate changes-view --strict`
-- [ ] 5.2 Codex adversarial review of the branch (the git calls, read-only guarantees, caps)
+- [x] 5.2 Codex adversarial review of the branch (the git calls, read-only guarantees, caps). Ran 2026-11-16, needs-attention, five findings, all fixed tests-first: a slow diff landing under the next file opened (kept only while its file is open); leaving mid-read let the read run on (the hub hears at once and stops between calls); a top with a line feed or not UTF-8 (cut at git's own terminator, else Failed); hiding the keyboard on opening Changes could resize the desk (the phone grid is held while it shows); 8 MB of short lines held as millions of records (a 50,000-line cap, Ezra's call, in the spec)
 - [ ] 5.3 Test phone, debug build: every spec scenario that needs a device (before approving a blocked agent, the agent going on, a reverted file, lockfile churn, a 30 MB new file, a plain folder, back from a lost connection, from the chat and back), on the test repository and in a throwaway agent; the data an open huge diff costs per turn (D5, Risks)
 - [ ] 5.4 Records: `decisions.md` and the README feature line

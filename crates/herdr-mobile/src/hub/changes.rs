@@ -206,13 +206,18 @@ impl Changes {
         }
     }
 
-    fn view(&self) -> ChangesView {
+    pub(crate) fn view(&self) -> ChangesView {
         let h = self.held.lock().unwrap();
         ChangesView {
             list: list_of(&h.list),
             open: h.open.clone(),
             diff: h.diff.clone(),
         }
+    }
+
+    /// The screen left (the screen off or gone) since the last read began.
+    pub(crate) fn has_left(&self) -> bool {
+        self.left.load(Ordering::SeqCst)
     }
 
     /// Subscribes to the terminal's events on `conn` unless already.
@@ -259,6 +264,11 @@ impl Changes {
                 let mut reader = Reader::new(&folder);
                 let mut step = reader.start();
                 loop {
+                    // Leaving stops a read between calls: nothing more runs while
+                    // the screen is off (review 2026-11-16).
+                    if self.has_left() {
+                        return self.view();
+                    }
                     match step {
                         Step::Run(call) => step = reader.feed(run(c, &call).await),
                         Step::Done(o) => break o,
@@ -266,6 +276,9 @@ impl Changes {
                 }
             }
         };
+        if self.has_left() {
+            return self.view();
+        }
         self.held.lock().unwrap().list = Some(outcome);
         self.fetch_open(c).await;
         self.view()
@@ -289,14 +302,15 @@ impl Changes {
                         h.diff = Some(ChangesDiff::Failed { line: None });
                         return;
                     }
-                    Some(call) => (e.kind, call),
+                    Some(call) => (open, e.kind, call),
                 },
             }
         };
-        let got = parse_diff(call.0, run(c, &call.1).await);
+        let (path, kind, call) = call;
+        let got = parse_diff(kind, run(c, &call).await);
         let mut h = self.held.lock().unwrap();
-        // The person may have gone back meanwhile.
-        if h.open.is_some() {
+        // The person may have gone back, or on to another file, meanwhile.
+        if h.open.as_deref() == Some(path.as_str()) {
             h.diff = Some(diff_of(got));
         }
     }

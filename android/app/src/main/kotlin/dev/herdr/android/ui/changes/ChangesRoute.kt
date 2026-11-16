@@ -30,6 +30,8 @@ import dev.herdr.android.ui.theme.HerdrRadius
 import dev.herdr.android.ui.theme.HerdrTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.herdr_mobile.ChangesDiff
@@ -46,16 +48,21 @@ private const val WAIT_MS = 5_000u
 
 /**
  * Reads, shows, then waits for the hub to ask for the next read (a status or
- * turn event, the connection back); on cancellation (leaving, the screen
- * off) tells the hub, which then holds no events.
+ * turn event, the connection back). On cancellation (leaving, the screen
+ * off) the hub hears at once, without waiting for a read in progress, and
+ * runs no further git call for it; then it holds no events.
  */
-suspend fun followChanges(changes: ChangesInterface, waitMs: UInt = WAIT_MS, show: (ChangesView) -> Unit) {
-    try {
+suspend fun followChanges(changes: ChangesInterface, waitMs: UInt = WAIT_MS, show: (ChangesView) -> Unit): Unit = coroutineScope {
+    // The blocking calls cannot be interrupted, so the loop runs beside the wait for cancellation.
+    launch {
         while (true) {
             val view = withContext(Dispatchers.IO) { changes.read() }
             show(view)
             while (!withContext(Dispatchers.IO) { changes.waitChange(waitMs) }) Unit
         }
+    }
+    try {
+        awaitCancellation()
     } finally {
         withContext(NonCancellable + Dispatchers.IO) { changes.leave() }
     }

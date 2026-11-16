@@ -423,3 +423,77 @@ async fn a_restored_connection_reads_and_leaving_unsubscribes() {
     core.term_event("turn").await;
     assert!(!ch.wait_change_async(1_000).await);
 }
+
+/// Review 2026-11-16: a diff fetched for one file never lands under another.
+#[tokio::test(start_paused = true)]
+async fn a_slow_diff_of_the_last_file_does_not_land_under_the_next() {
+    let mut r = rig("ch-stale");
+    let (mut core, ch) = connected(&mut r).await;
+    let c = ch.clone();
+    let read = spawn(async move { c.read_async().await });
+    core.changes_subscribed().await;
+    core.serves_read(TOP, b"?? a.md\0?? b.md\0", Some(b"a.md\x001\nb.md\x001\n"))
+        .await;
+    read.await.unwrap();
+
+    let diff = |p: &str, line: &str| {
+        format!("diff --git a/{p} b/{p}\nnew file mode 100644\nindex 0000000..1111111\n--- /dev/null\n+++ b/{p}\n@@ -0,0 +1 @@\n+{line}\n")
+    };
+    // a.md is opened; its diff is slow.
+    let c = ch.clone();
+    let open_a = spawn(async move { c.open_async(Some("a.md".into())).await });
+    let req_a = core.expect("machine.exec").await;
+    assert_eq!(req_a["params"]["argv"].as_array().unwrap().last().unwrap(), "a.md");
+    // Back, then b.md, whose diff comes first.
+    ch.open_async(None).await;
+    let c = ch.clone();
+    let open_b = spawn(async move { c.open_async(Some("b.md".into())).await });
+    let req_b = core.expect("machine.exec").await;
+    assert_eq!(req_b["params"]["argv"].as_array().unwrap().last().unwrap(), "b.md");
+    core.reply(&req_b, exec_out(diff("b.md", "bee").as_bytes(), 1)).await;
+    open_b.await.unwrap();
+    core.reply(&req_a, exec_out(diff("a.md", "ay").as_bytes(), 1)).await;
+    open_a.await.unwrap();
+
+    let v = ch.view();
+    assert_eq!(v.open.as_deref(), Some("b.md"));
+    let Some(ChangesDiff::Lines { lines, .. }) = v.diff else {
+        panic!("{v:?}")
+    };
+    assert_eq!(lines.last().unwrap().text, "+bee");
+}
+
+/// Review 2026-11-16: the screen going off mid-read stops the read's
+/// remaining calls; the next read starts again.
+#[tokio::test(start_paused = true)]
+async fn leaving_during_a_read_stops_its_calls() {
+    let mut r = rig("ch-leave-mid");
+    let (mut core, ch) = connected(&mut r).await;
+    let c = ch.clone();
+    let read = spawn(async move { c.read_async().await });
+    core.changes_subscribed().await;
+    let req = core.expect("terminal.get").await;
+    core.reply(&req, terminal(TOP)).await;
+    core.exec(Shape::Top, TOP, format!("{TOP}\n--\n").as_bytes(), 0)
+        .await;
+    let head = core.expect("machine.exec").await;
+    let c = ch.clone();
+    let leave = spawn(async move { c.leave_async().await });
+    // The flag is set before leave waits for anything.
+    while !ch.has_left() {
+        tokio::task::yield_now().await;
+    }
+    core.reply(&head, exec_out(b"sha1\nabc\n", 0)).await;
+    let v = read.await.unwrap();
+    leave.await.unwrap();
+    assert_eq!(v.list, ChangesList::Reading, "nothing listed from a read cut short");
+    core.quiet().await;
+
+    // Back on: a read runs whole.
+    let c = ch.clone();
+    let read = spawn(async move { c.read_async().await });
+    core.changes_subscribed().await;
+    core.serves_read(TOP, b"", None).await;
+    let v = read.await.unwrap();
+    assert_eq!(v.list, ChangesList::Listed { entries: vec![], capped: false });
+}

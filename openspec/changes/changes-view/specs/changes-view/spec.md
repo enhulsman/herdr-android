@@ -204,7 +204,7 @@ The Changes screen SHALL use exactly these texts:
 | Too large | Too large to show on the phone |
 | Reverted while open | No longer changed |
 | Line continues | a hooked arrow (↪) at the start of each wrapped part |
-| Carriage return | ␍ at the line's end |
+| Carriage return | CR, in a small box at the line's end |
 | Line cut at 4,000 characters | … (cut) at the cut |
 | A row's description | path, status word, lines added and removed |
 

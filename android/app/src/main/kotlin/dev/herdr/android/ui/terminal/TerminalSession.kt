@@ -98,6 +98,12 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
     /** Takes over at the phone's size without typing (a tap while watching). */
     fun lead() = send { lead() }
 
+    /**
+     * The terminal takes the phone's size only while it shows: under the chat
+     * it watches at the desk's size, and shown again it takes over.
+     */
+    fun follow(chat: Boolean) = send { if (chat) watch() else lead() }
+
     /** A tap on cell ([col], [row]) of the phone's grid; the core clicks a program that takes clicks. */
     fun click(col: Int, row: Int) = send { click(col.coerceIn(0, 0xFFFF).toUShort(), row.coerceIn(0, 0xFFFF).toUShort()) }
     fun live() = send { live() }
@@ -125,6 +131,9 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
         return if (painted) grid.toFullFrameOrNull() else null
     }
 }
+
+/** Opened under the chat, the terminal watches at the desk's size (see [TerminalSession.follow]). */
+fun atPhoneSizeOnOpen(chat: Boolean) = !chat
 
 data class GridShape(val cols: Int, val rows: Int, val live: Boolean)
 

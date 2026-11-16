@@ -45,8 +45,11 @@ pub(crate) enum Cmd {
     Scroll(i32),
     /// Back to the bottom.
     Live,
-    /// Take over at the phone's size without typing (a tap while watching).
+    /// Take over at the phone's size without typing (a tap while watching,
+    /// or the terminal shown again after the chat).
     Lead,
+    /// Watch at the desk's size: the chat shows over the terminal.
+    Watch,
     /// A tap on cell (col, row) of the phone's grid: a click for a program
     /// tracking the mouse, only while typing (watching draws the desk's size).
     Click(u16, u16),
@@ -372,17 +375,22 @@ impl Task {
                             }
                         }
                         Cmd::Click(..) => {}
-                        Cmd::Lead => match viewer.lead().await {
-                            Ok(Some(a)) => {
-                                let Some(t) = self.fresh_vt(&a) else {
-                                    return Over::Pause;
-                                };
-                                vt = t;
-                                dirty = false;
+                        Cmd::Lead | Cmd::Watch => {
+                            // A reattach after a reconnect keeps the choice.
+                            self.lead = matches!(cmd, Cmd::Lead);
+                            let r = if self.lead { viewer.lead().await } else { viewer.step_back().await };
+                            match r {
+                                Ok(Some(a)) => {
+                                    let Some(t) = self.fresh_vt(&a) else {
+                                        return Over::Pause;
+                                    };
+                                    vt = t;
+                                    dirty = false;
+                                }
+                                Ok(None) => {}
+                                Err(e) => return self.failed(e),
                             }
-                            Ok(None) => {}
-                            Err(e) => return self.failed(e),
-                        },
+                        }
                         Cmd::PhoneSize(c, r) => {
                             if c > 0 && r > 0 {
                                 self.phone = (c, r);

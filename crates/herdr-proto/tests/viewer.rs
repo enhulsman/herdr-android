@@ -623,3 +623,31 @@ async fn opening_at_the_phones_size_attaches_actively_once() {
     assert_eq!(viewer.mode(), Mode::Typing);
     assert_eq!(viewer.size(), PHONE);
 }
+
+// The chat over a terminal opened at the phone's size: stepping back gives the
+// desk its size again and goes on watching, with nothing typed.
+#[tokio::test(start_paused = true)]
+async fn stepping_back_while_typing_reattaches_as_a_watcher_and_types_nothing() {
+    let (client, mut core) = connect();
+    let c = client.clone();
+    let open = tokio::spawn(async move { Viewer::open(&c, "t3", PHONE, Mode::Typing).await });
+    core.attach(7, PHONE).await;
+    let (mut viewer, _) = open.await.unwrap().unwrap();
+    let stepped = tokio::spawn(async move {
+        let r = viewer.step_back().await;
+        (viewer, r)
+    });
+    let close = core.next().await;
+    assert_eq!((close.channel, close.kind), (7, wire::CLOSE));
+    let params = core.attach(8, (120, 40)).await;
+    assert_eq!(params["observe"], true);
+    let (mut viewer, attached) = stepped.await.unwrap();
+    let attached = attached.unwrap().unwrap();
+    assert_eq!((attached.mode, attached.cols, attached.rows), (Mode::Watching, 120, 40));
+    assert_eq!(viewer.mode(), Mode::Watching);
+    assert_sends_nothing(&marker(&client, &mut core).await, "stepping back");
+
+    // Stepping back again changes nothing.
+    assert!(viewer.step_back().await.unwrap().is_none());
+    assert_sends_nothing(&marker(&client, &mut core).await, "a second step back");
+}

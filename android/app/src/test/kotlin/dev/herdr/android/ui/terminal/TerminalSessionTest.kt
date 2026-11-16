@@ -40,6 +40,18 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun theTerminalTakesThePhonesSizeOnlyWhileItShows() {
+        // The chat over the terminal leaves the desk its size (Ezra, 2026-11-16).
+        assertTrue(atPhoneSizeOnOpen(chat = false))
+        assertFalse(atPhoneSizeOnOpen(chat = true))
+        val view = FakeTerminalView()
+        session.attach(view)
+        session.follow(chat = true)
+        session.follow(chat = false)
+        assertEquals(listOf("watch", "lead"), view.calls)
+    }
+
+    @Test
     fun theCachedScreenShowsUntilTheLiveOneArrives() {
         val cached = frameOf(6, 2, mapOf(0 to cellsOf("cached")))
         assertTrue(session.showCached(cached))
@@ -175,6 +187,9 @@ class FakeTerminalView : TerminalViewInterface, AutoCloseable {
     }
     override fun lead() {
         calls += "lead"
+    }
+    override fun watch() {
+        calls += "watch"
     }
     override fun click(col: UShort, row: UShort) {
         calls += "click $col $row"

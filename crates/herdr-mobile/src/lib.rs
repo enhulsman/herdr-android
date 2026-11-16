@@ -597,6 +597,13 @@ impl TerminalView {
         self.send(term::Cmd::Lead);
     }
 
+    /// Watches at the desk's size, handing it its size back (the chat shows
+    /// over the terminal); [`TerminalView::lead`] takes over again.
+    pub fn watch(&self) {
+        #[cfg(feature = "vt")]
+        self.send(term::Cmd::Watch);
+    }
+
     /// A tap on cell (col, row) of the phone's grid: a click for a program
     /// that tracks the mouse, while the phone types (else nothing).
     pub fn click(&self, col: u16, row: u16) {

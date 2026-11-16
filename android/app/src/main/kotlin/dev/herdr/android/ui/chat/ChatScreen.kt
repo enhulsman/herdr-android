@@ -92,8 +92,9 @@ import uniffi.herdr_mobile.ChatPoll
 import uniffi.herdr_mobile.ChatRow
 
 // The chat view over the terminal (spec "The chat shows the conversation as
-// the agents' apps do" and the requirements after it). [now] is uptime ms,
-// ticked by the route while something waits, fixed in screenshot tests;
+// the agents' apps do" and the requirements after it). [now] reads uptime ms,
+// ticked by the route while something waits, fixed in screenshot tests; it is
+// read only inside derivedStateOf, so a tick recomposes only what it changes;
 // [animate] false (reduced motion, screenshots) holds the working line still.
 
 const val LOOKING = "Looking for the conversation…"
@@ -120,7 +121,7 @@ fun ChatScreen(
     poll: ChatPoll?,
     state: ChatState,
     images: ChatImageSource,
-    now: Long,
+    now: () -> Long,
     onTerminal: () -> Unit,
     onPick: () -> Unit,
     onSend: () -> Unit,
@@ -227,7 +228,7 @@ private fun Bottom(text: String, onTerminal: (() -> Unit)?) {
 }
 
 @Composable
-private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, now: Long, animate: Boolean, onOlder: () -> Unit, onTerminal: () -> Unit) {
+private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, now: () -> Long, animate: Boolean, onOlder: () -> Unit, onTerminal: () -> Unit) {
     val rows = poll.rows
     val pending = state.pending
     if (rows.isEmpty() && pending.isEmpty()) {
@@ -264,7 +265,7 @@ private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, 
         snapshotFlow { list.canScrollForward }.collect { more -> if (more && state.stick && !list.isScrollInProgress) list.toEnd() }
     }
     val live = !poll.exited && poll.health !is ChatHealth.Broken
-    val working = live && busy(poll.status, pending, now, state.turnEnd)
+    val working by remember(live, poll.status, pending) { derivedStateOf { live && busy(poll.status, pending, now(), state.turnEnd) } }
     var settled by remember { mutableStateOf(start != null) }
     LaunchedEffect(rows.lastOrNull()?.key, pending.size) {
         if (state.stick || !settled) list.toEnd()
@@ -365,7 +366,7 @@ private val BUBBLE_MAX: Dp = 320.dp
 
 /** A message on its way: dimmed until the log holds it, with what it waits on. */
 @Composable
-private fun PendingBubble(p: Pending, now: Long, onTerminal: () -> Unit, onDismiss: () -> Unit, onDismissWait: () -> Unit) {
+private fun PendingBubble(p: Pending, now: () -> Long, onTerminal: () -> Unit, onDismiss: () -> Unit, onDismissWait: () -> Unit) {
     val c = HerdrTheme.colors
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val text = listOfNotNull(
@@ -377,7 +378,9 @@ private fun PendingBubble(p: Pending, now: Long, onTerminal: () -> Unit, onDismi
             style = HerdrType.body.copy(color = c.dimText),
             modifier = Modifier.widthIn(max = BUBBLE_MAX).clip(BUBBLE).background(c.raised).padding(horizontal = 14.dp, vertical = 10.dp),
         )
-        when (p.state(now)) {
+        val shown by remember(p) { derivedStateOf { p.state(now()) } }
+        val waits by remember(p) { derivedStateOf { p.showsWait(now()) } }
+        when (shown) {
             PendingState.Sending -> Status("Sending…")
             PendingState.Queued -> Status("Queued")
             PendingState.NotArrived -> {
@@ -386,7 +389,7 @@ private fun PendingBubble(p: Pending, now: Long, onTerminal: () -> Unit, onDismi
             }
             PendingState.Sent -> Status(SENT_TO_TERMINAL)
         }
-        if (p.showsWait(now)) {
+        if (waits) {
             BasicText(p.waitingText, style = HerdrType.secondary.copy(color = c.dimText, textAlign = TextAlign.End), modifier = Modifier.widthIn(max = BUBBLE_MAX))
             Actions(onTerminal, onDismissWait)
         }

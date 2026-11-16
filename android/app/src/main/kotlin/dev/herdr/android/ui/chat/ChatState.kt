@@ -49,6 +49,9 @@ class ChatState {
         }
     var refusal by mutableStateOf<Refusal?>(null)
 
+    /** The turn whose answer is still to be read: the working line stays meanwhile. */
+    var turnEnd by mutableStateOf<TurnEnd?>(null)
+
     /** The tool row whose sheet is open, and the call shown in detail. */
     var sheet by mutableStateOf<String?>(null)
     var detail by mutableStateOf<Int?>(null)

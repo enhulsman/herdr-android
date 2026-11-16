@@ -261,7 +261,7 @@ private fun Messages(poll: ChatPoll, state: ChatState, images: ChatImageSource, 
         snapshotFlow { list.canScrollForward }.collect { more -> if (more && state.stick && !list.isScrollInProgress) list.toEnd() }
     }
     val live = !poll.exited && poll.health !is ChatHealth.Broken
-    val working = live && busy(poll.status, pending, now)
+    val working = live && busy(poll.status, pending, now, state.turnEnd)
     var settled by remember { mutableStateOf(start != null) }
     LaunchedEffect(rows.lastOrNull()?.key, pending.size) {
         if (state.stick || !settled) list.toEnd()

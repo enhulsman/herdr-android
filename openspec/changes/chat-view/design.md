@@ -69,7 +69,7 @@ sendable. A message while working is sent like any other (decision 1).
 
 ### D5. Polling follows the terminal's events
 With the chat on screen: each `status`, `turn` or `title` event triggers a
-read; between them, 0.5 s while working or a message waits, 5 s otherwise.
+read; between them, 0.5 s while working, a message waits or a turn's answer is still to be read (up to 3 s after the status stops working), 5 s otherwise.
 The lookup runs when the foreground process changes, every 10 s, and on
 every poll for 5 s after a `/` command. With the terminal view showing:
 one lookup and one recent-window read decide the switch, repeated on each

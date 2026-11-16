@@ -16,6 +16,8 @@ sealed interface MdBlock {
     data class Item(val marker: String, val text: String, val depth: Int) : MdBlock
     data class Code(val text: String) : MdBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : MdBlock
+    /** `>` lines, read as Markdown of their own. */
+    data class Quote(val blocks: List<MdBlock>) : MdBlock
 }
 
 private val TABLE_RULE = Regex("^\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?$")
@@ -56,6 +58,15 @@ fun markdownBlocks(src: String): List<MdBlock> {
                 }
                 i--
                 out += MdBlock.Table(header, rows)
+            }
+            trimmed.startsWith(">") -> {
+                flush()
+                val quoted = StringBuilder()
+                while (i < lines.size && lines[i].trimStart().startsWith(">")) {
+                    quoted.appendLine(lines[i].trimStart().removePrefix(">").removePrefix(" ")); i++
+                }
+                i--
+                out += MdBlock.Quote(markdownBlocks(quoted.toString()))
             }
             trimmed.startsWith("#") -> {
                 flush(); out += MdBlock.Heading(trimmed.trimStart('#').trim())

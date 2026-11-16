@@ -50,6 +50,33 @@ class ChatRowsTest {
     }
 
     @Test
+    fun aQuoteIsABlockWithoutItsMarkers() {
+        // Seen in a real answer: a drafted reply quoted between paragraphs.
+        val src = "So the reply is in Dutch too:\n> Hoi, sorry voor de late reactie.\n> Past woensdag?\nYour calendar is free."
+        assertEquals(
+            listOf(
+                MdBlock.Para("So the reply is in Dutch too:"),
+                MdBlock.Quote(listOf(MdBlock.Para("Hoi, sorry voor de late reactie.\nPast woensdag?"))),
+                MdBlock.Para("Your calendar is free."),
+            ),
+            markdownBlocks(src),
+        )
+    }
+
+    @Test
+    fun aQuoteHoldsItsOwnParagraphsAndLists() {
+        assertEquals(
+            listOf(MdBlock.Quote(listOf(MdBlock.Para("one"), MdBlock.Item("•", "two", 0), MdBlock.Para("three")))),
+            markdownBlocks("> one\n>\n> - two\n>three"),
+        )
+    }
+
+    @Test
+    fun aGreaterThanSignInsideALineIsText() {
+        assertEquals(listOf(MdBlock.Para("a > b")), markdownBlocks("a > b"))
+    }
+
+    @Test
     fun inlineCodeIsMarkedNotPaintedAsASpanBackground() {
         val s = inline("Run `cargo test` and `ls`")
         assertEquals("Run cargo test and ls", s.text)

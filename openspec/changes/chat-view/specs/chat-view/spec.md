@@ -245,7 +245,7 @@ with a button to the terminal; the switch stays.
 
 ### Requirement: The chat shows the conversation as the agents' apps do
 The chat SHALL show the person's messages as bubbles, the agent's text as
-Markdown (headings, lists, tables, links, inline code, and code blocks that
+Markdown (headings, lists, block quotes, tables, links, inline code, and code blocks that
 wrap and have a copy button), a run of tool calls as one line naming what
 ran ("Ran 7 commands, read 2 files, started 1 agent"), notes for slash
 command results, compaction and interruptions, and another agent's or a

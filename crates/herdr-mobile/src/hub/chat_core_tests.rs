@@ -282,6 +282,73 @@ fn a_read_back_that_finds_no_whole_line_reads_wider() {
     assert_eq!(c.plan_older().unwrap().start, (at - 2 * OLDER_BUDGET).to_string());
 }
 
+/// A read of a real file through the tail script, as `machine.exec` runs it.
+fn read_real(r: &Read) -> Result<Chunk, String> {
+    let mut cmd = std::process::Command::new("sh");
+    cmd.arg("-c").arg(herdr_chat::tail::SCRIPT).arg("sh").arg(&r.path).arg(&r.start);
+    if let Some(e) = r.end {
+        cmd.arg(e.to_string());
+    }
+    let out = cmd.env("LC_ALL", "C.UTF-8").output().map_err(|e| e.to_string())?;
+    herdr_chat::tail::parse_chunk(&String::from_utf8_lossy(&out.stdout)).ok_or_else(|| "unexpected".into())
+}
+
+/// Opens a real log at its end and reads back until the start or a stop.
+fn read_back_all(name: &str, log: &str) -> View {
+    let dir = std::env::temp_dir().join(format!("herdr-core-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join(name);
+    std::fs::write(&f, log).unwrap();
+    let t0 = Instant::now();
+    let mut c = ChatCore::new();
+    let l = Lookup::Found { path: f.to_str().unwrap().into(), session: S1.into() };
+    c.take_lookup(&term("idle"), Some(l), t0);
+    let r = c.plan_read().unwrap();
+    c.take_read(read_real(&r), t0);
+    // Each outer turn is one Chat::older (the person reaching the top).
+    for _ in 0..10 {
+        let mut reads = 0;
+        while let Some(r) = c.plan_older() {
+            reads += 1;
+            assert!(reads < 40, "a read back that never ends");
+            if !c.take_older(read_real(&r)) {
+                break;
+            }
+        }
+    }
+    c.view()
+}
+
+/// One JSON line of about `bytes` bytes.
+fn padded(kind: &str, bytes: usize) -> String {
+    format!("{{\"type\":\"{kind}\",\"pad\":\"{}\"}}", "x".repeat(bytes))
+}
+
+#[test]
+fn reading_back_crosses_a_request_record_over_the_read_limit() {
+    // Found in the review: an older message, a 9 MB api-request record, a recent one.
+    let log = format!("{}\n{}\n{}\n", asked("Old"), padded("api-request", 9_000_000), asked("Recent"));
+    let v = read_back_all("big-request.jsonl", &log);
+    assert_eq!(texts(&v), ["user Old", "user Recent"]);
+    assert!(!v.cut, "the start is read");
+}
+
+#[test]
+fn reading_back_crosses_a_message_over_the_read_limit_with_a_note() {
+    let log = format!("{}\n{}\n{}\n", asked("Old"), padded("user", 9_000_000), asked("Recent"));
+    let v = read_back_all("big-message.jsonl", &log);
+    assert_eq!(texts(&v), ["user Old".to_string(), format!("note {SKIPPED}"), "user Recent".to_string()]);
+}
+
+#[test]
+fn reading_back_crosses_many_records_it_does_not_show() {
+    // 10 MB of request records, each small: every window holds only them.
+    let reqs: String = (0..20).map(|_| padded("api-request", 500_000) + "\n").collect();
+    let log = format!("{}\n{reqs}{}\n", asked("Old"), asked("Recent"));
+    let v = read_back_all("many-requests.jsonl", &log);
+    assert_eq!(texts(&v), ["user Old", "user Recent"]);
+}
+
 #[test]
 fn a_failed_read_back_stops_with_a_note_at_the_top() {
     let t0 = Instant::now();

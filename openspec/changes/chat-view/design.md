@@ -114,7 +114,7 @@ A pending message reads "Queued" while the agent works and it waits:
 Claude Code writes a `queue-operation` `enqueue` record with the text within
 0.3 s of the send and a `remove` when it takes the message in (desk check
 2.8), so the parser reports the texts queued; Codex shows a message sent
-mid-turn in its transcript and takes it at the next tool-call boundary, so
+mid-turn in its transcript and takes it at the next tool-call boundary (one sent while it is idle shows the same way while it starts, so only a message sent while it works counts), so
 for Codex the screen text (the terminal stays attached under the chat)
 decides. Otherwise "Sending…". The 30 s expiry starts at sending for a
 message not shown as queued, and when the agent stops working for one that

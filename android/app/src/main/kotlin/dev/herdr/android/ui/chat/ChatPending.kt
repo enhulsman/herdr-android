@@ -256,6 +256,13 @@ fun codexShows(lines: List<String>, text: String): Boolean =
     lines.indices.any { lines[it].trimStart().startsWith(CODEX_PROMPT) && holdsFrom(lines, it, CODEX_PROMPT, text) }
 
 /**
+ * Codex holds [p]: sent mid-turn, still working, and on its screen. A message
+ * sent to an idle Codex shows the same way while Codex starts on it.
+ */
+fun codexQueued(p: Pending, status: String, lines: List<String>): Boolean =
+    p.statusAtSend == "working" && status == "working" && codexShows(lines, p.text)
+
+/**
  * The agent's input box holds exactly [text] (white space ignored): Claude
  * Code's between its last two rules, Codex's at its last prompt. For a photo
  * send the placeholders the agent shows for the paths come first.

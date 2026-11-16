@@ -61,7 +61,8 @@ licenses, sources) before any artifact is uploaded.
 ### Requirement: Obtainium installs and updates the app
 Each release SHALL attach one arm64-v8a APK whose `versionCode` is
 `major*10000 + minor*100 + patch`, tested to exceed the previous release's, plus a
-`herdr-push` binary for Linux x86_64 with its sum and signature. The signing
+`herdr-push` binary for each of Linux x86_64 and aarch64, each with its sum and
+signature. The signing
 certificate fingerprint SHALL be recorded in the repository.
 
 #### Scenario: Update on the phone

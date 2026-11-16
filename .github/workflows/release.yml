@@ -1,8 +1,8 @@
 # Release build on a v* tag (see docs/release.md and the release spec): checks
 # the tag, runs every test (with core-tests.yml: the scratch-core suite against
 # the oldest supported and the latest herdr-core) and cargo-deny, builds the
-# unsigned arm64-v8a APK and herdr-push, and uploads them with their SHA-256
-# sums. No secrets, no caches.
+# unsigned arm64-v8a APK and herdr-push for Linux x86_64 and aarch64 (each on
+# its own architecture's runner), and uploads them with their SHA-256 sums. No secrets, no caches.
 # release-sign.yml signs and publishes once this succeeds; it runs as it is on
 # main and repeats the tag checks itself, since a tag can carry any version of
 # this file.
@@ -32,8 +32,36 @@ jobs:
   core:
     uses: ./.github/workflows/core-tests.yml
 
+  # herdr-push runs on whatever machine runs herdr-core: built natively on an
+  # arm runner, so it links the same libssl as on a Debian or Ubuntu arm host.
+  push-aarch64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain and OpenSSL headers
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q libssl-dev pkg-config
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+
+      - name: herdr-push for Linux aarch64
+        run: |
+          cargo build -p herdr-push --release --locked --target aarch64-unknown-linux-gnu
+          mkdir push && cp target/aarch64-unknown-linux-gnu/release/herdr-push push/herdr-push-aarch64
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: push-aarch64
+          path: push/
+          if-no-files-found: error
+          retention-days: 1
+
   build:
-    needs: core
+    needs: [core, push-aarch64]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -96,12 +124,19 @@ jobs:
           grep -q "^package: name='dev.herdr.android' versionCode='$VERSION_CODE' versionName='${GITHUB_REF_NAME#v}'" <<<"$badging"
           [[ $(grep '^native-code:' <<<"$badging") == "native-code: 'arm64-v8a'" ]]
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: push-aarch64
+          path: push
+
       - name: Stage artifacts and record their sums
         run: |
           mkdir dist
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk dist/herdr-android-unsigned.apk
-          cp target/x86_64-unknown-linux-gnu/release/herdr-push dist/herdr-push
-          (cd dist && sha256sum herdr-android-unsigned.apk herdr-push > SHA256SUMS)
+          cp target/x86_64-unknown-linux-gnu/release/herdr-push dist/herdr-push-x86_64
+          cp push/herdr-push-aarch64 dist/herdr-push-aarch64
+          [[ $(file -b dist/herdr-push-x86_64) == *x86-64* && $(file -b dist/herdr-push-aarch64) == *aarch64* ]]
+          (cd dist && sha256sum herdr-android-unsigned.apk herdr-push-x86_64 herdr-push-aarch64 > SHA256SUMS)
           cat dist/SHA256SUMS
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

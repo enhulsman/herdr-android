@@ -40,9 +40,11 @@ has an Alerts row, "Mute alerts" (agents still go to the top of the list) and
 
 ## Install
 
-1. Download `herdr-push`, `herdr-push.sig` and `SHA256SUMS` from the release and
-   check them (see [release.md](release.md#checking-herdr-push-on-a-machine)).
-2. `install -m 755 herdr-push ~/.local/bin/herdr-push`
+1. Download the `herdr-push` for your machine (`uname -m` names it:
+   `herdr-push-x86_64` or `herdr-push-aarch64`), its `.sig` and `SHA256SUMS`
+   from the release, and check them (see
+   [release.md](release.md#checking-herdr-push-on-a-machine)).
+2. `install -m 755 herdr-push-$(uname -m) ~/.local/bin/herdr-push`
 3. Put the ntfy access token in `~/.config/herdr-push/ntfy-token` (mode 600).
    Use a dedicated ntfy user that may only write to `up*` topics, never read:
 

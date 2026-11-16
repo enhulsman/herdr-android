@@ -122,7 +122,7 @@ jobs:
             exit 1
           fi
 
-      - name: Sign herdr-push (detached, namespace herdr-push)
+      - name: Sign herdr-push for each architecture (detached, namespace herdr-push)
         env:
           HERDR_PUSH_SIGNING_KEY: ${{ secrets.HERDR_PUSH_SIGNING_KEY }}
         run: |
@@ -130,13 +130,16 @@ jobs:
           key="$RUNNER_TEMP/herdr-push-signing"
           trap 'rm -f "$key"' EXIT
           printf '%s\n' "$HERDR_PUSH_SIGNING_KEY" > "$key"
-          cp unsigned/herdr-push release/herdr-push
-          ssh-keygen -Y sign -f "$key" -n herdr-push release/herdr-push
+          for arch in x86_64 aarch64; do
+            cp "unsigned/herdr-push-$arch" "release/herdr-push-$arch"
+            ssh-keygen -Y sign -f "$key" -n herdr-push "release/herdr-push-$arch"
+          done
 
       - name: Publish the release
         working-directory: release
         run: |
-          files=("herdr-android-${TAG#v}.apk" herdr-push herdr-push.sig)
+          files=("herdr-android-${TAG#v}.apk"
+            herdr-push-x86_64 herdr-push-x86_64.sig herdr-push-aarch64 herdr-push-aarch64.sig)
           sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \

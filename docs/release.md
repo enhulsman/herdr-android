@@ -21,7 +21,8 @@ The rules behind this are in `openspec/changes/android-client-v1/specs/release/s
    `main`, `VERSION` matches, and the versionCode is above every published
    release; then it verifies the sums, signs, checks the certificate against
    `docs/release-signing-fingerprint.txt`, and publishes the release with the
-   APK, `herdr-push`, `herdr-push.sig` and `SHA256SUMS`.
+   APK, `herdr-push-x86_64` and `herdr-push-aarch64` with a `.sig` each, and
+   `SHA256SUMS`.
 
 A tag cannot be moved or deleted, so a failed release is fixed with the next
 patch version.
@@ -70,7 +71,7 @@ pushes and workflow runs.
 ```
 sha256sum --check --ignore-missing SHA256SUMS
 ssh-keygen -Y verify -f allowed_signers -I herdr-push -n herdr-push \
-  -s herdr-push.sig < herdr-push
+  -s herdr-push-$(uname -m).sig < herdr-push-$(uname -m)
 ```
 
 `allowed_signers` holds one line: `herdr-push` followed by the public half of

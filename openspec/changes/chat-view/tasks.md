@@ -41,11 +41,11 @@
 ## 5. Review and phone check
 
 - [x] 5.1 `openspec validate chat-view --strict` (valid, 2026-11-14)
-- [ ] 5.2 Codex adversarial review of the branch (send gating, matching, reading bounds, health clearing)
+- [x] 5.2 Codex adversarial review of the branch (send gating, matching, reading bounds, health clearing) (2026-11-16, "needs attention", 5 findings). Fixed with tests: the second Enter went to the terminal unchecked (now through the hub, after the send's checks against the process and session it was typed into); a send with no reply in time gave the draft back (now followed as sent); a read of many short records printed past exec's 8 MiB and stalled (the script stops at 8 MB printed); reading back stopped at a record over 7.5 MB or a stretch of request records (it now steps past them, and an oversized request record gets no note). Left for 5.6: an open chat's memory grows with the session (no cap in the spec; measure first). Also fixed from the 5.3 round: "No conversation found" for 2 s after `/clear` (the Empty guard took the old session's turn)
 - [ ] 5.3 Test phone, debug build: every spec scenario that needs a device (two agents in a folder, new session watched in the terminal, `/clear` within 5 s, exit, 84 MB log within 2 s, blocked send, `/usage` refusal and Dismiss, a message queued behind a minute-long command, photo send (and whether its Enter is dropped like a file path), swipe, keyboard in a working session, taps on the margin above the box and between rows reach nothing); tune the fade with Ezra. A missed target is recorded here and becomes a spec change
 - [ ] 5.4 Owner's daily phone (install only, Ezra drives): a working session with the keyboard open; a day of real use
 - [ ] 5.5 Untested cases: Codex slash commands (dialogs, status, what they write; amend the spec if it differs from Claude Code's), `/resume` inside each agent, a person-attached image in Codex, a mirrored EXIF photo
-- [ ] 5.6 Desk and battery cost of 0.5 s polling and event lookups: an hour of a working agent with the chat open on the test phone, and an hour with a Missed agent in terminal view; record it here
+- [ ] 5.6 Desk and battery cost of 0.5 s polling and event lookups: an hour of a working agent with the chat open on the test phone, and an hour with a Missed agent in terminal view, and the app's memory over the hour with the chat open (the review's open finding: no cap on what an open chat holds); record it here
 
 ## 6. Records
 

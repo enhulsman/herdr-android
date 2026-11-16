@@ -104,7 +104,10 @@ A diff is fetched whole (up to the 8 MB exec limit) when its file is opened
 and held while the diff screen shows; the screen draws the first 2,000
 lines after the file headers and "Show the whole diff" draws the rest from
 what is held. A `truncated` result is "Too large to show on the phone"
-(Ezra, 2026-11-16: the exception to decision 5). *Over* fetching 2,000
+(Ezra, 2026-11-16: the exception to decision 5), and so is a diff past
+50,000 lines after its headers, of which only the first 50,000 are held
+(Ezra, 2026-11-16, after the review: 8 MB of near-empty lines would be
+millions of records on the phone). *Over* fetching 2,000
 lines and then the rest: git has no line range, and a shell `head` would
 break D2's no-shell rule. The cost is up to 8 MB over mobile data for a
 huge diff opened once (the Mac does the same, uncapped).

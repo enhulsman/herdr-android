@@ -61,6 +61,9 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     val switch = chat.switch
     // The Changes screen (issue 19) over either view; nothing is sent to the terminal for it.
     var changesOpen by remember(key) { mutableStateOf(false) }
+    // While it shows, the phone's grid (it grows when the keyboard hides) is held, not
+    // sent: the desk keeps its size under a permission prompt. Back applies the last one.
+    var heldGrid by remember(key) { mutableStateOf<GridSize?>(null) }
     val opener = remember(key, generation) {
         TerminalOpener(session) { size ->
             // Opened at the phone's size (phone check round 2) unless the chat shows over it;
@@ -162,7 +165,7 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             onOpen = home::open,
             onSwipe = home::step,
             onTab = home::tab,
-            onPhoneGrid = { phone = it },
+            onPhoneGrid = { if (changesOpen) heldGrid = it else phone = it },
             onWatchView = { app.terminalZoom[key] = it.zoom },
         )
     }
@@ -204,7 +207,11 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
         }
         if (changesOpen) {
             val changes = remember(key) { app.hubHost.hub?.openChanges(key.machine, key.address) }
-            ChangesRoute(changes, ui.header.name, ui.header.lineTwo.substringBefore(" · ")) { changesOpen = false }
+            ChangesRoute(changes, ui.header.name, ui.header.lineTwo.substringBefore(" · ")) {
+                changesOpen = false
+                heldGrid?.let { phone = it }
+                heldGrid = null
+            }
         }
     }
 }

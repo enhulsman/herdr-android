@@ -6,6 +6,10 @@ use crate::read::{Exec, Kind, Outcome, check};
 pub const LINE_MAX: usize = 4000;
 /// Lines shown before "Show the whole diff (N lines)".
 pub const SHOWN_FIRST: usize = 2000;
+/// Lines after the file headers held at most; past this the diff is "Too
+/// large to show on the phone" (8 MB of near-empty lines would otherwise be
+/// millions of records).
+pub const LINES_MAX: usize = 50_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Line {
@@ -23,8 +27,8 @@ pub struct Diff {
     /// How many of [`Diff::lines`] are file headers (`diff --git` up to and
     /// including `+++`, or the extended header when there is no `+++`).
     pub headers: usize,
-    /// The output passed what one call returns: [`Diff::lines`] is its
-    /// start ("Too large to show on the phone").
+    /// The output passed what one call returns, or [`LINES_MAX`] lines:
+    /// [`Diff::lines`] is its start ("Too large to show on the phone").
     pub too_large: bool,
 }
 
@@ -57,17 +61,25 @@ pub fn parse_diff(kind: Kind, exec: Exec) -> Outcome<Diff> {
     if new && !out.starts_with(b"diff --git") {
         return Outcome::Failed(None);
     }
-    let mut parts: Vec<&[u8]> = out.split(|&b| b == b'\n').collect();
+    // Never more than the cap and the longest header are split off.
+    let mut split = out.split(|&b| b == b'\n');
+    let mut parts: Vec<&[u8]> = split.by_ref().take(LINES_MAX + EXTENDED.len() + 3).collect();
+    let more = split.next().is_some();
     // The part after the last line feed: empty, or a line cut off mid-way.
-    if parts.last().is_some_and(|p| p.is_empty() || truncated) {
+    if !more && parts.last().is_some_and(|p| p.is_empty() || truncated) {
         parts.pop();
     }
-    let lines: Vec<Line> = parts.into_iter().map(line).collect();
+    let mut lines: Vec<Line> = parts.into_iter().map(line).collect();
     let headers = headers(&lines);
+    let mut too_large = truncated;
+    if lines.len() - headers > LINES_MAX {
+        lines.truncate(headers + LINES_MAX);
+        too_large = true;
+    }
     Outcome::Ok(Diff {
         lines,
         headers,
-        too_large: truncated,
+        too_large,
     })
 }
 

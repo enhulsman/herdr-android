@@ -219,11 +219,16 @@ impl Reader {
         match self.stage {
             Stage::Top => {
                 let (out, _) = ok(exec, true, &[0])?;
-                // The top, then the `--` that rev-parse echoes.
-                let top = String::from_utf8_lossy(&out);
-                self.top = top.lines().next().unwrap_or("").to_owned();
-                if self.top.is_empty() {
-                    return Err(Outcome::Failed(None));
+                // The top, then the `--` that rev-parse echoes; a top may hold
+                // a line feed of its own, and one that is not UTF-8 cannot be
+                // passed to machine.exec as it is.
+                let top = out
+                    .strip_suffix(b"\n--\n")
+                    .or_else(|| out.strip_suffix(b"\n"))
+                    .unwrap_or(&out);
+                match std::str::from_utf8(top) {
+                    Ok(t) if !t.is_empty() => self.top = t.to_owned(),
+                    _ => return Err(Outcome::Failed(None)),
                 }
                 Ok(self.run(Stage::Head, Shape::Head))
             }

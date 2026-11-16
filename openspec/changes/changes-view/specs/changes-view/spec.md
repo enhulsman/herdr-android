@@ -122,13 +122,18 @@ missing newline at the end, and a submodule (with its old and new commit).
 A diff of more than 2,000 lines (counted after its file headers) SHALL show
 its first 2,000 lines and a control "Show the whole diff (N lines)", N being
 that count, that shows the rest. A diff larger than herdr-core returns in
-one call (8 MB) SHALL show what arrived and read "Too large to show on the
+one call (8 MB), or longer than 50,000 lines after its file headers, SHALL
+show its start (at most 50,000 lines) and read "Too large to show on the
 phone" instead of that control. A single line over 4,000 characters SHALL
 be cut with a mark, also in the whole diff.
 
 #### Scenario: Lockfile churn
 - **WHEN** a lockfile's diff is 20,000 lines long
 - **THEN** the first 2,000 lines show with "Show the whole diff (20,000 lines)", and a tap shows all of them
+
+#### Scenario: A diff of very many short lines
+- **WHEN** an untracked file holds three million empty lines (under 8 MB)
+- **THEN** its first 50,000 lines show and the screen reads "Too large to show on the phone"
 
 #### Scenario: A new file larger than one call
 - **WHEN** an untracked 30 MB log file is opened

@@ -34,7 +34,6 @@ import dev.herdr.android.ui.chat.rememberChatVisit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import uniffi.herdr_mobile.HubSnapshot
-import uniffi.herdr_mobile.RowKeyTap
 import uniffi.herdr_mobile.TerminalViewInterface
 
 /**
@@ -165,7 +164,6 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     ChatPolling(
         chat, app,
         screen = { (0 until session.grid.rows).map(session.grid::rowText) },
-        enter = { session.tap(RowKeyTap.Enter) },
     )
     Box {
         val input = TerminalKeyboard(key, sink)

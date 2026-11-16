@@ -135,9 +135,9 @@ class ChatSendTest {
         val out = s.send(rows, "idle", now = 0)!!
         s.typed(out.pending.id, now = 0)
         val box = claudeBox("Read @/work/website/notes/plan.md ")
-        assertNull("not before 1.5 s", s.enterAgain("claude", box, now = ENTER_AGAIN_MS - 1))
-        assertEquals(out.pending.id, s.enterAgain("claude", box, now = ENTER_AGAIN_MS))
-        assertNull("once per message, never twice", s.enterAgain("claude", box, now = ENTER_AGAIN_MS + 2_000))
+        assertNull("not before 1.5 s", s.enterAgain("claude", box, now = ENTER_AGAIN_MS - 1, canSend = true))
+        assertEquals(out.pending.id, s.enterAgain("claude", box, now = ENTER_AGAIN_MS, canSend = true))
+        assertNull("once per message, never twice", s.enterAgain("claude", box, now = ENTER_AGAIN_MS + 2_000, canSend = true))
     }
 
     @Test
@@ -145,9 +145,24 @@ class ChatSendTest {
         val s = ChatState()
         s.draft = "Run the tests"
         val out = s.send(rows, "idle", now = 0)!!
-        assertNull("not typed yet", s.enterAgain("claude", claudeBox("Run the tests"), now = 5_000))
+        assertNull("not typed yet", s.enterAgain("claude", claudeBox("Run the tests"), now = 5_000, canSend = true))
         s.typed(out.pending.id, now = 0)
-        assertNull(s.enterAgain("claude", claudeBox("Something the person typed"), now = 5_000))
-        assertNull(s.enterAgain("claude", claudeBox(""), now = 5_000))
+        assertNull(s.enterAgain("claude", claudeBox("Something the person typed"), now = 5_000, canSend = true))
+        assertNull(s.enterAgain("claude", claudeBox(""), now = 5_000, canSend = true))
+    }
+
+    @Test
+    fun noEnterWhileTheAgentCannotTakeAMessage() {
+        // A dialog opened, the agent exited or the session changed: the
+        // chat cannot send, so neither does the second Enter.
+        val s = ChatState()
+        s.draft = "Read @/work/website/notes/plan.md"
+        val out = s.send(rows, "idle", now = 0)!!
+        s.typed(out.pending.id, now = 0)
+        val box = claudeBox("Read @/work/website/notes/plan.md ")
+        assertNull(s.enterAgain("claude", box, now = ENTER_AGAIN_MS, canSend = false))
+        // Once it can again, the Enter still goes, once.
+        assertEquals(out.pending.id, s.enterAgain("claude", box, now = ENTER_AGAIN_MS + 500, canSend = true))
+        assertNull(s.enterAgain("claude", box, now = ENTER_AGAIN_MS + 1_000, canSend = true))
     }
 }

@@ -141,7 +141,9 @@ class ChatState {
      * ([lines]: the terminal's screen), with no row for it: Enter is pressed
      * once more for it, once. Its id, or null.
      */
-    fun enterAgain(agent: String, lines: List<String>, now: Long): Long? {
+    fun enterAgain(agent: String, lines: List<String>, now: Long, canSend: Boolean): Long? {
+        // Not into a dialog, a shell or another session: the send's own checks.
+        if (!canSend) return null
         val p = pending.firstOrNull { it.needsEnter(now, boxHolds(agent, lines, it.text, it.images)) } ?: return null
         update(p.id) { it.enteredAgain() }
         return p.id

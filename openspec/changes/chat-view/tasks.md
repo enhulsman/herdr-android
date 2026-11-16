@@ -50,4 +50,4 @@
 ## 6. Records
 
 - [ ] 6.1 `decisions.md`: the proposal's decisions as settled; README feature line
-- [ ] 6.2 Draft the 1.x issues verbatim (plan limits, verb themes, terminal rows while a command waits, session switching, `/` completion, the start hook, the Codex image fallback by order within a tool call); create them after Ezra's OK
+- [ ] 6.2 Draft the 1.x issues verbatim (plan limits, verb themes, terminal rows while a command waits, session switching, `/` completion, the start hook, the Codex image fallback by order within a tool call, renaming panes and agent titles from the phone: herdr-core 0.1.15 has no terminal or pane rename, so it needs a core call or herdr's own command); create them after Ezra's OK

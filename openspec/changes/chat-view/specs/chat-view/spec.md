@@ -61,7 +61,14 @@ The lookup SHALL give one of four results:
 
 Empty SHALL turn Missed when the agent's first turn ends (working, then
 done or idle) and its log still does not exist, so a misread id shows the
-terminal rather than an empty chat for good.
+terminal rather than an empty chat for good. Only a turn that began on that
+same session counts, and not one a command sent from the chat began: the
+turn of a `/clear` belongs to the old session, and the new log is written
+about a second after it ends.
+
+#### Scenario: Between /clear and the new log
+- **WHEN** Ezra sends `/clear` from the chat and the new session's log is not written yet
+- **THEN** the chat shows the new, empty conversation, never "No conversation found"
 
 #### Scenario: Two agents in one folder
 - **WHEN** two Claude Code agents run in the same folder in two terminals
@@ -118,14 +125,21 @@ reads SHALL read only new whole lines; each read SHALL span at most 7.5 MB.
 The script SHALL drop records the chat never shows and replace base64 image
 data over 300 characters with a reference. Scrolling to the top SHALL read
 the 2 MB before the oldest line held (doubled while one line is longer),
-back to the start of the log, and every line SHALL be read exactly once. A
-record over 7.5 MB SHALL be skipped with a note, and reading SHALL go on
-after it. A read that fails SHALL keep the chat and say so over it
+back to the start of the log, and every line SHALL be read exactly once,
+passing over records it never shows and records over 7.5 MB on the way. A
+read SHALL print at most 8 MB, what `machine.exec` keeps, stopping early
+when the lines' offsets would make it longer. A
+record over 7.5 MB SHALL be skipped with a note (none for a record the
+chat never shows), and reading SHALL go on after it. A read that fails SHALL keep the chat and say so over it
 ("Can't read new messages; retrying") until a read succeeds.
 
 #### Scenario: An 84 MB log
 - **WHEN** Ezra opens the chat of an agent whose log is 84 MB
 - **THEN** the recent messages show within 2 s on Wi-Fi, and scrolling up loads older ones in steps
+
+#### Scenario: Reading back past a 9 MB record
+- **WHEN** Ezra scrolls to the top of a chat whose older messages lie before a 9 MB record
+- **THEN** the older messages load, with a note in the record's place unless it is a request record
 
 #### Scenario: A record too large to read
 - **WHEN** the agent writes one record of 9 MB
@@ -314,7 +328,14 @@ SHALL pass `terminal.send`'s `if` guard with the status seen at the check
 when that is idle or working; for done no guard exists, a known window. A
 refusal SHALL keep the draft and say why ("The agent is waiting for you in
 the terminal", "The agent has exited", "This is a different session now"),
-with a button to the terminal where it applies.
+with a button to the terminal where it applies. A send whose outcome is not
+known (no reply in time, or the connection lost while waiting) is not a
+refusal: it may be typed, so its bubble SHALL stay and be followed as sent,
+and the draft SHALL NOT come back.
+
+#### Scenario: No reply to the send
+- **WHEN** the connection drops while the message is being sent
+- **THEN** the bubble stays, turns into the row if the message arrives, and reads "Not in the conversation yet" after 30 s if it does not; the draft stays empty
 
 #### Scenario: Blocked on a permission prompt
 - **WHEN** Ezra taps send while the agent is blocked
@@ -346,13 +367,18 @@ message in its box (seen on 2.1.325: lost 6 of 8 times, 0 of 3 with the
 space; the log holds the message without it). The app SHALL also press
 Enter once more, once per message, when the terminal's screen still shows
 the sent message in the agent's input box 1.5 s after sending and no row for
-it has arrived, spaces at its end ignored; for a photo send, its text after
+it has arrived, spaces at its end ignored, and only after the send's own
+checks pass again against the process and session it was typed into; for a photo send, its text after
 the placeholders the agent shows in place of the photo paths. An Enter 1 s
 or more after the paste is taken.
 
 #### Scenario: A message ending in a file path
 - **WHEN** Ezra sends `Read @/work/website/notes/plan.md` to an idle Claude Code
 - **THEN** it is typed with a space at its end, sent by the first Enter, and its bubble turns into the row
+
+#### Scenario: A dialog before the second Enter
+- **WHEN** the agent shows a dialog, exits or starts another session before the second Enter is due
+- **THEN** no Enter is pressed while it cannot take a message
 
 #### Scenario: A message with a file path
 - **WHEN** Ezra sends `@/work/website/notes/plan.md` to an idle Claude Code

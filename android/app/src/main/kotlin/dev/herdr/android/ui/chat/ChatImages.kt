@@ -270,12 +270,26 @@ private val SENDABLE = setOf("image/png", "image/jpeg", "image/gif", "image/webp
 /** An attached photo's file name beside the terminal: unique within a pick and across picks. */
 fun photoName(stamp: Long, index: Int, ext: String) = "photo-$stamp-$index.$ext"
 
-/** The turn that puts a photo upright, from its EXIF orientation (mirrored ones are left as they are). */
-fun exifRotation(orientation: Int): Float = when (orientation) {
-    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-    else -> 0f
+/** What puts a photo upright: mirrored left to right first if [mirror], then turned [degrees] clockwise. */
+data class ExifTurn(val degrees: Float, val mirror: Boolean) {
+    val none: Boolean get() = degrees == 0f && !mirror
+
+    fun matrix(): Matrix = Matrix().apply {
+        if (mirror) postScale(-1f, 1f)
+        postRotate(degrees)
+    }
+}
+
+/** The turn for a photo's EXIF orientation, the mirrored ones included. */
+fun exifTurn(orientation: Int): ExifTurn = when (orientation) {
+    ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> ExifTurn(0f, true)
+    ExifInterface.ORIENTATION_ROTATE_180 -> ExifTurn(180f, false)
+    ExifInterface.ORIENTATION_FLIP_VERTICAL -> ExifTurn(180f, true)
+    ExifInterface.ORIENTATION_TRANSPOSE -> ExifTurn(270f, true)
+    ExifInterface.ORIENTATION_ROTATE_90 -> ExifTurn(90f, false)
+    ExifInterface.ORIENTATION_TRANSVERSE -> ExifTurn(90f, true)
+    ExifInterface.ORIENTATION_ROTATE_270 -> ExifTurn(270f, false)
+    else -> ExifTurn(0f, false)
 }
 
 /** A picked photo as it will be sent: small enough, in a type agents take. */
@@ -286,20 +300,20 @@ fun prepareAttachment(context: Context, uri: Uri, index: Int = 0): Attachment? {
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     if (bounds.outWidth <= 0) return null
     val stamp = System.currentTimeMillis()
-    // A camera photo is stored sideways with an orientation tag; re-encoding
-    // drops the tag, so it is turned upright first (and always re-encoded).
+    // A camera photo is stored sideways or mirrored with an orientation tag;
+    // re-encoding drops the tag, so it is turned upright first (and always re-encoded).
     val turn = runCatching {
-        exifRotation(ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL))
-    }.getOrDefault(0f)
+        exifTurn(ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL))
+    }.getOrDefault(ExifTurn(0f, false))
     val long = uploadLongEdge(bounds.outWidth, bounds.outHeight, bytes.size)
-        ?: if (type in SENDABLE && turn == 0f) null else maxOf(bounds.outWidth, bounds.outHeight).coerceAtMost(2000)
+        ?: if (type in SENDABLE && turn.none) null else maxOf(bounds.outWidth, bounds.outHeight).coerceAtMost(2000)
     val (name, out) = if (long == null) {
         photoName(stamp, index, type.substringAfter('/')) to bytes
     } else {
         val full = decodeSampled(bytes, long, atLeast = true)?.asAndroidBitmap() ?: return null
         val k = long.toFloat() / maxOf(full.width, full.height)
         val scaled = if (k < 1f) Bitmap.createScaledBitmap(full, (full.width * k).toInt(), (full.height * k).toInt(), true) else full
-        val upright = if (turn == 0f) scaled else Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, Matrix().apply { postRotate(turn) }, true)
+        val upright = if (turn.none) scaled else Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, turn.matrix(), true)
         val buf = ByteArrayOutputStream()
         upright.compress(Bitmap.CompressFormat.JPEG, 85, buf)
         photoName(stamp, index, "jpg") to buf.toByteArray()

@@ -2,7 +2,9 @@ package dev.herdr.android.ui.chat
 
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -135,11 +137,23 @@ class ChatStateTest {
 
     @Test
     fun cameraPhotosAreTurnedUprightBeforeSending() {
-        assertEquals(0f, exifRotation(android.media.ExifInterface.ORIENTATION_NORMAL))
-        assertEquals(0f, exifRotation(android.media.ExifInterface.ORIENTATION_UNDEFINED))
-        assertEquals(90f, exifRotation(android.media.ExifInterface.ORIENTATION_ROTATE_90))
-        assertEquals(180f, exifRotation(android.media.ExifInterface.ORIENTATION_ROTATE_180))
-        assertEquals(270f, exifRotation(android.media.ExifInterface.ORIENTATION_ROTATE_270))
+        // Mirror first (left to right), then turn clockwise.
+        assertEquals(ExifTurn(0f, false), exifTurn(android.media.ExifInterface.ORIENTATION_NORMAL))
+        assertEquals(ExifTurn(0f, false), exifTurn(android.media.ExifInterface.ORIENTATION_UNDEFINED))
+        assertEquals(ExifTurn(90f, false), exifTurn(android.media.ExifInterface.ORIENTATION_ROTATE_90))
+        assertEquals(ExifTurn(180f, false), exifTurn(android.media.ExifInterface.ORIENTATION_ROTATE_180))
+        assertEquals(ExifTurn(270f, false), exifTurn(android.media.ExifInterface.ORIENTATION_ROTATE_270))
+        assertTrue(exifTurn(android.media.ExifInterface.ORIENTATION_NORMAL).none)
+    }
+
+    @Test
+    fun mirroredPhotosAreTurnedUprightToo() {
+        assertEquals(ExifTurn(0f, true), exifTurn(android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL))
+        assertEquals(ExifTurn(180f, true), exifTurn(android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL))
+        // Transpose (5): mirrored, then a quarter turn back, so (x, y) lands on (y, x).
+        assertEquals(ExifTurn(270f, true), exifTurn(android.media.ExifInterface.ORIENTATION_TRANSPOSE))
+        assertEquals(ExifTurn(90f, true), exifTurn(android.media.ExifInterface.ORIENTATION_TRANSVERSE))
+        assertFalse(exifTurn(android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL).none)
     }
 
     @Test

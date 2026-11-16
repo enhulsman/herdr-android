@@ -204,7 +204,10 @@ fn a_diff_of_many_short_lines_is_held_only_up_to_the_line_cap() {
     let Outcome::Ok(d) = parse_diff(Kind::New, ran(&out, 1, false)) else {
         panic!()
     };
-    assert!(d.too_large, "past the line cap reads 'Too large to show on the phone'");
+    assert!(
+        d.too_large,
+        "past the line cap reads 'Too large to show on the phone'"
+    );
     assert_eq!(d.body_len(), LINES_MAX);
     assert!(!d.is_long());
     assert_eq!(d.headers, 5);
@@ -213,7 +216,8 @@ fn a_diff_of_many_short_lines_is_held_only_up_to_the_line_cap() {
 #[test]
 fn a_diff_at_the_line_cap_is_whole() {
     use herdr_changes::diff::LINES_MAX;
-    let mut out = b"diff --git a/a b/a\nindex 1..2 100644\n--- a/a\n+++ b/a\n@@ -1 +1,49999 @@\n".to_vec();
+    let mut out =
+        b"diff --git a/a b/a\nindex 1..2 100644\n--- a/a\n+++ b/a\n@@ -1 +1,49999 @@\n".to_vec();
     out.extend(std::iter::repeat_n(b"+x\n".as_slice(), LINES_MAX - 1).flatten());
     let Outcome::Ok(d) = parse_diff(Kind::Changed, ran(&out, 0, false)) else {
         panic!()
@@ -235,14 +239,23 @@ fn top_after(out: &[u8]) -> Result<String, Outcome<herdr_changes::List>> {
 
 #[test]
 fn a_repository_top_keeps_a_newline_in_its_name() {
-    assert_eq!(top_after(b"/work/site\nother\n--\n"), Ok("/work/site\nother".into()));
-    assert_eq!(top_after(b"/work/website\n--\n"), Ok("/work/website".into()));
+    assert_eq!(
+        top_after(b"/work/site\nother\n--\n"),
+        Ok("/work/site\nother".into())
+    );
+    assert_eq!(
+        top_after(b"/work/website\n--\n"),
+        Ok("/work/website".into())
+    );
     // Without the echoed `--` (older git), the last line feed alone ends it.
     assert_eq!(top_after(b"/work/website\n"), Ok("/work/website".into()));
 }
 
 #[test]
 fn a_repository_top_that_is_not_utf8_cannot_be_read() {
-    assert_eq!(top_after(b"/work/caf\xe9\n--\n"), Err(Outcome::Failed(None)));
+    assert_eq!(
+        top_after(b"/work/caf\xe9\n--\n"),
+        Err(Outcome::Failed(None))
+    );
     assert_eq!(top_after(b"\n--\n"), Err(Outcome::Failed(None)));
 }

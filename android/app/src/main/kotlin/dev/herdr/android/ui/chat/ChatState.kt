@@ -38,7 +38,15 @@ class ChatState {
     var poll by mutableStateOf<ChatPoll?>(null)
     var draft by mutableStateOf("")
     var attached by mutableStateOf<List<Attachment>>(emptyList())
-    var pending by mutableStateOf<List<Pending>>(emptyList())
+    private var pendingNow by mutableStateOf<List<Pending>>(emptyList())
+
+    /** Setting it ends the dialog refusal once no slash command's wait is open. */
+    var pending: List<Pending>
+        get() = pendingNow
+        set(value) {
+            pendingNow = value
+            if (refusal?.text == DIALOG_FIRST && value.none { it.waitOpen }) refusal = null
+        }
     var refusal by mutableStateOf<Refusal?>(null)
 
     /** The tool row whose sheet is open, and the call shown in detail. */

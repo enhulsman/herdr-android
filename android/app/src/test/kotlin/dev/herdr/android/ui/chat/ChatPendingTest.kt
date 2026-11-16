@@ -294,6 +294,19 @@ class ChatPendingTest {
     }
 
     @Test
+    fun theWaitingLineCountsFromTheTapWhileTheSendStillRuns() {
+        // Seen on the test phone: terminal.send answers a /usage after 5.2 s
+        // (the core waits to see the program start working; a dialog never
+        // does), so counting from that answer showed the line after 8 s and
+        // let a second send through into the dialog meanwhile.
+        val p = pendingFor(1, "/usage", 0, emptyList(), "idle", now = 1_000)
+        assertFalse(p.waiting(now = 3_999))
+        assertTrue("the send has not answered yet", p.waiting(now = 4_000))
+        assertEquals(DIALOG_FIRST, sendRefusal(listOf(p), now = 4_000))
+        assertTrue(p.typed(6_200).waiting(now = 6_300))
+    }
+
+    @Test
     fun theWaitingLineRefusesSendsUntilItEnds() {
         val p = send("/usage", emptyList(), status = "idle", at = 0)
         assertEquals(DIALOG_FIRST, sendRefusal(listOf(p), now = 5_000))

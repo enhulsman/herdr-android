@@ -395,11 +395,27 @@ class ChatPendingTest {
     }
 
     @Test
-    fun anAnswerGrowingTheLastRowEndsIt() {
-        val rows = turn + said("3:0", "The sheep")
-        val end = nextTurnEnd(null, "working", rows, "idle", rows, now = 10_000)
+    fun theAnswerReadBeforeTheTurnEndsHoldsNothing() {
+        // Codex writes its answer, then ends the turn: the line goes with the status.
+        val answered = turn + said("3:0", "Hello. What are we working on?")
+        assertNull(nextTurnEnd(null, "working", answered, "idle", answered, now = 10_000))
+        val noted = turn + ChatRow("3:0", "note", "Interrupted", "", emptyList(), emptyList())
+        assertNull("a note ends the turn too", nextTurnEnd(null, "working", noted, "idle", noted, now = 10_000))
+    }
+
+    @Test
+    fun anAgentCardOrTheMessageLastHolds() {
+        val card = turn + ChatRow("3:0", "agent", "Explore the repo", "", emptyList(), emptyList())
+        assertTrue(nextTurnEnd(null, "working", card, "idle", card, now = 10_000).holds(now = 10_000))
+        val asked = listOf(user("1:0", "Write a poem"))
+        assertTrue(nextTurnEnd(null, "working", asked, "idle", asked, now = 10_000).holds(now = 10_000))
+    }
+
+    @Test
+    fun aGrowingLastRowEndsIt() {
+        val end = nextTurnEnd(null, "working", turn, "idle", turn, now = 10_000)
         assertTrue(end.holds(now = 10_000))
-        assertNull(nextTurnEnd(end, "idle", rows, "idle", turn + said("3:0", "The sheep come down"), now = 10_500))
+        assertNull(nextTurnEnd(end, "idle", turn, "idle", listOf(turn[0], shell("2:0", "date", "date")), now = 10_500))
     }
 
     @Test

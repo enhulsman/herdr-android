@@ -201,15 +201,21 @@ data class TurnEnd(val at: Long, val last: ChatRow?)
 
 fun TurnEnd?.holds(now: Long): Boolean = this != null && now - at < ANSWER_MS
 
+/** Last rows after which the turn's answer is still to come: the message, a tool row, an agent's card. */
+private val ANSWER_DUE = setOf("user", "tools", "agent")
+
 /**
  * The turn end after a poll that read [status] and [rows], the poll before it
- * having read [wasStatus] and [wasRows] (null on the first). Null once a row
- * newer than [TurnEnd.last] is in (a grown last row counts), after
- * [ANSWER_MS], or when the agent works again or is blocked.
+ * having read [wasStatus] and [wasRows] (null on the first). Only a turn whose
+ * last row leaves the answer to come holds (Codex writes its answer before it
+ * ends the turn). Null once a row newer than [TurnEnd.last] is in (a grown
+ * last row counts), after [ANSWER_MS], or when the agent works again or is
+ * blocked.
  */
 fun nextTurnEnd(held: TurnEnd?, wasStatus: String?, wasRows: List<ChatRow>, status: String, rows: List<ChatRow>, now: Long): TurnEnd? {
     if (status == "working" || status == "blocked") return null
-    val end = if (wasStatus == "working") TurnEnd(now, wasRows.lastOrNull()) else held
+    val due = wasRows.lastOrNull()?.takeIf { it.kind in ANSWER_DUE }
+    val end = if (wasStatus == "working") due?.let { TurnEnd(now, it) } else held
     return end?.takeIf { it.holds(now) && rows.lastOrNull() == it.last }
 }
 

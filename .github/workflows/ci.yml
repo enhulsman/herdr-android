@@ -147,9 +147,29 @@ jobs:
 
   # The one check the main ruleset requires: green when every job above passed
   # or was skipped for a docs-only change, red when any failed or was cancelled.
+  # The release builds herdr-push for aarch64 on an arm runner: prove it builds.
+  push-aarch64:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain and OpenSSL headers
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q libssl-dev pkg-config
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+
+      - name: herdr-push for Linux aarch64
+        run: cargo build -p herdr-push --release --locked --target aarch64-unknown-linux-gnu
+
   ci-ok:
     if: always()
-    needs: [changes, rust, core, android]
+    needs: [changes, rust, core, android, push-aarch64]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

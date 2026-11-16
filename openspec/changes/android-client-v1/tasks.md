@@ -55,4 +55,4 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [ ] M4.4 Phone check
 
 ### M5. Changes view
-Moved to its own change, `openspec/changes/changes-view/` (2026-11-16).
+Moved to its own change, `openspec/changes/changes-view/` (2026-11-16), archived as `openspec/changes/archive/2026-11-16-changes-view/` and synced to `openspec/specs/changes-view/`.

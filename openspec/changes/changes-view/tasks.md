@@ -21,11 +21,11 @@
 
 - [x] 4.1 Pure functions: every diff line kind (added, removed, context, hunk header, file header, no newline mark, binary, submodule, mode change, empty file), wrapping with the continuation mark, the carriage return mark, the 4,000-character cut, status words, count texts, the 2,000-line cut and its control text
 - [x] 4.2 Changes screen per the signed-off render: list, diff, states; goldens in paper and graphite for every state in 1.2 plus loading, a binary file, a submodule, a new file, an empty file, a mode change, a nested repository, a conflict, "Too large to show on the phone", "No longer changed", 1,000 files; each text checked against the spec's table
-- [ ] 4.3 Changes button in the title bar of both views; back returns to the view as it was; the terminal under it keeps watching at the desk's size; content descriptions for rows and the button
+- [x] 4.3 Changes button in the title bar of both views; back returns to the view as it was; the terminal under it keeps watching at the desk's size; content descriptions for rows and the button
 
 ## 5. Review and phone check
 
-- [ ] 5.1 `openspec validate changes-view --strict`
+- [x] 5.1 `openspec validate changes-view --strict`
 - [ ] 5.2 Codex adversarial review of the branch (the git calls, read-only guarantees, caps)
 - [ ] 5.3 Test phone, debug build: every spec scenario that needs a device (before approving a blocked agent, the agent going on, a reverted file, lockfile churn, a 30 MB new file, a plain folder, back from a lost connection, from the chat and back), on the test repository and in a throwaway agent; the data an open huge diff costs per turn (D5, Risks)
 - [ ] 5.4 Records: `decisions.md` and the README feature line

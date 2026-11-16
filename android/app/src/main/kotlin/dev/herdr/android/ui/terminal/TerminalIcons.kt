@@ -61,6 +61,11 @@ enum class LineIcon(val strokeWidth: Float, val paths: List<String>) {
     Search(2f, listOf("M19 11a8 8 0 1 1-16 0a8 8 0 1 1 16 0z", "m21 21-4.3-4.3")),
     File(2f, listOf("M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z", "M14 2v4a2 2 0 0 0 2 2h4")),
     Close(2f, listOf("M18 6 6 18", "m6 6 12 12")),
+    // The title bar's Changes button (render 13, `ico.changes`): a file with a plus over a minus.
+    Changes(
+        1.7f,
+        listOf("M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z", "M14 3v5h5", "M12 10.5v5", "M9.5 13h5", "M9.5 17.5h5"),
+    ),
     Back(2f, listOf("m12 19-7-7 7-7", "M19 12H5")),
     Tasks(2f, listOf("m3 7 2 2 4-4", "M8 17a2 2 0 1 1-4 0a2 2 0 1 1 4 0z", "M13 7h8", "M13 17h8")),
     Wrench(

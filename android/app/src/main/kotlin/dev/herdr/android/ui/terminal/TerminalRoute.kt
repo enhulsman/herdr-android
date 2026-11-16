@@ -29,6 +29,7 @@ import dev.herdr.android.ui.agents.SheetTone
 import dev.herdr.android.ui.agents.agentSheet
 import dev.herdr.android.ui.agents.agentsUi
 import dev.herdr.android.ui.chat.ChatPolling
+import dev.herdr.android.ui.changes.ChangesRoute
 import dev.herdr.android.ui.chat.ChatRoute
 import dev.herdr.android.ui.chat.rememberChatVisit
 import kotlinx.coroutines.delay
@@ -58,6 +59,8 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     // The chat view (issue 17): over the live terminal, so switching back is instant.
     val chat = rememberChatVisit(app, key)
     val switch = chat.switch
+    // The Changes screen (issue 19) over either view; nothing is sent to the terminal for it.
+    var changesOpen by remember(key) { mutableStateOf(false) }
     val opener = remember(key, generation) {
         TerminalOpener(session) { size ->
             // Opened at the phone's size (phone check round 2) unless the chat shows over it;
@@ -171,8 +174,14 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     )
     Box {
         val input = TerminalKeyboard(key, sink)
+        val openChanges = {
+            // The phone's keyboard would cover the screen; the terminal itself is left as it is.
+            input.hide()
+            if (!screen.typing) screen.inputOpen = false
+            changesOpen = true
+        }
         // Under the chat the terminal is left out of accessibility: its keys are covered.
-        Box(if (switch.chat) Modifier.clearAndSetSemantics {} else Modifier) {
+        Box(if (switch.chat || changesOpen) Modifier.clearAndSetSemantics {} else Modifier) {
             TerminalScreen(
                 ui, session, screen, actions, input,
                 onChat = if (switch.offered) ({
@@ -182,13 +191,20 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
                     app.chatView.choose(chat = true)
                     switch.toChat()
                 }) else null,
+                onChanges = openChanges,
             )
         }
         if (switch.chat) {
-            ChatRoute(chat, app, ui.header, actions) {
-                app.chatView.choose(chat = false)
-                switch.toTerminal()
+            Box(if (changesOpen) Modifier.clearAndSetSemantics {} else Modifier) {
+                ChatRoute(chat, app, ui.header, actions, onChanges = openChanges) {
+                    app.chatView.choose(chat = false)
+                    switch.toTerminal()
+                }
             }
+        }
+        if (changesOpen) {
+            val changes = remember(key) { app.hubHost.hub?.openChanges(key.machine, key.address) }
+            ChangesRoute(changes, ui.header.name, ui.header.lineTwo.substringBefore(" · ")) { changesOpen = false }
         }
     }
 }

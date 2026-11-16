@@ -99,12 +99,12 @@ class ChatScreenshotTest {
         gaugeUsed = used, gaugeWindow = window, gaugePercent = percent, queued = queued, timings = "",
     )
 
-    private fun capture(scene: String, poll: ChatPoll?, state: () -> ChatState = { ChatState() }) {
+    private fun capture(scene: String, poll: ChatPoll?, changes: (() -> Unit)? = null, state: () -> ChatState = { ChatState() }) {
         for (dark in listOf(false, true)) {
             val s = state()
             captureRoboImage("src/test/snapshots/chat-$scene-${if (dark) "graphite" else "paper"}.png") {
                 HerdrTheme(dark = dark) {
-                    ChatScreen(header, actions, poll, s, source, { now }, onTerminal = {}, onPick = {}, onSend = {}, animate = false)
+                    ChatScreen(header, actions, poll, s, source, { now }, onTerminal = {}, onPick = {}, onSend = {}, animate = false, onChanges = changes)
                 }
             }
         }
@@ -119,6 +119,10 @@ class ChatScreenshotTest {
 
     @Test
     fun conversation() = capture("conversation", poll())
+
+    /** Render 13 in the chat: the Changes button between the gauge and the switch (changes-view, task 4.3). */
+    @Test
+    fun changesButton() = capture("changes-button", poll(), changes = {})
 
     @Test
     fun thinkingUpdate() = capture(

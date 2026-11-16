@@ -120,7 +120,7 @@ fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>) {
 
 /** The chat over the terminal, while [ChatVisit.switch] shows it. */
 @Composable
-fun ChatRoute(visit: ChatVisit, app: HerdrApp, header: TerminalHeader, actions: TerminalActions, onTerminal: () -> Unit) {
+fun ChatRoute(visit: ChatVisit, app: HerdrApp, header: TerminalHeader, actions: TerminalActions, onChanges: (() -> Unit)? = null, onTerminal: () -> Unit) {
     val context = LocalContext.current
     val state = visit.state
     val scope = rememberCoroutineScope()
@@ -197,5 +197,6 @@ fun ChatRoute(visit: ChatVisit, app: HerdrApp, header: TerminalHeader, actions: 
             }
         },
         animate = animate,
+        onChanges = onChanges,
     )
 }

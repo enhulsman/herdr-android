@@ -55,10 +55,15 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
     val generation = reopen.generation
     val session = remember(key, generation) { TerminalSession(key, context.mainExecutor) }
     val screen = remember(key) { TerminalScreenState(app.terminalZoom[key]) }
+    // The chat view (issue 17): over the live terminal, so switching back is instant.
+    val chat = rememberChatVisit(app, key)
+    val switch = chat.switch
     val opener = remember(key, generation) {
         TerminalOpener(session) { size ->
-            // Opened at the phone's size (phone check round 2); closing lets the desk take its size back.
-            app.hubHost.hub?.openTerminal(key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), true, session.listener)
+            // Opened at the phone's size (phone check round 2) unless the chat shows over it;
+            // closing lets the desk take its size back.
+            val lead = atPhoneSizeOnOpen(switch.chat)
+            app.hubHost.hub?.openTerminal(key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), lead, session.listener)
         }
     }
     var phone by remember(key) { mutableStateOf<GridSize?>(null) }
@@ -158,9 +163,8 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             onWatchView = { app.terminalZoom[key] = it.zoom },
         )
     }
-    // The chat view (issue 17): over the live terminal, so switching back is instant.
-    val chat = rememberChatVisit(app, key)
-    val switch = chat.switch
+    // Under the chat the desk keeps its size; the terminal shown takes the phone's.
+    LaunchedEffect(session, switch.chat) { session.follow(switch.chat) }
     ChatPolling(
         chat, app,
         screen = { (0 until session.grid.rows).map(session.grid::rowText) },

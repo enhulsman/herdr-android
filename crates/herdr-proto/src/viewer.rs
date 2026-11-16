@@ -242,6 +242,18 @@ impl Viewer {
         Ok(Some(self.reattach(Mode::Typing).await?))
     }
 
+    /// Gives the desk its size back (the chat shows over the terminal): while
+    /// typing it reattaches as a watcher (`Some`: start a fresh VT); while
+    /// watching it does nothing. The next input or [`Viewer::lead`] takes the
+    /// phone's size again.
+    pub async fn step_back(&mut self) -> Result<Option<Attached>, CallError> {
+        if self.mode != Mode::Typing {
+            return Ok(None);
+        }
+        self.detach_current();
+        Ok(Some(self.reattach(Mode::Watching).await?))
+    }
+
     /// Keys, a keys-row key or a compose paste, already encoded. The first
     /// input while watching (or after a failed reattach) reattaches as an
     /// active viewer at the phone's size (`Some`: start a fresh VT), then the

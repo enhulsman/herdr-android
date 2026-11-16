@@ -38,6 +38,22 @@ switching back unasked.
 - **WHEN** Ezra chose Chat and opens a terminal with a plain shell
 - **THEN** the terminal shows, and returning to an agent with a log shows its chat again
 
+### Requirement: Under the chat the desk keeps its size
+While the chat shows, the app SHALL watch the terminal at the desk's size
+and SHALL NOT take it over at the phone's size: a terminal opened with the
+chat chosen attaches to watch, and switching from the terminal view to the
+chat hands the desk its size back. Switching to the terminal view SHALL take
+over at the phone's size, as opening an agent in the terminal view does.
+Sending from the chat goes through the hub and needs no takeover.
+
+#### Scenario: Opening an agent in the chat
+- **WHEN** Ezra opens an agent whose chat shows, while its terminal is 227 columns wide on the desk
+- **THEN** the desk's terminal stays 227 columns wide
+
+#### Scenario: Switching between the views
+- **WHEN** Ezra switches from the chat to the terminal view and back
+- **THEN** the terminal takes the phone's size in the terminal view and the desk's size again under the chat
+
 ### Requirement: A terminal is matched to its agent's log without desk setup
 The app SHALL find the log of the agent in front of a terminal from the
 terminal's foreground process, with one `machine.exec` script and nothing

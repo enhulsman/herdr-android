@@ -674,6 +674,36 @@ async fn leading_takes_over_at_the_phones_size_without_typing() {
     );
 }
 
+// The chat shows over the terminal: the phone steps back to watching and the
+// desk has its size again; switching to the terminal leads once more.
+#[tokio::test(start_paused = true)]
+async fn stepping_back_watches_at_the_desks_size_and_leading_takes_over_again() {
+    let mut rig = rig("term-step-back");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![sized("t3", 80, 24)]).await;
+    rig.until_state(WS, connected).await;
+    let o = open_with(&rig, true);
+    core.attach(5, PHONE).await;
+    o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
+
+    o.cmds.send(Cmd::Watch).unwrap();
+    let close = core.frame().await;
+    assert_eq!((close.channel, close.kind), (5, wire::CLOSE));
+    let params = core.attach(6, (80, 24)).await;
+    assert_eq!(params["observe"], true);
+    let s = o.screen.until_state(|s| s.phase == TermPhase::Watching).await;
+    assert_eq!((s.cols, s.rows), (80, 24));
+
+    o.cmds.send(Cmd::Lead).unwrap();
+    let close = core.frame().await;
+    assert_eq!((close.channel, close.kind), (6, wire::CLOSE));
+    let params = core.attach(7, PHONE).await;
+    assert_eq!(params["observe"], false);
+    o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
+}
+
 // Opening from the list at the phone's size (phone check round 2): the first
 // attach is active at the phone's size; the desk's own input still takes the
 // size back, and the phone then watches.

@@ -1,7 +1,7 @@
 ## 1. Records and render
 
 - [x] 1.1 Move V1's `changes-view` delta and tasks M5.1-M5.3 into this change; V1's proposal points here
-- [ ] 1.2 Render in `design/` (D7): list and diff in paper and graphite, a wrapped long line, "Show the whole diff", "No changes since the last commit", "Not a git repository", "Could not read the changes", with the spec's table of texts; signed off by Ezra before 4.2
+- [x] 1.2 Render in `design/` (D7): list and diff in paper and graphite, a wrapped long line, "Show the whole diff", "No changes since the last commit", "Not a git repository", "Could not read the changes", with the spec's table of texts; signed off by Ezra before 4.2. Signed off 2026-11-16 (renders 13-23 in `design/renders/screens.html`)
 - [ ] 1.3 Draft the two 1.x issues verbatim (the branch's commits not on main; the chat's tool sheet showing an edit as a diff); create them after Ezra's OK
 
 ## 2. Tests first (Rust, `herdr-changes`)

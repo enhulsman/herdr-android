@@ -501,14 +501,21 @@ SHALL also have a light sweeping over it while the agent works; both SHALL
 show together. A Codex command has no running line (it is written once it
 ends), so for Codex only the working line shows. The status stops being
 working about when the agent writes its answer, and the answer is read
-after it (seen: 1.8 s), so when the status stops being working the line
-SHALL stay, and the chat SHALL keep reading as often as while it works,
-until a row newer than the last one read while it worked arrives, 3 s have
-passed, or the agent works again or is blocked.
+after it (seen: 1.8 s), so when the status stops being working while the
+last row read is the person's message, a tool row or an agent's card (the
+answer still to come), the line SHALL stay, and the chat SHALL keep reading
+as often as while it works, until a row newer than that one arrives, 3 s
+have passed, or the agent works again or is blocked. When the answer was
+read first (Codex writes it before the turn ends), the line SHALL go with
+the status.
 
 #### Scenario: The answer read after the turn ends
 - **WHEN** the status turns idle and the answer's row is read 1.8 s later
 - **THEN** the working line shows until the answer's row shows, with no moment showing neither
+
+#### Scenario: The answer read before the turn ends
+- **WHEN** Codex's answer shows and its status then turns idle
+- **THEN** the working line goes with the status
 
 #### Scenario: A turn that writes nothing more
 - **WHEN** the status turns idle and no new row arrives

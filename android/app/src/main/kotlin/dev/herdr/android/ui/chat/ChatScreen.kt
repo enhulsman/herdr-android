@@ -11,6 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -467,18 +470,28 @@ private fun AgentCard(row: ChatRow) {
 
 @Composable
 private fun Said(text: String, maxBlocks: Int = Int.MAX_VALUE) {
+    MdBlocks(markdownBlocks(text).take(maxBlocks), HerdrTheme.colors.fg)
+}
+
+@Composable
+private fun MdBlocks(blocks: List<MdBlock>, fg: Color) {
     val c = HerdrTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (b in markdownBlocks(text).take(maxBlocks)) {
+        for (b in blocks) {
             when (b) {
-                is MdBlock.Heading -> MdText(inline(b.text), HerdrType.body.copy(color = c.fg, fontWeight = FontWeight.SemiBold))
-                is MdBlock.Para -> MdText(inline(b.text), HerdrType.body.copy(color = c.fg))
+                is MdBlock.Heading -> MdText(inline(b.text), HerdrType.body.copy(color = fg, fontWeight = FontWeight.SemiBold))
+                is MdBlock.Para -> MdText(inline(b.text), HerdrType.body.copy(color = fg))
                 is MdBlock.Item -> Row(Modifier.padding(start = (12 * b.depth).dp)) {
-                    BasicText(b.marker, style = HerdrType.body.copy(color = c.fg), modifier = Modifier.widthIn(min = 18.dp).padding(end = 4.dp))
-                    MdText(inline(b.text), HerdrType.body.copy(color = c.fg))
+                    BasicText(b.marker, style = HerdrType.body.copy(color = fg), modifier = Modifier.widthIn(min = 18.dp).padding(end = 4.dp))
+                    MdText(inline(b.text), HerdrType.body.copy(color = fg))
                 }
                 is MdBlock.Code -> CodeBlock(b.text)
                 is MdBlock.Table -> MdTable(b)
+                // A bar down the left and the text a step quieter, as Claude's apps draw a quote.
+                is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
+                    Box(Modifier.width(3.dp).fillMaxHeight().background(c.border, RoundedCornerShape(2.dp)))
+                    Box(Modifier.padding(start = 12.dp)) { MdBlocks(b.blocks, c.muted) }
+                }
             }
         }
     }

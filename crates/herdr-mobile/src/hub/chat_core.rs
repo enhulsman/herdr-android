@@ -120,6 +120,10 @@ pub(crate) struct ChatCore {
     probe_size: bool,
     /// The status the terminal view saw last, for Empty's first turn only.
     watch_status: Option<String>,
+    /// The Empty session a turn began on, for Empty's first turn: a turn that
+    /// began on another session (the old one, before `/clear`) or with a
+    /// command sent from the chat says nothing about this one's log.
+    turn_session: Option<String>,
 }
 
 impl Log {
@@ -251,13 +255,31 @@ impl ChatCore {
     /// first turn is followed; the per-turn rule judges turns the chat saw.
     pub fn watch_see(&mut self, t: &Term) {
         let was = self.watch_status.as_deref() == Some("working");
-        if was
-            && matches!(t.status.as_deref(), Some("idle" | "done"))
-            && let Some(l) = &self.lookup
+        if !was && t.status.as_deref() == Some("working") {
+            self.turn_session = self.empty_session();
+        }
+        if was && matches!(t.status.as_deref(), Some("idle" | "done")) {
+            self.first_turn_ended();
+        }
+        self.watch_status = t.status.clone();
+    }
+
+    fn empty_session(&self) -> Option<String> {
+        match &self.lookup {
+            Some(Lookup::Empty { session }) => Some(session.clone()),
+            _ => None,
+        }
+    }
+
+    /// Arms the guard only for the session the turn began on.
+    fn first_turn_ended(&mut self) {
+        let began = self.turn_session.take();
+        if let Some(l) = &self.lookup
+            && began.is_some()
+            && self.empty_session() == began
         {
             self.guard.turn_ended(l);
         }
-        self.watch_status = t.status.clone();
     }
 
     /// The terminal's status at a poll: follows turns for the per-turn rule
@@ -266,18 +288,19 @@ impl ChatCore {
         let status = t.status.clone();
         let working = status.as_deref() == Some("working");
         let was = self.last_status.as_deref() == Some("working");
+        let by_command = self.command_sent.is_some_and(|at| now.duration_since(at) < RELOOK);
+        if working && !was {
+            self.turn_session = if by_command { None } else { self.empty_session() };
+        }
         if working && !was && self.last_status.is_some() {
-            let skip = self.command_sent.is_some_and(|at| now.duration_since(at) < RELOOK);
             if let Some(o) = self.log.as_mut() {
-                o.parser.turn_started(skip);
+                o.parser.turn_started(by_command);
             }
             self.turn_end = None;
         }
         if was && matches!(status.as_deref(), Some("idle" | "done")) {
             self.turn_end = Some(now);
-            if let Some(l) = &self.lookup {
-                self.guard.turn_ended(l);
-            }
+            self.first_turn_ended();
         }
         self.last_status = status;
     }

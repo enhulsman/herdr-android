@@ -10,12 +10,12 @@
 - [x] 2.2 Real git in temporary repositories: agent in a subfolder; staged, unstaged and untracked; rename as deleted and new; no first commit with `AM` (counts and diff from disk) and `AD` (not listed), in a SHA-256 repository as well; submodule at a new commit (word and both commits, also with `diff.submodule=log` set); an untracked nested repository; a conflict; a mode-only change; CRLF lines; binary file; new-file line counts (D4) including a path with spaces, a newline and a leading `-`, a binary and an empty new file, and `color.grep=always` set; the outcome table, "not a git repository" also under a German locale; a repository owned by another user (skipped where it cannot be set up). The German locale test skips where git does not speak German (the desk had no de_DE locale); the other user is git's `GIT_TEST_ASSUME_DIFFERENT_OWNER`. The list keeps git's order: tracked entries, then new ones
 - [x] 2.3 Hostile repository: external diff driver, text conversion and fsmonitor hook that each create a marker file; files named `--output=x`, `:(glob)*` and `HEAD`; an index lock held during every call; no marker file, nothing under `.git` created or changed (checksum of the git dir, and of the common dir under a linked worktree), and `git commit` succeeds after the lock is released. A clean filter: the list and diff show, the index and `index.lock` untouched
 - [x] 2.4 Caps: 1,000 entries and the note; a 20,000-line diff with its line count after the headers; a truncated exec result is "too large"; a line over 4,000 characters cut with its mark
-- [ ] 2.5 Hub `Changes` with a fake core (D5): reads on open, on status and turn events, on Retry, on reconnect and on screen on; none while the screen is off or after leaving; an event during a read queues one read; an open diff re-fetched, and "no longer changed"; `spawn_failed` gives "Not a git repository"; nothing is sent to the terminal
+- [x] 2.5 Hub `Changes` with a fake core (D5): reads on open, on status and turn events, on Retry, on reconnect and on screen on; none while the screen is off or after leaving; an event during a read queues one read; an open diff re-fetched, and "no longer changed"; `spawn_failed` gives "Not a git repository"; nothing is sent to the terminal. Reading on reconnect is the hub's (the subscription comes back on a new connection); reading on screen on and none while it is off are the screen's loop (4.3), as for the chat
 
 ## 3. Build (Rust)
 
 - [x] 3.1 `herdr-changes` crate: builder, parsers, outcomes, caps (2.1-2.4)
-- [ ] 3.2 `Changes` in `herdr-mobile` (2.5): folder from `terminal.get`, calls through `machine.exec` with D2's timeouts, results over uniffi
+- [x] 3.2 `Changes` in `herdr-mobile` (2.5): folder from `terminal.get`, calls through `machine.exec` with D2's timeouts, results over uniffi
 
 ## 4. Android (tests first in each)
 

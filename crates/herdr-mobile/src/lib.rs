@@ -304,6 +304,17 @@ impl Hub {
         })
     }
 
+    /// The Changes view of the terminal `address` on `machine`: a new one per
+    /// visit, dropped on leaving (changes-view design D5). Call it off the
+    /// main thread; call `leave` when the screen goes off.
+    pub fn open_changes(&self, machine: String, address: String) -> Arc<hub::changes::Changes> {
+        Arc::new(hub::changes::Changes::new(
+            self.core.clone(),
+            machine,
+            address,
+        ))
+    }
+
     /// Android asked to free memory: every held chat but the one on screen
     /// goes.
     pub fn trim_chats(&self, shown_machine: Option<String>, shown_address: Option<String>) {

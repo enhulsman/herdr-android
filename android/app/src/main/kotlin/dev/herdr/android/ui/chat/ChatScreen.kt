@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.herdr.android.ui.changes.ChangesButton
 import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
 import dev.herdr.android.ui.terminal.LineIcon
@@ -128,6 +129,8 @@ fun ChatScreen(
     onOlder: () -> Unit = {},
     animate: Boolean = true,
     modifier: Modifier = Modifier,
+    /** Opens the Changes screen; null hides the button. */
+    onChanges: (() -> Unit)? = null,
 ) {
     val c = HerdrTheme.colors
     // An exited agent's conversation stays, read-only (its lookup reads None).
@@ -137,6 +140,7 @@ fun ChatScreen(
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
             TitleBar(header, actions) {
                 if (poll != null) Gauge(poll, state)
+                onChanges?.let { ChangesButton(it) }
                 ViewSwitch("Terminal", onTerminal)
             }
             if (state.gaugeOpen && poll != null) gaugeDetail(poll.gaugeUsed, poll.gaugeWindow)?.let { Strip(it) }

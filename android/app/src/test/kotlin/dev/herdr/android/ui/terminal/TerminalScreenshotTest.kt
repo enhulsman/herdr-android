@@ -55,6 +55,13 @@ class TerminalScreenshotTest {
         capture("terminal-watch-graphite", session, TerminalScreenState())
     }
 
+    /** Render 13: the Changes button before the view switch (changes-view, task 4.3). */
+    @Test
+    fun changesButtonGraphite() {
+        val session = session(TermPhase.Watching, SessionFixture.frame(96, 44, wide = true, bottom = false))
+        capture("terminal-changes-button-graphite", session, TerminalScreenState(), chat = {}, changes = {})
+    }
+
     /** Render 4: typing at phone size with the keyboard up; ctrl held. */
     @Test
     fun typingGraphite() {
@@ -125,6 +132,8 @@ class TerminalScreenshotTest {
         screen: TerminalScreenState,
         keyboardDp: Int = 0,
         composeFocus: Boolean = true,
+        chat: (() -> Unit)? = null,
+        changes: (() -> Unit)? = null,
     ) {
         val ui = terminalUi(hub, key, res)
         val actions = TerminalActions(onBack = {}, onOpen = {}, onSwipe = { false }, onPhoneGrid = {})
@@ -132,7 +141,7 @@ class TerminalScreenshotTest {
             HerdrTheme(dark = true) {
                 Column {
                     Box(Modifier.fillMaxWidth().weight(1f)) {
-                        TerminalScreen(ui, session, screen, actions, TerminalInputHandle.None, composeFocus = composeFocus)
+                        TerminalScreen(ui, session, screen, actions, TerminalInputHandle.None, composeFocus = composeFocus, onChat = chat, onChanges = changes)
                     }
                     if (keyboardDp > 0) {
                         Box(Modifier.fillMaxWidth().height(keyboardDp.dp).background(HerdrTheme.colors.canvas))

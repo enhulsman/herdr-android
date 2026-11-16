@@ -499,7 +499,20 @@ followed by an ellipsis. It SHALL NOT show for a `/` or `!` command on its
 way or while the agent is blocked. A running Claude Code command's tool line
 SHALL also have a light sweeping over it while the agent works; both SHALL
 show together. A Codex command has no running line (it is written once it
-ends), so for Codex only the working line shows.
+ends), so for Codex only the working line shows. The status stops being
+working about when the agent writes its answer, and the answer is read
+after it (seen: 1.8 s), so when the status stops being working the line
+SHALL stay, and the chat SHALL keep reading as often as while it works,
+until a row newer than the last one read while it worked arrives, 3 s have
+passed, or the agent works again or is blocked.
+
+#### Scenario: The answer read after the turn ends
+- **WHEN** the status turns idle and the answer's row is read 1.8 s later
+- **THEN** the working line shows until the answer's row shows, with no moment showing neither
+
+#### Scenario: A turn that writes nothing more
+- **WHEN** the status turns idle and no new row arrives
+- **THEN** the working line goes 3 s later
 
 #### Scenario: Thinking, then running a command
 - **WHEN** Claude Code thinks and then runs a command

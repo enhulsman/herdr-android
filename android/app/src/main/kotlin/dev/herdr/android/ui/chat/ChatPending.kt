@@ -181,12 +181,37 @@ fun sendRefusal(pending: List<Pending>, now: Long): String? = if (pending.any { 
  * and the status has not caught up. A `/` command may only open a dialog, a
  * `!` command runs in the shell; blocked waits on the person.
  */
-fun busy(status: String, pending: List<Pending>, now: Long): Boolean =
-    status == "working" || pending.any { it.plain && !it.settled(now) }
+fun busy(status: String, pending: List<Pending>, now: Long, ending: TurnEnd? = null): Boolean =
+    status == "working" || pending.any { it.plain && !it.settled(now) } || ending.holds(now)
 
 /** The pause before the next poll while the chat shows. */
-fun pollMs(status: String, pending: List<Pending>, now: Long): Long =
-    if (status == "working" || pending.any { !it.settled(now) }) 500L else 5_000L
+fun pollMs(status: String, pending: List<Pending>, now: Long, ending: TurnEnd? = null): Long =
+    if (status == "working" || pending.any { !it.settled(now) } || ending.holds(now)) 500L else 5_000L
+
+/** How long the working line waits for the answer once the status stops working. */
+const val ANSWER_MS = 3_000L
+
+/**
+ * The status stopped working at [at]; [last] is the last row read while it
+ * worked. The answer is written about then and read after it, so the working
+ * line and the fast poll stay until a newer row (spec "A working line shows
+ * for the whole turn").
+ */
+data class TurnEnd(val at: Long, val last: ChatRow?)
+
+fun TurnEnd?.holds(now: Long): Boolean = this != null && now - at < ANSWER_MS
+
+/**
+ * The turn end after a poll that read [status] and [rows], the poll before it
+ * having read [wasStatus] and [wasRows] (null on the first). Null once a row
+ * newer than [TurnEnd.last] is in (a grown last row counts), after
+ * [ANSWER_MS], or when the agent works again or is blocked.
+ */
+fun nextTurnEnd(held: TurnEnd?, wasStatus: String?, wasRows: List<ChatRow>, status: String, rows: List<ChatRow>, now: Long): TurnEnd? {
+    if (status == "working" || status == "blocked") return null
+    val end = if (wasStatus == "working") TurnEnd(now, wasRows.lastOrNull()) else held
+    return end?.takeIf { it.holds(now) && rows.lastOrNull() == it.last }
+}
 
 /** The message as typed into the terminal: a space after a last word starting with `@`. */
 fun typedText(text: String): String {

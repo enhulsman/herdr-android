@@ -369,6 +369,63 @@ class ChatPendingTest {
         for (s in listOf("done", "idle", "blocked", "unknown", "")) assertFalse(s, busy(s, emptyList(), now = 0))
     }
 
+    // --- the answer read after the turn ends ---
+
+    private val turn = listOf(user("1:0", "Write a poem"), shell("2:0", "date"))
+
+    @Test
+    fun theWorkingLineStaysUntilTheAnswerIsRead() {
+        // The status turns idle; the answer's row comes 1.8 s later.
+        val end = nextTurnEnd(null, "working", turn, "idle", turn, now = 10_000)
+        assertTrue(busy("idle", emptyList(), now = 10_000, ending = end))
+        assertEquals("it keeps the fast poll", 500L, pollMs("idle", emptyList(), now = 10_000, ending = end))
+        val still = nextTurnEnd(end, "idle", turn, "idle", turn, now = 10_500)
+        assertTrue("no moment showing neither", busy("idle", emptyList(), now = 11_700, ending = still))
+        val answered = turn + said("3:0", "The sheep come down")
+        val after = nextTurnEnd(still, "idle", turn, "idle", answered, now = 11_800)
+        assertNull("the answer's row ends it", after)
+        assertFalse(busy("idle", emptyList(), now = 11_800, ending = after))
+        assertEquals(5_000L, pollMs("idle", emptyList(), now = 11_800, ending = after))
+    }
+
+    @Test
+    fun anAnswerReadWithTheIdleStatusHoldsNothing() {
+        val answered = turn + said("3:0", "Done.")
+        assertNull(nextTurnEnd(null, "working", turn, "done", answered, now = 10_000))
+    }
+
+    @Test
+    fun anAnswerGrowingTheLastRowEndsIt() {
+        val rows = turn + said("3:0", "The sheep")
+        val end = nextTurnEnd(null, "working", rows, "idle", rows, now = 10_000)
+        assertTrue(end.holds(now = 10_000))
+        assertNull(nextTurnEnd(end, "idle", rows, "idle", turn + said("3:0", "The sheep come down"), now = 10_500))
+    }
+
+    @Test
+    fun aTurnThatWritesNothingMoreEndsTheLineAfterThreeSeconds() {
+        val end = nextTurnEnd(null, "working", turn, "idle", turn, now = 10_000)
+        assertTrue(busy("idle", emptyList(), now = 12_999, ending = end))
+        assertFalse(busy("idle", emptyList(), now = 13_000, ending = end))
+        assertEquals(5_000L, pollMs("idle", emptyList(), now = 13_000, ending = end))
+        assertNull("the next poll drops it", nextTurnEnd(end, "idle", turn, "idle", turn, now = 13_000))
+    }
+
+    @Test
+    fun workingAgainOrBlockedEndsIt() {
+        val end = nextTurnEnd(null, "working", turn, "idle", turn, now = 10_000)
+        assertNull(nextTurnEnd(end, "idle", turn, "working", turn, now = 10_500))
+        assertNull("blocked shows no working line", nextTurnEnd(end, "idle", turn, "blocked", turn, now = 10_500))
+        assertNull("working to blocked holds nothing", nextTurnEnd(null, "working", turn, "blocked", turn, now = 10_000))
+    }
+
+    @Test
+    fun onlyTheEndOfAWorkingTurnHolds() {
+        assertNull("the first poll", nextTurnEnd(null, null, emptyList(), "idle", turn, now = 0))
+        assertNull(nextTurnEnd(null, "idle", turn, "done", turn, now = 0))
+        assertNull(nextTurnEnd(null, "working", turn, "working", turn, now = 0))
+    }
+
     @Test
     fun pollsEveryHalfSecondWhileWorkingOrAMessageWaits() {
         assertEquals(500L, pollMs("working", emptyList(), now = 0))

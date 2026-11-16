@@ -31,6 +31,10 @@ changes between releases.
   screen, and a working line while the agent works. Answer from a message
   box, photos included; `/` and `!` commands work as in the agent's own box.
   When the app cannot read an agent's log, the terminal is all you see.
+- **Changes:** a button on an agent's terminal and chat lists the files not
+  committed yet in its repository, with lines added and removed, and shows
+  each file's diff wrapped to the screen. It follows the agent as it works and
+  only reads: nothing is staged, committed or discarded from the phone.
 - **Alerts:** "Needs you" with sound, "Finished" silently, and a quiet warning
   when a machine has gone silent for 13 hours. Alerts name the session and
   where it sits. Tap an alert to open that agent's terminal. Mute per machine, and a test alert that checks the whole

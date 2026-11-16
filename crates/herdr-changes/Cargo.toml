@@ -1,0 +1,11 @@
+[package]
+name = "herdr-changes"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "The git calls of the Changes view: fixed argument lists, their parsing and outcomes."
+
+[dependencies]
+serde_json = "1"
+base64 = "0.22"

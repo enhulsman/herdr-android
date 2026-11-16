@@ -40,7 +40,7 @@
 
 ## 5. Review and phone check
 
-- [ ] 5.1 `openspec validate chat-view --strict`
+- [x] 5.1 `openspec validate chat-view --strict` (valid, 2026-11-14)
 - [ ] 5.2 Codex adversarial review of the branch (send gating, matching, reading bounds, health clearing)
 - [ ] 5.3 Test phone, debug build: every spec scenario that needs a device (two agents in a folder, new session watched in the terminal, `/clear` within 5 s, exit, 84 MB log within 2 s, blocked send, `/usage` refusal and Dismiss, a message queued behind a minute-long command, photo send (and whether its Enter is dropped like a file path), swipe, keyboard in a working session, taps on the margin above the box and between rows reach nothing); tune the fade with Ezra. A missed target is recorded here and becomes a spec change
 - [ ] 5.4 Owner's daily phone (install only, Ezra drives): a working session with the keyboard open; a day of real use

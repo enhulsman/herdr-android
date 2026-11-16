@@ -306,6 +306,24 @@ class ChatPendingTest {
         assertEquals("its row arrived", 0, follow(listOf(p), listOf(user("0:0", "/usage")), now = 5_000).size)
     }
 
+    @Test
+    fun theSendsOwnWorkingBlipDoesNotEndTheWaitingLine() {
+        // Seen on the test phone: typing /usage shows "working" for ~0.1 s,
+        // a poll caught it, and the line never came, so "hi" went into the dialog.
+        val p = send("/usage", emptyList(), status = "done", at = 0)
+        val blip = follow(listOf(p), emptyList(), status = "working", now = 300).single()
+        val back = follow(listOf(blip), emptyList(), status = "done", now = 2_000).single()
+        assertTrue(back.waiting(now = 3_000))
+        assertEquals(DIALOG_FIRST, sendRefusal(listOf(back), now = 3_500))
+    }
+
+    @Test
+    fun doneAndIdleAreTheSameStatusForTheWaitingLine() {
+        val p = send("/usage", emptyList(), status = "done", at = 0)
+        val seen = follow(listOf(p), emptyList(), status = "idle", now = 2_000).single()
+        assertTrue(seen.waiting(now = 3_000))
+    }
+
     // --- the working line and the poll pace ---
 
     @Test

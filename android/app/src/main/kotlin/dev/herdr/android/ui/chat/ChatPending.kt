@@ -15,6 +15,9 @@ const val ARRIVE_MS = 30_000L
 /** How long a slash command may show nothing before the waiting line. */
 const val WAIT_MS = 3_000L
 
+/** The moment after typing when the status the send itself caused is not taken as a change. */
+const val SETTLE_MS = 1_000L
+
 /** When the agent's input box may be read for a dropped Enter. */
 const val ENTER_AGAIN_MS = 1_500L
 
@@ -96,6 +99,17 @@ data class Pending(
     val waitingText: String
         get() = "Waiting for the terminal: ${trimmed.substringBefore(' ')} may have opened a dialog there."
 
+    /**
+     * The status moved off what it was at the send: not in the first second
+     * after typing (the send itself shows "working" for a moment), and done
+     * and idle are the same (neither works nor waits).
+     */
+    internal fun statusMoved(status: String, now: Long): Boolean {
+        val typed = typedAt ?: return false
+        fun calm(s: String) = if (s == "done") "idle" else s
+        return now - typed >= SETTLE_MS && calm(status) != calm(statusAtSend)
+    }
+
     /** Press Enter once more: the box still holds the message 1.5 s after it was typed. */
     fun needsEnter(now: Long, boxHoldsIt: Boolean): Boolean {
         val typed = typedAt ?: return false
@@ -138,7 +152,7 @@ fun followPending(pending: List<Pending>, rows: List<ChatRow>, status: String, n
             queued = q,
             wasQueued = was,
             stoppedAt = if (!was || status == "working") null else p.stoppedAt ?: now,
-            statusChanged = p.statusChanged || status != p.statusAtSend,
+            statusChanged = p.statusChanged || p.statusMoved(status, now),
         )
     }
     return left

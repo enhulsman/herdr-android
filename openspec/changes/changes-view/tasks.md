@@ -19,7 +19,7 @@
 
 ## 4. Android (tests first in each)
 
-- [ ] 4.1 Pure functions: every diff line kind (added, removed, context, hunk header, file header, no newline mark, binary, submodule, mode change, empty file), wrapping with the continuation mark, the carriage return mark, the 4,000-character cut, status words, count texts, the 2,000-line cut and its control text
+- [x] 4.1 Pure functions: every diff line kind (added, removed, context, hunk header, file header, no newline mark, binary, submodule, mode change, empty file), wrapping with the continuation mark, the carriage return mark, the 4,000-character cut, status words, count texts, the 2,000-line cut and its control text
 - [ ] 4.2 Changes screen per the signed-off render: list, diff, states; goldens in paper and graphite for every state in 1.2 plus loading, a binary file, a submodule, a new file, an empty file, a mode change, a nested repository, a conflict, "Too large to show on the phone", "No longer changed", 1,000 files; each text checked against the spec's table
 - [ ] 4.3 Changes button in the title bar of both views; back returns to the view as it was; the terminal under it keeps watching at the desk's size; content descriptions for rows and the button
 

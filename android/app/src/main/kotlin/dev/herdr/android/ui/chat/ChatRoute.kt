@@ -64,7 +64,7 @@ fun rememberChatVisit(app: HerdrApp, key: AgentKey): ChatVisit {
 
 /** A pending message the agent shows queued: Claude Code by its log, Codex by its screen. */
 private fun queuedBy(poll: ChatPoll, screen: () -> List<String>): (Pending) -> Boolean = when (poll.agent) {
-    "codex" -> { p -> poll.status == "working" && codexShows(screen(), p.text) }
+    "codex" -> { p -> codexQueued(p, poll.status, screen()) }
     else -> { p -> p.queuedIn(poll.queued) }
 }
 

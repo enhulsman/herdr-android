@@ -210,6 +210,17 @@ class ChatPendingTest {
         assertFalse(codexShows(screen, "Something else"))
     }
 
+    @Test
+    fun aMessageSentToAnIdleCodexIsNeverQueued() {
+        // Codex prints a message it starts on at once like a held one: only one sent mid-turn waits.
+        val screen = listOf("› Reply with one word: baa.", "", "• Working (1s • esc to interrupt)", "", "› Ask Codex to do anything")
+        val idle = send("Reply with one word: baa.", emptyList(), status = "idle")
+        assertFalse(codexQueued(idle, "working", screen))
+        val midTurn = send("Reply with one word: baa.", emptyList(), status = "working")
+        assertTrue(codexQueued(midTurn, "working", screen))
+        assertFalse("not once Codex stops working", codexQueued(midTurn, "idle", screen))
+    }
+
     // --- the trailing space and the second Enter ---
 
     @Test

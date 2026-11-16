@@ -8,7 +8,8 @@
 //!   field 22 of /proc/<pid>/stat), and removes it on a clean exit. The log is
 //!   `~/.claude/projects/<folder>/<sessionId>.jsonl`.
 //! - Codex holds its rollout file and a per-thread lock file open while it
-//!   runs; after /new it also keeps the old thread's files open.
+//!   runs; after /new it also keeps the old thread's files open, and /resume
+//!   touches the resumed thread's lock without writing to its rollout.
 
 use serde_json::Value;
 
@@ -212,38 +213,42 @@ fn thread_id(path: &str) -> Option<&str> {
 }
 
 fn codex(p: &Probe) -> Lookup {
-    let rollouts: Vec<(&str, u64, &str)> = p
-        .codex_open
-        .iter()
-        .filter(|(path, _)| path.ends_with(".jsonl"))
-        .filter_map(|(path, m)| Some((path.as_str(), *m, thread_id(path)?)))
-        .collect();
-    let newest_rollout_id = rollouts.iter().map(|r| r.2).max();
-    // A lock for a thread newer than every rollout: /new before its first message.
-    let fresh = p
-        .codex_open
-        .iter()
-        .filter(|(path, _)| path.ends_with(".lock"))
-        .filter_map(|(path, _)| thread_id(path))
-        .filter(|id| !rollouts.iter().any(|r| r.2 == *id))
-        .filter(|id| newest_rollout_id.is_none_or(|n| *id > n))
-        .max();
-    if let Some(id) = fresh {
-        return Lookup::Empty {
-            session: id.to_owned(),
-        };
+    // Each open thread with the last time it was touched: its rollout is written
+    // as it works, its lock is taken by /new and touched by /resume (which
+    // writes nothing to the resumed rollout until the next message).
+    let mut threads: Vec<(&str, u64, Option<&str>)> = Vec::new();
+    for (path, m) in &p.codex_open {
+        let Some(id) = thread_id(path) else { continue };
+        let rollout = path.ends_with(".jsonl").then_some(path.as_str());
+        match threads.iter_mut().find(|t| t.0 == id) {
+            Some(t) => {
+                t.1 = t.1.max(*m);
+                t.2 = t.2.or(rollout);
+            }
+            None => threads.push((id, *m, rollout)),
+        }
     }
-    // Times are whole seconds: two rollouts written in the same second could be
-    // either thread in front (a resumed older thread beside the current one).
-    let newest = rollouts.iter().map(|r| r.1).max();
-    if rollouts.iter().filter(|r| Some(r.1) == newest).count() > 1 {
-        return Lookup::Missed("two Codex sessions open, written in the same second");
-    }
-    match rollouts.iter().max_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(b.2))) {
-        Some((path, _, id)) => Lookup::Found {
-            path: (*path).to_owned(),
-            session: (*id).to_owned(),
+    let Some(newest) = threads.iter().map(|t| t.1).max() else {
+        return Lookup::Missed("no rollout open");
+    };
+    let front: Vec<_> = threads.iter().filter(|t| t.1 == newest).collect();
+    let pick = match front.as_slice() {
+        [one] => *one,
+        // Times are whole seconds. A thread with no rollout yet, newer than the
+        // others, is a /new taken after the old thread's last write; any other
+        // tie could be either thread in front.
+        tied => match tied.iter().max_by_key(|t| t.0) {
+            Some(t) if t.2.is_none() && tied.iter().filter(|t| t.2.is_none()).count() == 1 => *t,
+            _ => return Lookup::Missed("two Codex sessions open, touched in the same second"),
         },
-        None => Lookup::Missed("no rollout open"),
+    };
+    match pick.2 {
+        Some(path) => Lookup::Found {
+            path: path.to_owned(),
+            session: pick.0.to_owned(),
+        },
+        None => Lookup::Empty {
+            session: pick.0.to_owned(),
+        },
     }
 }

@@ -98,7 +98,15 @@ about a second after it ends.
 The app SHALL look the log up again when the process in front changes, every
 10 s, and on every poll for 5 s after a `/` command was sent, so that a new
 session in the same process (Claude Code `/clear`, a fork, Codex `/new`)
-replaces the chat with its own conversation.
+replaces the chat with its own conversation. A session resumed inside the
+agent (`/resume`) SHALL replace the chat the same way, also before anything
+is written to its log: Codex marks the resumed thread only by touching its
+lock, so a Codex thread counts as touched at its lock's or its rollout's
+latest time, whichever is later.
+
+#### Scenario: /resume inside Codex
+- **WHEN** Ezra resumes an older Codex thread in the terminal and sends nothing yet
+- **THEN** at the next lookup (every 10 s) the chat shows the resumed thread, not the one he left
 
 #### Scenario: /clear from the chat
 - **WHEN** Ezra sends `/clear` from the chat

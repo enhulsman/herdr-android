@@ -95,16 +95,16 @@ fn codex_log_is_the_rollout_it_holds_open() {
 
 #[test]
 fn after_new_codex_shows_the_new_thread_even_before_its_first_message() {
-    // /new keeps the old rollout open and takes a lock for the new thread; its
-    // rollout appears with the first message.
+    // /new keeps the old rollout open and takes a lock for the new thread (the
+    // lock's time is when /new ran); its rollout appears with the first message.
     assert_eq!(
-        locate::decide(&codex_probe(&[(L1, 0), (R1, 100), (L2, 0)])),
+        locate::decide(&codex_probe(&[(L1, 50), (R1, 100), (L2, 150)])),
         Lookup::Empty {
             session: "01a1d588-c7a0-7f61-b91d-7bb85b1693dc".into()
         }
     );
     assert_eq!(
-        locate::decide(&codex_probe(&[(L1, 0), (R1, 100), (L2, 0), (R2, 200)])),
+        locate::decide(&codex_probe(&[(L1, 50), (R1, 100), (L2, 150), (R2, 200)])),
         Lookup::Found {
             path: R2.into(),
             session: "01a1d588-c7a0-7f61-b91d-7bb85b1693dc".into()
@@ -113,10 +113,48 @@ fn after_new_codex_shows_the_new_thread_even_before_its_first_message() {
 }
 
 #[test]
+fn new_in_the_same_second_as_the_old_threads_last_write_is_the_new_thread() {
+    // A lock with no rollout yet came after the old thread's turn ended.
+    assert_eq!(
+        locate::decide(&codex_probe(&[(L1, 50), (R1, 100), (L2, 100)])),
+        Lookup::Empty {
+            session: "01a1d588-c7a0-7f61-b91d-7bb85b1693dc".into()
+        }
+    );
+}
+
+#[test]
+fn after_resume_codex_shows_the_resumed_thread_before_anything_is_written_to_it() {
+    // Seen with Codex 0.169.0: /resume of an older thread keeps the current
+    // rollout open, writes nothing to the resumed one, and touches its lock.
+    assert_eq!(
+        locate::decide(&codex_probe(&[(L1, 300), (R1, 100), (L2, 150), (R2, 200)])),
+        Lookup::Found {
+            path: R1.into(),
+            session: "01a1d584-3784-7b73-991e-7e1205e3a546".into()
+        }
+    );
+    // Back to the newer thread by /resume: its lock is touched in turn.
+    assert_eq!(
+        locate::decide(&codex_probe(&[(L1, 300), (R1, 310), (L2, 400), (R2, 200)])),
+        Lookup::Found {
+            path: R2.into(),
+            session: "01a1d588-c7a0-7f61-b91d-7bb85b1693dc".into()
+        }
+    );
+}
+
+#[test]
+fn a_resume_in_the_same_second_as_the_other_threads_last_write_is_not_guessed() {
+    let got = locate::decide(&codex_probe(&[(L1, 200), (R1, 100), (L2, 150), (R2, 200)]));
+    assert!(matches!(got, Lookup::Missed(_)), "{got:?}");
+}
+
+#[test]
 fn two_codex_rollouts_written_in_the_same_second_are_not_guessed() {
     // Whole-second times cannot tell which thread is in front (a resumed
     // older thread beside the current one): say so instead of picking.
-    let got = locate::decide(&codex_probe(&[(L1, 0), (R1, 200), (L2, 0), (R2, 200)]));
+    let got = locate::decide(&codex_probe(&[(L1, 50), (R1, 200), (L2, 150), (R2, 200)]));
     assert!(matches!(got, Lookup::Missed(_)), "{got:?}");
 }
 

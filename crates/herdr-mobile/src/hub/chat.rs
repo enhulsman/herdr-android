@@ -12,7 +12,7 @@ use base64::Engine;
 use herdr_chat::locate::{self, Lookup};
 use herdr_chat::send::{self, Refusal, Seen};
 use herdr_chat::{Agent, Health, Image, Item, image, tail};
-use herdr_proto::rpc::{Client, Stream, StreamItem};
+use herdr_proto::rpc::{CallError, Client, Stream, StreamItem};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -138,6 +138,8 @@ pub struct Chat {
     files: Mutex<HashMap<String, (String, Vec<u8>)>>,
     /// This terminal's events, subscribed on the first wait.
     events: tokio::sync::Mutex<Option<Stream>>,
+    /// What the last message was typed into, for [`Chat::enter_again`].
+    sent_to: Mutex<Option<send::Target>>,
 }
 
 impl Chat {
@@ -150,6 +152,7 @@ impl Chat {
             images: Mutex::new(HashMap::new()),
             files: Mutex::new(HashMap::new()),
             events: tokio::sync::Mutex::new(None),
+            sent_to: Mutex::new(None),
         }
     }
 }
@@ -280,6 +283,31 @@ fn file_image(
 /// shell (it would run the text).
 fn may_send(t: &Term) -> bool {
     t.agent.is_some() && matches!(t.status.as_deref(), Some("idle" | "done" | "working"))
+}
+
+/// What became of a `terminal.send`.
+#[derive(Debug, PartialEq, Eq)]
+enum Sent {
+    Typed,
+    /// No reply in time, or the connection went while waiting: it may be
+    /// typed, so it is followed as sent, never given back as a draft.
+    Unsure,
+    /// The core refused it (its `if` did not hold): nothing was typed.
+    Refused(String),
+}
+
+fn send_outcome(r: &Result<Value, CallError>) -> Sent {
+    match r {
+        Ok(_) => Sent::Typed,
+        Err(CallError::OutcomeUnknown | CallError::Lost) => Sent::Unsure,
+        Err(e) => Sent::Refused(e.to_string()),
+    }
+}
+
+/// Enter is pressed once more only into what the message was typed into:
+/// the same process and session, and an agent that may take it now.
+fn may_enter_again(sent_to: Option<&send::Target>, seen: &Seen) -> bool {
+    sent_to.is_some_and(|t| send::check_again(t, seen).is_ok())
 }
 
 fn refusal(r: Refusal) -> ChatRefusal {
@@ -542,13 +570,30 @@ impl Chat {
             if let Some(st) = guard {
                 params["if"] = json!(st);
             }
-            match c.call("terminal.send", params).await {
-                Ok(_) => {
+            match send_outcome(&c.call("terminal.send", params).await) {
+                Sent::Typed | Sent::Unsure => {
                     self.state.lock().unwrap().sent(&message, Instant::now());
+                    *self.sent_to.lock().unwrap() = Some(target);
                     None
                 }
-                Err(e) => failed(format!("{e}")),
+                Sent::Refused(e) => failed(e),
             }
+        })
+    }
+
+    /// Presses Enter once more for a message the agent left in its input
+    /// box, after the same checks as a send, against the process and
+    /// session it was typed into; true when pressed. Blocks.
+    pub fn enter_again(&self) -> bool {
+        let core = self.core.clone();
+        core.runtime().block_on(async {
+            let Some(conn) = self.core.live_conn(&self.machine) else { return false };
+            let c = conn.client;
+            let Ok((t, start, l)) = self.check(&c).await else { return false };
+            if !may_enter_again(self.sent_to.lock().unwrap().as_ref(), &seen(&t, start, &l)) {
+                return false;
+            }
+            c.call("terminal.keys", json!({"terminal": self.address, "keys": ["enter"]})).await.is_ok()
         })
     }
 
@@ -786,6 +831,33 @@ mod tests {
         assert!(!may_send(&t("claude", Some("blocked"))), "a dialog would take the text");
         assert!(!may_send(&t("claude", None)), "no status yet: a start-up prompt");
         assert!(!may_send(&t("zsh", Some("idle"))), "a shell would run it");
+    }
+
+    #[test]
+    fn a_send_whose_outcome_is_unknown_is_not_given_back_as_a_draft() {
+        // A timeout or a lost connection after the send went out: the
+        // message may be typed, so the bubble stays and follows the log.
+        assert_eq!(send_outcome(&Ok(json!({}))), Sent::Typed);
+        assert_eq!(send_outcome(&Err(CallError::OutcomeUnknown)), Sent::Unsure);
+        assert_eq!(send_outcome(&Err(CallError::Lost)), Sent::Unsure);
+        let no = CallError::Rpc { kind: Some("conflict".into()), message: "status is working".into(), hint: None };
+        assert_eq!(send_outcome(&Err(no)), Sent::Refused("status is working".into()), "the core said no");
+    }
+
+    #[test]
+    fn the_second_enter_goes_only_to_the_process_and_session_sent_to() {
+        let s1 = Lookup::Found { path: "/l/s1.jsonl".into(), session: "s1".into() };
+        let s2 = Lookup::Found { path: "/l/s2.jsonl".into(), session: "s2".into() };
+        let to = send::Target { agent: Agent::Claude, pid: 7, proc_start: Some(100), session: "s1".into() };
+        let seen = |agent, pid, status, l| Seen { agent, pid: Some(pid), proc_start: Some(100), status, lookup: l };
+        let claude = Some(Agent::Claude);
+        assert!(may_enter_again(Some(&to), &seen(claude, 7, Some("idle"), &s1)));
+        assert!(may_enter_again(Some(&to), &seen(claude, 7, Some("working"), &s1)));
+        assert!(!may_enter_again(None, &seen(claude, 7, Some("idle"), &s1)), "nothing sent");
+        assert!(!may_enter_again(Some(&to), &seen(claude, 7, Some("blocked"), &s1)), "a dialog would take it");
+        assert!(!may_enter_again(Some(&to), &seen(claude, 8, Some("idle"), &s1)), "another process");
+        assert!(!may_enter_again(Some(&to), &seen(claude, 7, Some("idle"), &s2)), "another session");
+        assert!(!may_enter_again(Some(&to), &seen(None, 7, Some("idle"), &s1)), "exited into the shell");
     }
 
     #[test]

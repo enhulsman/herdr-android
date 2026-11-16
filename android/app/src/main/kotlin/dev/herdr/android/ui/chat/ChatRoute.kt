@@ -71,11 +71,11 @@ private fun queuedBy(poll: ChatPoll, screen: () -> List<String>): (Pending) -> B
  * Polls while the chat shows (after each event of the terminal, 0.5 s while
  * the agent works or a message waits, else 5 s) and watches while the
  * terminal shows, to decide the switch. [screen] is the terminal's text, for
- * Codex's queued messages and the agent's input box; [enter] presses Enter
- * in the terminal, for a message whose Enter the agent dropped.
+ * Codex's queued messages and the agent's input box (a message whose Enter
+ * the agent dropped gets one more, through the hub's checks).
  */
 @Composable
-fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>, enter: () -> Unit) {
+fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>) {
     val chat = visit.chat ?: return
     val state = visit.state
     val switch = visit.switch
@@ -94,7 +94,9 @@ fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>, ent
                     val now = SystemClock.uptimeMillis()
                     if (showing) {
                         state.pending = followPending(state.pending, p.rows, p.status, now, queuedBy(p, screen))
-                        if (state.enterAgain(p.agent, screen(), now) != null) enter()
+                        if (state.enterAgain(p.agent, screen(), now, canSend = p.canSend && !p.exited) != null) {
+                            withContext(Dispatchers.IO) { chat.enterAgain() }
+                        }
                         // Rows first seen now arrived live; the first read and rows read back are history.
                         state.live.saw(p.rows, now, live = state.poll != null)
                     } else {

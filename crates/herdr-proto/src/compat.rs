@@ -24,7 +24,9 @@ pub const USES: &[&str] = &[
     "terminal.attach",
     "terminal.get",
     "terminal.interrupt",
+    "terminal.keys",
     "terminal.run",
+    "terminal.send",
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]

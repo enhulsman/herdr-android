@@ -99,6 +99,9 @@ struct Log {
     skipped: Vec<u64>,
     older_budget: u64,
     older_blocked: bool,
+    /// Stepping back through a record over [`READ_MAX`] while reading back:
+    /// where the next window ends (inside that record).
+    older_scan: Option<u64>,
 }
 
 #[derive(Default)]
@@ -133,6 +136,7 @@ impl Log {
             skipped: Vec::new(),
             older_budget: OLDER_BUDGET,
             older_blocked: false,
+            older_scan: None,
         }
     }
 
@@ -318,14 +322,11 @@ impl ChatCore {
 
     pub fn plan_older(&self) -> Option<Read> {
         let o = self.log.as_ref()?;
-        if o.from == 0 || o.older_blocked || o.next.is_none() {
+        let end = o.older_scan.unwrap_or(o.from);
+        if end == 0 || o.older_blocked || o.next.is_none() {
             return None;
         }
-        Some(Read {
-            path: o.path.clone()?,
-            start: o.from.saturating_sub(o.older_budget).to_string(),
-            end: Some(o.from),
-        })
+        Some(Read { path: o.path.clone()?, start: end.saturating_sub(o.older_budget).to_string(), end: Some(end) })
     }
 
     /// A read back's outcome; true when it should be read again, wider.
@@ -338,15 +339,30 @@ impl ChatCore {
                 return false;
             }
         };
-        let start = o.from.saturating_sub(o.older_budget);
+        let end = o.older_scan.unwrap_or(o.from);
+        let start = end.saturating_sub(o.older_budget);
         if c.text.is_empty() && c.skipped.is_none() {
-            if start > 0 && o.older_budget < READ_MAX {
-                o.older_budget = (o.older_budget * 2).min(READ_MAX);
+            if c.from < end {
+                // Whole records, none the chat shows (requests): read on before them.
+                o.from = c.from;
+                o.older_scan = None;
+                o.older_budget = OLDER_BUDGET;
                 return true;
             }
-            o.older_blocked = true;
-            return false;
+            // No whole record: the window lies inside one. Wider, then step
+            // back through it a window at a time to where it starts.
+            if start == 0 {
+                o.older_blocked = true;
+                return false;
+            }
+            if o.older_budget < READ_MAX {
+                o.older_budget = (o.older_budget * 2).min(READ_MAX);
+            } else {
+                o.older_scan = Some(start);
+            }
+            return true;
         }
+        o.older_scan = None;
         let mut lines = Vec::new();
         let mut rest = c.text.as_str();
         for at in &c.offsets {
@@ -392,6 +408,7 @@ impl ChatCore {
             o.skipped.retain(|at| *at >= cut);
             o.from = o.lines.first().map_or(next, |(at, _)| *at);
             o.older_blocked = false;
+            o.older_scan = None;
             o.reparse();
         }
     }

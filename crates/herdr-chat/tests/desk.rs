@@ -136,11 +136,13 @@ fn tail_skips_a_record_over_the_read_limit_and_goes_on_after_it() {
     let path = f.to_str().unwrap();
     let (at_b, at_c) = (a.len() as u64, (a.len() + b.len()) as u64);
 
+    // Reached after lines this read kept: skipped in the same read.
     let r1 = tail::parse_chunk(&run(tail::SCRIPT, &[path, "0"])).unwrap();
     assert_eq!(r1.text, a);
-    assert_eq!(r1.next, at_b);
-    assert!(r1.skipped.is_none());
+    assert_eq!(r1.skipped, Some((at_b, b.len() as u64)));
+    assert_eq!((r1.from, r1.next), (0, at_c));
 
+    // Reached first.
     let r2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &at_b.to_string()])).unwrap();
     assert_eq!(r2.skipped, Some((at_b, b.len() as u64)), "the record is reported by offset and length");
     assert_eq!(r2.text, "");
@@ -148,6 +150,20 @@ fn tail_skips_a_record_over_the_read_limit_and_goes_on_after_it() {
 
     let r3 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &r2.next.to_string()])).unwrap();
     assert_eq!(r3.text, c_line);
+}
+
+#[test]
+fn tail_passes_an_oversized_record_the_chat_never_shows_without_a_note() {
+    let a = big_line(100, "a");
+    let req = format!("{{\"type\":\"api-request\",\"pad\":\"{}\"}}\n", "x".repeat(tail::READ_MAX as usize + (1 << 20)));
+    let c_line = big_line(100, "c");
+    let f = temp("t13r.jsonl", format!("{a}{req}{c_line}").as_bytes());
+    let path = f.to_str().unwrap();
+    let at_c = (a.len() + req.len()) as u64;
+    let r1 = tail::parse_chunk(&run(tail::SCRIPT, &[path, "0"])).unwrap();
+    assert_eq!((r1.text.as_str(), r1.skipped, r1.next), (a.as_str(), None, at_c));
+    let r2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &a.len().to_string()])).unwrap();
+    assert_eq!((r2.skipped, r2.from, r2.next), (None, a.len() as u64, at_c), "reached first: passed over too");
 }
 
 #[test]
@@ -182,6 +198,32 @@ fn tail_starting_inside_an_oversized_record_moves_past_it_without_a_note() {
         r.text.clone()
     };
     assert_eq!(all, c_line);
+}
+
+/// `machine.exec` keeps the first 8 MiB of what a script prints.
+const EXEC_KEEPS: usize = 8 << 20;
+
+#[test]
+fn tail_output_with_its_offsets_fits_what_exec_keeps() {
+    // Many short records far into a log: each printed line gains its
+    // offset, so 7.5 MB read can print more than exec keeps (found in the
+    // review). Every read must fit, go on, and give each line once.
+    let line = |i: usize| format!("{{\"type\":\"system\",\"n\":{i:08}}}\n");
+    let body: String = (0..300_000).map(line).collect();
+    let f = temp("t-out.jsonl", body.as_bytes());
+    let path = f.to_str().unwrap();
+    let (mut at, mut lines, mut reads) = (0u64, 0usize, 0);
+    while at < body.len() as u64 {
+        let out = run(tail::SCRIPT, &[path, &at.to_string()]);
+        assert!(out.len() < EXEC_KEEPS, "read {reads} printed {} bytes", out.len());
+        let c = tail::parse_chunk(&out).unwrap();
+        assert!(c.next > at, "a read goes on");
+        lines += c.offsets.len();
+        at = c.next;
+        reads += 1;
+    }
+    assert_eq!(lines, 300_000, "each line once");
+    assert!(reads >= 2);
 }
 
 #[test]

@@ -14,8 +14,9 @@ pub(crate) const FIRST_BUDGET: u64 = 2_000_000;
 /// A read back starts this far before the oldest line held, doubled while a
 /// single line is longer.
 pub(crate) const OLDER_BUDGET: u64 = 2_000_000;
-/// `machine.exec` keeps the first 8 MB of output: no read spans more.
-pub(crate) const READ_MAX: u64 = 7_500_000;
+/// No read spans more than the tail script's limit, nor less: a record the
+/// script does not skip must fit one read.
+pub(crate) use herdr_chat::tail::READ_MAX;
 /// With the same process in front, the log is looked up again this often.
 pub(crate) const RELOCATE: Duration = Duration::from_secs(10);
 /// After a `/` command, every poll looks the log up for this long; a turn
@@ -185,7 +186,9 @@ impl ChatCore {
     /// every poll for [`RELOOK`] after a `/` command, and on an event while
     /// Empty or Missed with an agent in front.
     pub fn needs_lookup(&self, t: &Term, event: bool, now: Instant) -> bool {
-        let Some((pid, at)) = self.located else { return true };
+        let Some((pid, at)) = self.located else {
+            return true;
+        };
         let waiting = matches!(self.lookup, Some(Lookup::Empty { .. } | Lookup::Missed(_)));
         self.returned
             || pid != t.pid
@@ -217,8 +220,14 @@ impl ChatCore {
                     Lookup::Found { path, .. } => Some(path.clone()),
                     _ => None,
                 };
-                let agent = t.agent.or(self.log.as_ref().map(|o| o.agent)).unwrap_or(Agent::Claude);
-                let same = self.log.as_ref().is_some_and(|o| &o.session == session && o.agent == agent);
+                let agent = t
+                    .agent
+                    .or(self.log.as_ref().map(|o| o.agent))
+                    .unwrap_or(Agent::Claude);
+                let same = self
+                    .log
+                    .as_ref()
+                    .is_some_and(|o| &o.session == session && o.agent == agent);
                 if !same {
                     self.log = Some(Log::new(agent, session.clone(), path));
                     self.problem = None;
@@ -238,7 +247,9 @@ impl ChatCore {
     /// Missed with an agent in front. Never on a timer: a Found agent's log
     /// is not read again while the terminal shows.
     pub fn needs_watch(&self, t: &Term, event: bool) -> bool {
-        let Some((pid, _)) = self.located else { return true };
+        let Some((pid, _)) = self.located else {
+            return true;
+        };
         let waiting = matches!(self.lookup, Some(Lookup::Empty { .. } | Lookup::Missed(_)));
         pid != t.pid || (event && waiting && t.agent.is_some())
     }
@@ -288,9 +299,15 @@ impl ChatCore {
         let status = t.status.clone();
         let working = status.as_deref() == Some("working");
         let was = self.last_status.as_deref() == Some("working");
-        let by_command = self.command_sent.is_some_and(|at| now.duration_since(at) < RELOOK);
+        let by_command = self
+            .command_sent
+            .is_some_and(|at| now.duration_since(at) < RELOOK);
         if working && !was {
-            self.turn_session = if by_command { None } else { self.empty_session() };
+            self.turn_session = if by_command {
+                None
+            } else {
+                self.empty_session()
+            };
         }
         if working && !was && self.last_status.is_some() {
             if let Some(o) = self.log.as_mut() {
@@ -309,15 +326,29 @@ impl ChatCore {
         let o = self.log.as_ref()?;
         let path = o.path.clone()?;
         Some(match o.next {
-            None => Read { path, start: format!("-{FIRST_BUDGET}"), end: None },
-            Some(n) if self.probe_size => Read { path, start: n.to_string(), end: Some(n) },
-            Some(n) => Read { path, start: n.to_string(), end: Some(n + READ_MAX) },
+            None => Read {
+                path,
+                start: format!("-{FIRST_BUDGET}"),
+                end: None,
+            },
+            Some(n) if self.probe_size => Read {
+                path,
+                start: n.to_string(),
+                end: Some(n),
+            },
+            Some(n) => Read {
+                path,
+                start: n.to_string(),
+                end: Some(n + READ_MAX),
+            },
         })
     }
 
     /// A read's outcome; true when another read should follow at once.
     pub fn take_read(&mut self, got: Result<Chunk, String>, now: Instant) -> bool {
-        let Some(o) = self.log.as_mut() else { return false };
+        let Some(o) = self.log.as_mut() else {
+            return false;
+        };
         let c = match got {
             Ok(c) => c,
             Err(_) => {
@@ -334,7 +365,9 @@ impl ChatCore {
             return true;
         }
         o.take(&c);
-        if self.turn_end.is_some_and(|end| now.duration_since(end) >= TURN_GRACE)
+        if self
+            .turn_end
+            .is_some_and(|end| now.duration_since(end) >= TURN_GRACE)
             && self.last_status.as_deref() != Some("working")
         {
             o.parser.turn_ended();
@@ -349,12 +382,18 @@ impl ChatCore {
         if end == 0 || o.older_blocked || o.next.is_none() {
             return None;
         }
-        Some(Read { path: o.path.clone()?, start: end.saturating_sub(o.older_budget).to_string(), end: Some(end) })
+        Some(Read {
+            path: o.path.clone()?,
+            start: end.saturating_sub(o.older_budget).to_string(),
+            end: Some(end),
+        })
     }
 
     /// A read back's outcome; true when it should be read again, wider.
     pub fn take_older(&mut self, got: Result<Chunk, String>) -> bool {
-        let Some(o) = self.log.as_mut() else { return false };
+        let Some(o) = self.log.as_mut() else {
+            return false;
+        };
         let c = match got {
             Ok(c) => c,
             Err(_) => {
@@ -467,14 +506,41 @@ impl ChatCore {
                 version: None,
             };
         };
-        let mut rows: Vec<Row> =
-            o.parser.items().iter().zip(&o.keys).map(|(item, key)| Row { key: *key, item: item.clone() }).collect();
+        let mut rows: Vec<Row> = o
+            .parser
+            .items()
+            .iter()
+            .zip(&o.keys)
+            .map(|(item, key)| Row {
+                key: *key,
+                item: item.clone(),
+            })
+            .collect();
         for at in &o.skipped {
-            let i = rows.iter().position(|r| r.key.0 > *at).unwrap_or(rows.len());
-            rows.insert(i, Row { key: (*at, 0), item: Item::Note { text: SKIPPED.into() } });
+            let i = rows
+                .iter()
+                .position(|r| r.key.0 > *at)
+                .unwrap_or(rows.len());
+            rows.insert(
+                i,
+                Row {
+                    key: (*at, 0),
+                    item: Item::Note {
+                        text: SKIPPED.into(),
+                    },
+                },
+            );
         }
         if o.older_blocked {
-            rows.insert(0, Row { key: (o.from, u32::MAX), item: Item::Note { text: OLDER_FAILED.into() } });
+            rows.insert(
+                0,
+                Row {
+                    key: (o.from, u32::MAX),
+                    item: Item::Note {
+                        text: OLDER_FAILED.into(),
+                    },
+                },
+            );
         }
         View {
             found,

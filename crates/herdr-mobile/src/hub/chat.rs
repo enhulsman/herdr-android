@@ -78,7 +78,9 @@ pub enum ChatHealth {
     /// Readable, with parts left out.
     Degraded,
     /// Not readable any more: keep what was read, show the terminal button.
-    Broken { reason: String },
+    Broken {
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug, uniffi::Record)]
@@ -169,14 +171,19 @@ impl Chat {
 }
 
 fn exec_stdout(v: &Value) -> Option<String> {
-    let b = base64::engine::general_purpose::STANDARD.decode(v["stdout"].as_str()?).ok()?;
+    let b = base64::engine::general_purpose::STANDARD
+        .decode(v["stdout"].as_str()?)
+        .ok()?;
     Some(String::from_utf8_lossy(&b).into_owned())
 }
 
 /// What `terminal.get` says, as the core reads it.
 fn term_of(t: &Value) -> Term {
     let fg = &t["foreground"];
-    let argv: Vec<&str> = fg["argv"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let argv: Vec<&str> = fg["argv"]
+        .as_array()
+        .map(|a| a.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
     Term {
         agent: locate::agent_in_front(fg["name"].as_str().unwrap_or(""), &argv),
         pid: fg["pid"].as_i64(),
@@ -187,16 +194,30 @@ fn term_of(t: &Value) -> Term {
 /// `session` is the log's: a `log:` key names its session, so an image of an
 /// earlier session (after `/clear`) is never fetched from the current log.
 /// `line` is the row's first line, which a file image's key carries.
-fn chat_images(images: &[Image], session: &str, line: u64) -> Vec<ChatImage> {
+fn chat_images(images: &[Image], session: &str) -> Vec<ChatImage> {
     images
         .iter()
         .map(|m| match m {
-            Image::InLog { line, n, media_type } => {
-                ChatImage { key: format!("log:{session}:{line}:{n}"), media_type: media_type.clone() }
-            }
-            Image::Inline { media_type, data } => ChatImage { key: format!("inline:{data}"), media_type: media_type.clone() },
-            Image::File { path } => ChatImage { key: format!("file:{line}:{path}"), media_type: String::new() },
-            Image::Missing => ChatImage { key: "missing".into(), media_type: String::new() },
+            Image::InLog {
+                line,
+                n,
+                media_type,
+            } => ChatImage {
+                key: format!("log:{session}:{line}:{n}"),
+                media_type: media_type.clone(),
+            },
+            Image::Inline { media_type, data } => ChatImage {
+                key: format!("inline:{data}"),
+                media_type: media_type.clone(),
+            },
+            Image::File { path, line } => ChatImage {
+                key: format!("file:{line}:{path}"),
+                media_type: String::new(),
+            },
+            Image::Missing => ChatImage {
+                key: "missing".into(),
+                media_type: String::new(),
+            },
         })
         .collect()
 }
@@ -211,9 +232,15 @@ fn chat_row(r: &Row, session: &str) -> ChatRow {
         calls: vec![],
     };
     match &r.item {
-        Item::User { text, images } => ChatRow { images: chat_images(images, session, r.key.0), ..row("user", text) },
+        Item::User { text, images } => ChatRow {
+            images: chat_images(images, session),
+            ..row("user", text)
+        },
         Item::Assistant { text } => row("said", text),
-        Item::AgentMessage { from, text } => ChatRow { from: from.clone(), ..row("agent", text) },
+        Item::AgentMessage { from, text } => ChatRow {
+            from: from.clone(),
+            ..row("agent", text)
+        },
         Item::Note { text } => row("note", text),
         Item::Update { text } => row("update", text),
         Item::Tools { calls } => ChatRow {
@@ -226,7 +253,7 @@ fn chat_row(r: &Row, session: &str) -> ChatRow {
                     output: c.output.clone(),
                     done: c.done,
                     failed: c.failed,
-                    images: chat_images(&c.images, session, r.key.0),
+                    images: chat_images(&c.images, session),
                 })
                 .collect(),
             ..row("tools", "")
@@ -282,7 +309,10 @@ fn file_image(
             held.insert(path.to_owned(), (time, bytes.clone()));
             Some(bytes)
         }
-        Some((time, None)) => held.get(path).filter(|(t, _)| *t == time).map(|(_, b)| b.clone()),
+        Some((time, None)) => held
+            .get(path)
+            .filter(|(t, _)| *t == time)
+            .map(|(_, b)| b.clone()),
         None => {
             held.remove(path);
             None
@@ -333,12 +363,23 @@ fn refusal(r: Refusal) -> ChatRefusal {
 /// One read of the log through the tail script: an error says why (the
 /// output was cut, the read timed out, the file went away).
 async fn read_chunk(c: &Client, r: &Read) -> Result<tail::Chunk, String> {
-    let mut argv = vec![json!("sh"), json!("-c"), json!(tail::SCRIPT), json!("sh"), json!(r.path), json!(r.start)];
+    let mut argv = vec![
+        json!("sh"),
+        json!("-c"),
+        json!(tail::SCRIPT),
+        json!("sh"),
+        json!(r.path),
+        json!(r.start),
+    ];
     if let Some(e) = r.end {
         argv.push(json!(e.to_string()));
     }
     let got = c
-        .call_timeout("machine.exec", json!({"argv": argv, "timeout": 25}), Duration::from_secs(30))
+        .call_timeout(
+            "machine.exec",
+            json!({"argv": argv, "timeout": 25}),
+            Duration::from_secs(30),
+        )
         .await
         .map_err(|e| format!("Couldn't read the log: {e}"))?;
     if got["truncated"] == true {
@@ -385,7 +426,8 @@ impl Times {
         if !self.0.is_empty() {
             self.0.push(' ');
         }
-        self.0.push_str(&format!("{stage} {}", since.elapsed().as_millis()));
+        self.0
+            .push_str(&format!("{stage} {}", since.elapsed().as_millis()));
     }
 }
 
@@ -411,7 +453,11 @@ impl Chat {
                 return self.view("", false, Times("not connected".into()));
             };
             let c = conn.client;
-            let Ok(t) = c.call("terminal.get", json!({"terminal": self.address})).await.map(|t| term_of(&t)) else {
+            let Ok(t) = c
+                .call("terminal.get", json!({"terminal": self.address}))
+                .await
+                .map(|t| term_of(&t))
+            else {
                 return self.view("", false, times);
             };
             self.state.lock().unwrap().watch_see(&t);
@@ -419,9 +465,14 @@ impl Chat {
                 let at = Instant::now();
                 let (l, _) = look_up(&c, &t).await;
                 times.mark("locate", at);
-                self.state.lock().unwrap().take_watch_lookup(&t, l, Instant::now());
+                self.state
+                    .lock()
+                    .unwrap()
+                    .take_watch_lookup(&t, l, Instant::now());
                 for _ in 0..2 {
-                    let Some(r) = self.state.lock().unwrap().plan_read() else { break };
+                    let Some(r) = self.state.lock().unwrap().plan_read() else {
+                        break;
+                    };
                     let at = Instant::now();
                     let got = read_chunk(&c, &r).await;
                     times.mark("tail", at);
@@ -439,9 +490,7 @@ impl Chat {
     /// What is held, with no call: the last view drawn at once on return
     /// (design D12); `None` before the first lookup.
     pub fn held(&self) -> Option<ChatPoll> {
-        if self.state.lock().unwrap().lookup().is_none() {
-            return None;
-        }
+        self.state.lock().unwrap().lookup()?;
         Some(self.view("", false, Times::default()))
     }
 
@@ -454,7 +503,9 @@ impl Chat {
             let mut times = Times::default();
             if let Some(conn) = self.core.live_conn(&self.machine) {
                 loop {
-                    let Some(r) = self.state.lock().unwrap().plan_older() else { break };
+                    let Some(r) = self.state.lock().unwrap().plan_older() else {
+                        break;
+                    };
                     let got = read_chunk(&conn.client, &r).await;
                     if !self.state.lock().unwrap().take_older(got) {
                         break;
@@ -485,7 +536,11 @@ impl Chat {
                     tokio::time::sleep(Duration::from_millis(timeout_ms.into())).await;
                     return false;
                 };
-                match conn.client.subscribe(json!({"terminal": self.address})).await {
+                match conn
+                    .client
+                    .subscribe(json!({"terminal": self.address}))
+                    .await
+                {
                     Ok((_, stream)) => *events = Some(stream),
                     // Waits anyway: returning at once would make the poll loop spin.
                     Err(_) => {
@@ -513,7 +568,8 @@ impl Chat {
                 Ok(None) => {
                     *events = None;
                     drop(events);
-                    tokio::time::sleep(Duration::from_millis(u64::from(timeout_ms).min(1000))).await;
+                    tokio::time::sleep(Duration::from_millis(u64::from(timeout_ms).min(1000)))
+                        .await;
                     false
                 }
                 Err(_) => false,
@@ -543,7 +599,8 @@ impl Chat {
                 return no(ChatRefusal::Changed);
             };
             let target = match self.check(&c).await {
-                Ok((t, start, l)) => match send::first_check(agent, &session, &seen(&t, start, &l)) {
+                Ok((t, start, l)) => match send::first_check(agent, &session, &seen(&t, start, &l))
+                {
                     Ok(target) => target,
                     Err(r) => return no(refusal(r)),
                 },
@@ -587,7 +644,11 @@ impl Chat {
                 sent @ (Sent::Typed | Sent::Unsure) => {
                     self.state.lock().unwrap().sent(&message, Instant::now());
                     *self.sent_to.lock().unwrap() = Some(target);
-                    if sent == Sent::Typed { ChatSent::Typed } else { ChatSent::Unsure }
+                    if sent == Sent::Typed {
+                        ChatSent::Typed
+                    } else {
+                        ChatSent::Unsure
+                    }
                 }
                 Sent::Refused(e) => failed(e),
             }
@@ -600,13 +661,22 @@ impl Chat {
     pub fn enter_again(&self) -> bool {
         let core = self.core.clone();
         core.runtime().block_on(async {
-            let Some(conn) = self.core.live_conn(&self.machine) else { return false };
+            let Some(conn) = self.core.live_conn(&self.machine) else {
+                return false;
+            };
             let c = conn.client;
-            let Ok((t, start, l)) = self.check(&c).await else { return false };
+            let Ok((t, start, l)) = self.check(&c).await else {
+                return false;
+            };
             if !may_enter_again(self.sent_to.lock().unwrap().as_ref(), &seen(&t, start, &l)) {
                 return false;
             }
-            c.call("terminal.keys", json!({"terminal": self.address, "keys": ["enter"]})).await.is_ok()
+            c.call(
+                "terminal.keys",
+                json!({"terminal": self.address, "keys": ["enter"]}),
+            )
+            .await
+            .is_ok()
         })
     }
 
@@ -628,13 +698,22 @@ impl Chat {
 }
 
 fn seen<'a>(t: &'a Term, proc_start: Option<u64>, l: &'a Lookup) -> Seen<'a> {
-    Seen { agent: t.agent, pid: t.pid, proc_start, status: t.status.as_deref(), lookup: l }
+    Seen {
+        agent: t.agent,
+        pid: t.pid,
+        proc_start,
+        status: t.status.as_deref(),
+        lookup: l,
+    }
 }
 
 impl Chat {
     /// One check of the send target: the terminal and a fresh lookup.
     async fn check(&self, c: &Client) -> Result<(Term, Option<u64>, Lookup), String> {
-        let t = c.call("terminal.get", json!({"terminal": self.address})).await.map_err(|e| format!("{e}"))?;
+        let t = c
+            .call("terminal.get", json!({"terminal": self.address}))
+            .await
+            .map_err(|e| format!("{e}"))?;
         let t = term_of(&t);
         let (l, start) = look_up(c, &t).await;
         let l = l.ok_or_else(|| "The desk did not answer".to_string())?;
@@ -648,10 +727,16 @@ impl Chat {
             return self.view("", false, Times("not connected".into()));
         };
         let c = conn.client;
-        let t = match c.call("terminal.get", json!({"terminal": self.address})).await {
+        let t = match c
+            .call("terminal.get", json!({"terminal": self.address}))
+            .await
+        {
             Ok(t) => term_of(&t),
             Err(_) => {
-                self.state.lock().unwrap().take_read(Err("terminal".into()), Instant::now());
+                self.state
+                    .lock()
+                    .unwrap()
+                    .take_read(Err("terminal".into()), Instant::now());
                 return self.view("", false, times);
             }
         };
@@ -662,12 +747,17 @@ impl Chat {
             let at = Instant::now();
             let (l, _) = look_up(&c, &t).await;
             times.mark("locate", at);
-            self.state.lock().unwrap().take_lookup(&t, l, Instant::now());
+            self.state
+                .lock()
+                .unwrap()
+                .take_lookup(&t, l, Instant::now());
         }
         self.state.lock().unwrap().see(&t, Instant::now());
         // A return reads the log's size first, then the new lines.
         for _ in 0..2 {
-            let Some(r) = self.state.lock().unwrap().plan_read() else { break };
+            let Some(r) = self.state.lock().unwrap().plan_read() else {
+                break;
+            };
             let at = Instant::now();
             let got = read_chunk(&c, &r).await;
             times.mark("tail", at);
@@ -693,7 +783,9 @@ impl Chat {
         let health = match &v.health {
             Health::Ok => ChatHealth::Ok,
             Health::Degraded { .. } => ChatHealth::Degraded,
-            Health::Broken { reason } => ChatHealth::Broken { reason: reason.clone() },
+            Health::Broken { reason } => ChatHealth::Broken {
+                reason: reason.clone(),
+            },
         };
         let can_send = in_front
             && matches!(found, ChatFound::Found | ChatFound::Empty)
@@ -738,11 +830,21 @@ impl Chat {
             session.zip(path)
         };
         let file = file_path(key);
-        let held = file.map(|p| held_time(&self.files.lock().unwrap(), p)).unwrap_or_default();
-        let argv = image_argv(key, log.as_ref().map(|(s, p)| (s.as_str(), p.as_str())), &held)?;
+        let held = file
+            .map(|p| held_time(&self.files.lock().unwrap(), p))
+            .unwrap_or_default();
+        let argv = image_argv(
+            key,
+            log.as_ref().map(|(s, p)| (s.as_str(), p.as_str())),
+            &held,
+        )?;
         let c = self.core.live_conn(&self.machine)?.client;
         let got = c
-            .call_timeout("machine.exec", json!({"argv": argv, "timeout": 30}), Duration::from_secs(40))
+            .call_timeout(
+                "machine.exec",
+                json!({"argv": argv, "timeout": 30}),
+                Duration::from_secs(40),
+            )
             .await
             .ok()?;
         if got["truncated"] == true {
@@ -769,7 +871,10 @@ mod tests {
     #[test]
     fn image_paths_go_first_one_per_line() {
         let p = vec!["/f/t1/a.png".to_owned(), "/f/t1/b.png".to_owned()];
-        assert_eq!(with_images(&p, "What is this?"), "/f/t1/a.png\n/f/t1/b.png\nWhat is this?");
+        assert_eq!(
+            with_images(&p, "What is this?"),
+            "/f/t1/a.png\n/f/t1/b.png\nWhat is this?"
+        );
         assert_eq!(with_images(&p[..1], ""), "/f/t1/a.png", "an image alone");
         assert_eq!(with_images(&[], "hi"), "hi");
     }
@@ -778,7 +883,10 @@ mod tests {
     fn commands_are_sent_as_typed() {
         assert_eq!(with_images(&[], "/clear"), "/clear");
         assert_eq!(with_images(&[], "!ls"), "!ls");
-        assert_eq!(with_images(&[], "/compact keep the API notes"), "/compact keep the API notes");
+        assert_eq!(
+            with_images(&[], "/compact keep the API notes"),
+            "/compact keep the API notes"
+        );
     }
 
     #[test]
@@ -791,30 +899,75 @@ mod tests {
         let f = image_argv("file:812:/work/a b:c.png", None, "1731590000 2048").unwrap();
         assert_eq!(
             (f[2].as_str(), f[4].as_str(), f[5].as_str()),
-            (Some(image::FILE_SCRIPT), Some("/work/a b:c.png"), Some("1731590000 2048"))
+            (
+                Some(image::FILE_SCRIPT),
+                Some("/work/a b:c.png"),
+                Some("1731590000 2048")
+            )
         );
-        assert!(image_argv("log:s1:2048:1", None, "").is_none(), "no log open yet");
+        assert!(
+            image_argv("log:s1:2048:1", None, "").is_none(),
+            "no log open yet"
+        );
         assert!(image_argv("missing", None, "").is_none());
         let keys = chat_images(
-            &[Image::InLog { line: 9, n: 0, media_type: "image/png".into() }, Image::File { path: "/x.png".into() }],
+            &[
+                Image::InLog {
+                    line: 9,
+                    n: 0,
+                    media_type: "image/png".into(),
+                },
+                Image::File {
+                    path: "/x.png".into(),
+                    line: 812,
+                },
+                Image::File {
+                    path: "/x.png".into(),
+                    line: 990,
+                },
+            ],
             "s1",
-            812,
         );
-        assert_eq!(keys[1].key, "file:812:/x.png", "each row's own key: a reused path is a new image");
-        assert!(image_argv(&keys[0].key, open, "").is_some() && image_argv(&keys[1].key, None, "").is_some());
+        assert_eq!(
+            keys[1].key, "file:812:/x.png",
+            "each record's own key: a reused path is a new image"
+        );
+        assert_eq!(
+            keys[2].key, "file:990:/x.png",
+            "the same path viewed again in the same folded row"
+        );
+        assert!(
+            image_argv(&keys[0].key, open, "").is_some()
+                && image_argv(&keys[1].key, None, "").is_some()
+        );
     }
 
     #[test]
     fn a_codex_image_is_held_by_path_and_file_time() {
         let mut held = HashMap::new();
         let got = |t: &str, b: Option<&[u8]>| Some((t.to_owned(), b.map(<[u8]>::to_vec)));
-        assert_eq!(file_image(&mut held, "/s.png", got("1 3", Some(b"old"))), Some(b"old".to_vec()));
+        assert_eq!(
+            file_image(&mut held, "/s.png", got("1 3", Some(b"old"))),
+            Some(b"old".to_vec())
+        );
         assert_eq!(held_time(&held, "/s.png"), "1 3");
-        assert_eq!(file_image(&mut held, "/s.png", got("1 3", None)), Some(b"old".to_vec()), "unchanged: only its time came");
-        assert_eq!(file_image(&mut held, "/s.png", got("2 3", Some(b"new"))), Some(b"new".to_vec()), "written again");
+        assert_eq!(
+            file_image(&mut held, "/s.png", got("1 3", None)),
+            Some(b"old".to_vec()),
+            "unchanged: only its time came"
+        );
+        assert_eq!(
+            file_image(&mut held, "/s.png", got("2 3", Some(b"new"))),
+            Some(b"new".to_vec()),
+            "written again"
+        );
         assert_eq!(file_image(&mut held, "/s.png", None), None, "gone");
         assert_eq!(held_time(&held, "/s.png"), "");
-        assert_eq!(file_image(&mut HashMap::new(), "/t.png", got("1 3", None)), None, "a time not held, no bytes");
+        assert_eq!(
+            file_image(&mut HashMap::new(), "/t.png", got("1 3", None)),
+            None,
+            "a time not held, no bytes"
+        );
     }
 
     #[test]
@@ -829,8 +982,18 @@ mod tests {
 
     #[test]
     fn the_terminal_is_read_as_agent_process_and_status() {
-        let t = term_of(&get("node", &["node", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"], Some("idle")));
-        assert_eq!((t.agent, t.pid, t.status.as_deref()), (Some(Agent::Claude), Some(7), Some("idle")));
+        let t = term_of(&get(
+            "node",
+            &[
+                "node",
+                "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+            ],
+            Some("idle"),
+        ));
+        assert_eq!(
+            (t.agent, t.pid, t.status.as_deref()),
+            (Some(Agent::Claude), Some(7), Some("idle"))
+        );
         let shell = term_of(&get("zsh", &["zsh"], None));
         assert_eq!((shell.agent, shell.status), (None, None));
     }
@@ -841,8 +1004,14 @@ mod tests {
         assert!(may_send(&t("claude", Some("idle"))));
         assert!(may_send(&t("codex", Some("working"))));
         assert!(may_send(&t("claude", Some("done"))));
-        assert!(!may_send(&t("claude", Some("blocked"))), "a dialog would take the text");
-        assert!(!may_send(&t("claude", None)), "no status yet: a start-up prompt");
+        assert!(
+            !may_send(&t("claude", Some("blocked"))),
+            "a dialog would take the text"
+        );
+        assert!(
+            !may_send(&t("claude", None)),
+            "no status yet: a start-up prompt"
+        );
         assert!(!may_send(&t("zsh", Some("idle"))), "a shell would run it");
     }
 
@@ -853,30 +1022,84 @@ mod tests {
         assert_eq!(send_outcome(&Ok(json!({}))), Sent::Typed);
         assert_eq!(send_outcome(&Err(CallError::OutcomeUnknown)), Sent::Unsure);
         assert_eq!(send_outcome(&Err(CallError::Lost)), Sent::Unsure);
-        let no = CallError::Rpc { kind: Some("conflict".into()), message: "status is working".into(), hint: None };
-        assert_eq!(send_outcome(&Err(no)), Sent::Refused("status is working".into()), "the core said no");
+        let no = CallError::Rpc {
+            kind: Some("conflict".into()),
+            message: "status is working".into(),
+            hint: None,
+        };
+        assert_eq!(
+            send_outcome(&Err(no)),
+            Sent::Refused("status is working".into()),
+            "the core said no"
+        );
     }
 
     #[test]
     fn the_second_enter_goes_only_to_the_process_and_session_sent_to() {
-        let s1 = Lookup::Found { path: "/l/s1.jsonl".into(), session: "s1".into() };
-        let s2 = Lookup::Found { path: "/l/s2.jsonl".into(), session: "s2".into() };
-        let to = send::Target { agent: Agent::Claude, pid: 7, proc_start: Some(100), session: "s1".into() };
-        let seen = |agent, pid, status, l| Seen { agent, pid: Some(pid), proc_start: Some(100), status, lookup: l };
+        let s1 = Lookup::Found {
+            path: "/l/s1.jsonl".into(),
+            session: "s1".into(),
+        };
+        let s2 = Lookup::Found {
+            path: "/l/s2.jsonl".into(),
+            session: "s2".into(),
+        };
+        let to = send::Target {
+            agent: Agent::Claude,
+            pid: 7,
+            proc_start: Some(100),
+            session: "s1".into(),
+        };
+        let seen = |agent, pid, status, l| Seen {
+            agent,
+            pid: Some(pid),
+            proc_start: Some(100),
+            status,
+            lookup: l,
+        };
         let claude = Some(Agent::Claude);
-        assert!(may_enter_again(Some(&to), &seen(claude, 7, Some("idle"), &s1)));
-        assert!(may_enter_again(Some(&to), &seen(claude, 7, Some("working"), &s1)));
-        assert!(!may_enter_again(None, &seen(claude, 7, Some("idle"), &s1)), "nothing sent");
-        assert!(!may_enter_again(Some(&to), &seen(claude, 7, Some("blocked"), &s1)), "a dialog would take it");
-        assert!(!may_enter_again(Some(&to), &seen(claude, 8, Some("idle"), &s1)), "another process");
-        assert!(!may_enter_again(Some(&to), &seen(claude, 7, Some("idle"), &s2)), "another session");
-        assert!(!may_enter_again(Some(&to), &seen(None, 7, Some("idle"), &s1)), "exited into the shell");
+        assert!(may_enter_again(
+            Some(&to),
+            &seen(claude, 7, Some("idle"), &s1)
+        ));
+        assert!(may_enter_again(
+            Some(&to),
+            &seen(claude, 7, Some("working"), &s1)
+        ));
+        assert!(
+            !may_enter_again(None, &seen(claude, 7, Some("idle"), &s1)),
+            "nothing sent"
+        );
+        assert!(
+            !may_enter_again(Some(&to), &seen(claude, 7, Some("blocked"), &s1)),
+            "a dialog would take it"
+        );
+        assert!(
+            !may_enter_again(Some(&to), &seen(claude, 8, Some("idle"), &s1)),
+            "another process"
+        );
+        assert!(
+            !may_enter_again(Some(&to), &seen(claude, 7, Some("idle"), &s2)),
+            "another session"
+        );
+        assert!(
+            !may_enter_again(Some(&to), &seen(None, 7, Some("idle"), &s1)),
+            "exited into the shell"
+        );
     }
 
     #[test]
     fn a_row_key_names_its_line_and_index() {
-        let r = Row { key: (2048, 1), item: Item::Note { text: "Interrupted".into() } };
+        let r = Row {
+            key: (2048, 1),
+            item: Item::Note {
+                text: "Interrupted".into(),
+            },
+        };
         let c = chat_row(&r, "s1");
-        assert_eq!((c.key.as_str(), c.kind.as_str(), c.text.as_str()), ("2048:1", "note", "Interrupted"));
+        assert_eq!(
+            (c.key.as_str(), c.kind.as_str(), c.text.as_str()),
+            ("2048:1", "note", "Interrupted")
+        );
     }
 }

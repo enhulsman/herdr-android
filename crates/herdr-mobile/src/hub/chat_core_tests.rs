@@ -12,13 +12,22 @@ fn path(s: &str) -> String {
     format!("/u/.claude/projects/-work-website/{s}.jsonl")
 }
 fn found(s: &str) -> Lookup {
-    Lookup::Found { path: path(s), session: s.into() }
+    Lookup::Found {
+        path: path(s),
+        session: s.into(),
+    }
 }
 fn term(status: &str) -> Term {
-    Term { agent: Some(Agent::Claude), pid: Some(4242), status: Some(status.into()) }
+    Term {
+        agent: Some(Agent::Claude),
+        pid: Some(4242),
+        status: Some(status.into()),
+    }
 }
 fn asked(text: &str) -> String {
-    format!("{{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{{\"role\":\"user\",\"content\":\"{text}\"}}}}")
+    format!(
+        "{{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{{\"role\":\"user\",\"content\":\"{text}\"}}}}"
+    )
 }
 fn said(id: &str, text: &str) -> String {
     format!(
@@ -40,7 +49,14 @@ fn chunk(lines: &[String], at: u64, size: u64) -> Chunk {
         text.push('\n');
     }
     let next = at + text.len() as u64;
-    Chunk { text, offsets, skipped: None, from: at, next, size: size.max(next) }
+    Chunk {
+        text,
+        offsets,
+        skipped: None,
+        from: at,
+        next,
+        size: size.max(next),
+    }
 }
 fn end_of(c: &Chunk) -> u64 {
     c.next
@@ -64,7 +80,14 @@ fn opened(lines: &[String], now: Instant) -> (ChatCore, Chunk) {
     c.take_lookup(&term("idle"), Some(found(S1)), now);
     c.see(&term("idle"), now);
     let ch = chunk(lines, 0, 0);
-    assert_eq!(c.plan_read(), Some(Read { path: path(S1), start: "-2000000".into(), end: None }));
+    assert_eq!(
+        c.plan_read(),
+        Some(Read {
+            path: path(S1),
+            start: "-2000000".into(),
+            end: None
+        })
+    );
     c.take_read(Ok(ch.clone()), now);
     (c, ch)
 }
@@ -78,27 +101,53 @@ fn the_lookup_runs_on_open_on_a_new_process_every_10_s_and_for_5_s_after_a_slash
     assert!(c.needs_lookup(&term("idle"), false, t0), "first poll");
     c.take_lookup(&term("idle"), Some(found(S1)), t0);
     assert!(!c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(9)));
-    assert!(!c.needs_lookup(&term("working"), true, t0 + Duration::from_secs(9)), "an event while Found");
-    assert!(c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(10)), "every 10 s");
+    assert!(
+        !c.needs_lookup(&term("working"), true, t0 + Duration::from_secs(9)),
+        "an event while Found"
+    );
+    assert!(
+        c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(10)),
+        "every 10 s"
+    );
     let mut other = term("idle");
     other.pid = Some(5150);
-    assert!(c.needs_lookup(&other, false, t0 + Duration::from_secs(1)), "another process in front");
+    assert!(
+        c.needs_lookup(&other, false, t0 + Duration::from_secs(1)),
+        "another process in front"
+    );
     c.sent("/clear", t0 + Duration::from_secs(2));
     assert!(c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(3)));
     assert!(c.needs_lookup(&term("idle"), false, t0 + Duration::from_millis(6_900)));
-    c.take_lookup(&term("idle"), Some(found(S1)), t0 + Duration::from_millis(7_000));
-    assert!(!c.needs_lookup(&term("idle"), false, t0 + Duration::from_millis(7_100)), "5 s are over");
+    c.take_lookup(
+        &term("idle"),
+        Some(found(S1)),
+        t0 + Duration::from_millis(7_000),
+    );
+    assert!(
+        !c.needs_lookup(&term("idle"), false, t0 + Duration::from_millis(7_100)),
+        "5 s are over"
+    );
     c.sent("Fix the /api route", t0 + Duration::from_secs(8));
-    assert!(!c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(9)), "not a command");
+    assert!(
+        !c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(9)),
+        "not a command"
+    );
 }
 
 #[test]
 fn an_event_looks_up_again_while_empty_or_missed() {
     let t0 = Instant::now();
     let mut c = ChatCore::new();
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S1.into() }), t0);
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S1.into() }),
+        t0,
+    );
     assert!(c.needs_lookup(&term("working"), true, t0 + Duration::from_secs(1)));
-    assert!(!c.needs_lookup(&term("working"), false, t0 + Duration::from_secs(1)), "a timed poll waits for 10 s");
+    assert!(
+        !c.needs_lookup(&term("working"), false, t0 + Duration::from_secs(1)),
+        "a timed poll waits for 10 s"
+    );
     c.take_lookup(&term("idle"), Some(Lookup::Missed("no session file")), t0);
     assert!(c.needs_lookup(&term("idle"), true, t0 + Duration::from_secs(1)));
 }
@@ -107,11 +156,22 @@ fn an_event_looks_up_again_while_empty_or_missed() {
 fn empty_shows_no_messages_and_becomes_the_conversation_once_its_log_exists() {
     let t0 = Instant::now();
     let mut c = ChatCore::new();
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S1.into() }), t0);
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S1.into() }),
+        t0,
+    );
     let v = c.view();
-    assert_eq!((v.found, v.rows.len(), v.health.clone()), (Kind::Empty, 0, Health::Ok));
+    assert_eq!(
+        (v.found, v.rows.len(), v.health.clone()),
+        (Kind::Empty, 0, Health::Ok)
+    );
     assert_eq!(c.plan_read(), None, "no log to read yet");
-    assert_eq!(c.shown(), Some((Agent::Claude, S1.into())), "Empty follows the send rules");
+    assert_eq!(
+        c.shown(),
+        Some((Agent::Claude, S1.into())),
+        "Empty follows the send rules"
+    );
     c.take_lookup(&term("working"), Some(found(S1)), t0);
     assert_eq!(c.plan_read().map(|r| r.path), Some(path(S1)));
     c.take_read(Ok(chunk(&[asked("Hi")], 0, 0)), t0);
@@ -132,7 +192,11 @@ fn empty_turns_missed_when_the_first_turn_ends_without_a_log() {
     c.take_lookup(&term("idle"), empty(), t0 + Duration::from_secs(9));
     assert_eq!(c.view().found, Kind::Missed);
     // Another session (/clear) is Empty again until its own first turn ends.
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), t0 + Duration::from_secs(10));
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S2.into() }),
+        t0 + Duration::from_secs(10),
+    );
     assert_eq!(c.view().found, Kind::Empty);
 }
 
@@ -147,11 +211,23 @@ fn clear_from_the_chat_stays_empty_until_its_log_is_written() {
     c.sent("/clear", at(100));
     c.take_lookup(&term("working"), Some(found(S1)), at(300));
     c.see(&term("working"), at(300));
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(800));
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S2.into() }),
+        at(800),
+    );
     c.see(&term("idle"), at(800));
     assert_eq!(c.view().found, Kind::Empty);
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(1300));
-    assert_eq!(c.view().found, Kind::Empty, "the turn that ended was the old session's");
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S2.into() }),
+        at(1300),
+    );
+    assert_eq!(
+        c.view().found,
+        Kind::Empty,
+        "the turn that ended was the old session's"
+    );
     c.take_lookup(&term("idle"), Some(found(S2)), at(2000));
     assert_eq!(c.view().found, Kind::Found);
 }
@@ -164,9 +240,17 @@ fn a_session_that_changed_during_a_turn_is_not_judged_by_it() {
     let (mut c, _) = opened(&[asked("Hi")], t0);
     c.take_lookup(&term("working"), Some(found(S1)), at(1));
     c.see(&term("working"), at(1));
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(2));
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S2.into() }),
+        at(2),
+    );
     c.see(&term("idle"), at(2));
-    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(3));
+    c.take_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S2.into() }),
+        at(3),
+    );
     assert_eq!(c.view().found, Kind::Empty);
 }
 
@@ -177,8 +261,19 @@ fn a_new_session_replaces_the_held_conversation() {
     c.sent("/clear", t0);
     c.take_lookup(&term("idle"), Some(found(S2)), t0 + Duration::from_secs(1));
     assert_eq!(c.view().rows.len(), 0, "the held rows are gone");
-    assert_eq!(c.plan_read(), Some(Read { path: path(S2), start: "-2000000".into(), end: None }), "the new log from its end");
-    c.take_read(Ok(chunk(&[asked("/clear")], 0, 0)), t0 + Duration::from_secs(1));
+    assert_eq!(
+        c.plan_read(),
+        Some(Read {
+            path: path(S2),
+            start: "-2000000".into(),
+            end: None
+        }),
+        "the new log from its end"
+    );
+    c.take_read(
+        Ok(chunk(&[asked("/clear")], 0, 0)),
+        t0 + Duration::from_secs(1),
+    );
     assert_eq!(c.shown(), Some((Agent::Claude, S2.into())));
 }
 
@@ -211,8 +306,15 @@ fn a_desk_that_does_not_answer_keeps_the_chat_and_says_so() {
 fn an_exit_keeps_what_was_read_until_another_agent_starts() {
     let t0 = Instant::now();
     let (mut c, _) = opened(&[asked("Hi"), said("m1", "Hello")], t0);
-    let shell = Term { agent: None, pid: Some(777), status: None };
-    assert!(c.needs_lookup(&shell, false, t0), "another process in front");
+    let shell = Term {
+        agent: None,
+        pid: Some(777),
+        status: None,
+    };
+    assert!(
+        c.needs_lookup(&shell, false, t0),
+        "another process in front"
+    );
     c.take_lookup(&shell, Some(Lookup::None), t0);
     let v = c.view();
     assert!(v.exited);
@@ -236,9 +338,27 @@ fn later_reads_take_only_new_lines_at_most_7_5_mb() {
     let t0 = Instant::now();
     let (mut c, first) = opened(&[asked("Hi")], t0);
     let at = end_of(&first);
-    assert_eq!(c.plan_read(), Some(Read { path: path(S1), start: at.to_string(), end: Some(at + READ_MAX) }));
+    assert_eq!(
+        c.plan_read(),
+        Some(Read {
+            path: path(S1),
+            start: at.to_string(),
+            end: Some(at + READ_MAX)
+        })
+    );
     c.take_read(Ok(chunk(&[said("m1", "Hello")], at, 0)), t0);
     assert_eq!(texts(&c.view()), ["user Hi", "said Hello"]);
+}
+
+#[test]
+fn a_read_spans_the_tail_scripts_limit_so_every_record_it_keeps_fits() {
+    // A record between a smaller window and the script's limit would neither
+    // fit a read nor be skipped: the same offset forever (Codex review).
+    let t0 = Instant::now();
+    let (c, _) = opened(&[asked("Hi")], t0);
+    let r = c.plan_read().unwrap();
+    let span = r.end.unwrap() - r.start.parse::<u64>().unwrap();
+    assert_eq!(span, herdr_chat::tail::READ_MAX);
 }
 
 #[test]
@@ -252,9 +372,16 @@ fn a_record_too_large_is_a_note_in_its_place_and_reading_goes_on() {
     ch.from = at + big;
     ch.next = at + big;
     c.take_read(Ok(ch), t0);
-    assert_eq!(c.plan_read().unwrap().start, (at + big).to_string(), "goes on after it");
+    assert_eq!(
+        c.plan_read().unwrap().start,
+        (at + big).to_string(),
+        "goes on after it"
+    );
     c.take_read(Ok(chunk(&[said("m1", "After")], at + big, 0)), t0);
-    assert_eq!(texts(&c.view()), ["user Hi", format!("note {SKIPPED}").as_str(), "said After"]);
+    assert_eq!(
+        texts(&c.view()),
+        ["user Hi", format!("note {SKIPPED}").as_str(), "said After"]
+    );
 }
 
 #[test]
@@ -265,7 +392,11 @@ fn a_failed_read_keeps_the_chat_until_a_read_succeeds() {
     let v = c.view();
     assert_eq!(v.problem.as_deref(), Some(FAILED_READ));
     assert_eq!(v.rows.len(), 1);
-    assert_eq!(c.plan_read().unwrap().start, end_of(&first).to_string(), "the same read again");
+    assert_eq!(
+        c.plan_read().unwrap().start,
+        end_of(&first).to_string(),
+        "the same read again"
+    );
     c.take_read(Ok(chunk(&[], end_of(&first), 0)), t0);
     assert_eq!(c.view().problem, None);
 }
@@ -293,10 +424,20 @@ fn reading_back_puts_older_rows_in_front_and_keeps_the_keys_held() {
     c.take_read(Ok(recent.clone()), t0);
     let held: Vec<Key> = c.view().rows.iter().map(|r| r.key).collect();
     assert!(c.view().cut);
-    assert_eq!(c.plan_older(), Some(Read { path: path(S1), start: "0".into(), end: Some(end_of(&older)) }));
+    assert_eq!(
+        c.plan_older(),
+        Some(Read {
+            path: path(S1),
+            start: "0".into(),
+            end: Some(end_of(&older))
+        })
+    );
     assert!(!c.take_older(Ok(older)));
     let v = c.view();
-    assert_eq!(texts(&v), ["user First", "said One", "user Second", "said Two"]);
+    assert_eq!(
+        texts(&v),
+        ["user First", "said One", "user Second", "said Two"]
+    );
     assert_eq!(v.rows[2..].iter().map(|r| r.key).collect::<Vec<_>>(), held);
     assert!(!v.cut, "the start is read");
     assert_eq!(c.plan_older(), None);
@@ -309,22 +450,43 @@ fn a_read_back_that_finds_no_whole_line_reads_wider() {
     c.take_lookup(&term("idle"), Some(found(S1)), t0);
     let at = 5_000_000;
     c.take_read(Ok(chunk(&[asked("Recent")], at, 0)), t0);
-    assert_eq!(c.plan_older().unwrap().start, (at - OLDER_BUDGET).to_string());
+    assert_eq!(
+        c.plan_older().unwrap().start,
+        (at - OLDER_BUDGET).to_string()
+    );
     // Nothing whole in the window: the script reports `from` at the end.
-    let none = Chunk { text: String::new(), offsets: vec![], skipped: None, from: at, next: at, size: at + 100 };
+    let none = Chunk {
+        text: String::new(),
+        offsets: vec![],
+        skipped: None,
+        from: at,
+        next: at,
+        size: at + 100,
+    };
     assert!(c.take_older(Ok(none)), "read again");
-    assert_eq!(c.plan_older().unwrap().start, (at - 2 * OLDER_BUDGET).to_string());
+    assert_eq!(
+        c.plan_older().unwrap().start,
+        (at - 2 * OLDER_BUDGET).to_string()
+    );
 }
 
 /// A read of a real file through the tail script, as `machine.exec` runs it.
 fn read_real(r: &Read) -> Result<Chunk, String> {
     let mut cmd = std::process::Command::new("sh");
-    cmd.arg("-c").arg(herdr_chat::tail::SCRIPT).arg("sh").arg(&r.path).arg(&r.start);
+    cmd.arg("-c")
+        .arg(herdr_chat::tail::SCRIPT)
+        .arg("sh")
+        .arg(&r.path)
+        .arg(&r.start);
     if let Some(e) = r.end {
         cmd.arg(e.to_string());
     }
-    let out = cmd.env("LC_ALL", "C.UTF-8").output().map_err(|e| e.to_string())?;
-    herdr_chat::tail::parse_chunk(&String::from_utf8_lossy(&out.stdout)).ok_or_else(|| "unexpected".into())
+    let out = cmd
+        .env("LC_ALL", "C.UTF-8")
+        .output()
+        .map_err(|e| e.to_string())?;
+    herdr_chat::tail::parse_chunk(&String::from_utf8_lossy(&out.stdout))
+        .ok_or_else(|| "unexpected".into())
 }
 
 /// Opens a real log at its end and reads back until the start or a stop.
@@ -335,7 +497,10 @@ fn read_back_all(name: &str, log: &str) -> View {
     std::fs::write(&f, log).unwrap();
     let t0 = Instant::now();
     let mut c = ChatCore::new();
-    let l = Lookup::Found { path: f.to_str().unwrap().into(), session: S1.into() };
+    let l = Lookup::Found {
+        path: f.to_str().unwrap().into(),
+        session: S1.into(),
+    };
     c.take_lookup(&term("idle"), Some(l), t0);
     let r = c.plan_read().unwrap();
     c.take_read(read_real(&r), t0);
@@ -361,7 +526,12 @@ fn padded(kind: &str, bytes: usize) -> String {
 #[test]
 fn reading_back_crosses_a_request_record_over_the_read_limit() {
     // Found in the review: an older message, a 9 MB api-request record, a recent one.
-    let log = format!("{}\n{}\n{}\n", asked("Old"), padded("api-request", 9_000_000), asked("Recent"));
+    let log = format!(
+        "{}\n{}\n{}\n",
+        asked("Old"),
+        padded("api-request", 9_000_000),
+        asked("Recent")
+    );
     let v = read_back_all("big-request.jsonl", &log);
     assert_eq!(texts(&v), ["user Old", "user Recent"]);
     assert!(!v.cut, "the start is read");
@@ -369,15 +539,29 @@ fn reading_back_crosses_a_request_record_over_the_read_limit() {
 
 #[test]
 fn reading_back_crosses_a_message_over_the_read_limit_with_a_note() {
-    let log = format!("{}\n{}\n{}\n", asked("Old"), padded("user", 9_000_000), asked("Recent"));
+    let log = format!(
+        "{}\n{}\n{}\n",
+        asked("Old"),
+        padded("user", 9_000_000),
+        asked("Recent")
+    );
     let v = read_back_all("big-message.jsonl", &log);
-    assert_eq!(texts(&v), ["user Old".to_string(), format!("note {SKIPPED}"), "user Recent".to_string()]);
+    assert_eq!(
+        texts(&v),
+        [
+            "user Old".to_string(),
+            format!("note {SKIPPED}"),
+            "user Recent".to_string()
+        ]
+    );
 }
 
 #[test]
 fn reading_back_crosses_many_records_it_does_not_show() {
     // 10 MB of request records, each small: every window holds only them.
-    let reqs: String = (0..20).map(|_| padded("api-request", 500_000) + "\n").collect();
+    let reqs: String = (0..20)
+        .map(|_| padded("api-request", 500_000) + "\n")
+        .collect();
     let log = format!("{}\n{reqs}{}\n", asked("Old"), asked("Recent"));
     let v = read_back_all("many-requests.jsonl", &log);
     assert_eq!(texts(&v), ["user Old", "user Recent"]);
@@ -412,7 +596,11 @@ fn a_turn_that_brings_no_row_is_broken_5_s_after_it_ends() {
     assert_eq!(c.view().health, Health::Ok, "within the 5 s");
     c.see(&term("idle"), t0 + Duration::from_secs(8));
     c.take_read(Ok(chunk(&[], at, 0)), t0 + Duration::from_secs(8));
-    assert!(matches!(c.view().health, Health::Broken { .. }), "{:?}", c.view().health);
+    assert!(
+        matches!(c.view().health, Health::Broken { .. }),
+        "{:?}",
+        c.view().health
+    );
     assert_eq!(c.view().rows.len(), 2, "keeps what was read");
 }
 
@@ -423,7 +611,10 @@ fn a_turn_whose_row_comes_within_5_s_of_its_end_is_ok() {
     let at = end_of(&first);
     c.see(&term("working"), t0 + Duration::from_secs(1));
     c.see(&term("idle"), t0 + Duration::from_secs(3));
-    c.take_read(Ok(chunk(&[said("m1", "Hello")], at, 0)), t0 + Duration::from_secs(5));
+    c.take_read(
+        Ok(chunk(&[said("m1", "Hello")], at, 0)),
+        t0 + Duration::from_secs(5),
+    );
     c.see(&term("idle"), t0 + Duration::from_secs(9));
     c.take_read(Ok(chunk(&[], at, 0)), t0 + Duration::from_secs(9));
     assert_eq!(c.view().health, Health::Ok);
@@ -466,25 +657,41 @@ fn the_terminal_view_looks_up_on_opening_and_again_only_for_another_process() {
     let mut c = ChatCore::new();
     assert!(c.needs_watch(&term("idle"), false), "on opening");
     c.take_watch_lookup(&term("idle"), Some(found(S1)), t0);
-    assert!(!c.needs_watch(&term("working"), true), "an event while Found");
-    assert!(!c.needs_watch(&term("working"), false), "no lookup every 10 s");
+    assert!(
+        !c.needs_watch(&term("working"), true),
+        "an event while Found"
+    );
+    assert!(
+        !c.needs_watch(&term("working"), false),
+        "no lookup every 10 s"
+    );
     let mut other = term("idle");
     other.pid = Some(5150);
     assert!(c.needs_watch(&other, false), "another process in front");
     c.take_watch_lookup(&other, Some(Lookup::None), t0);
-    assert!(!c.needs_watch(&other, true), "a shell in front: an event looks up nothing");
+    assert!(
+        !c.needs_watch(&other, true),
+        "a shell in front: an event looks up nothing"
+    );
 }
 
 #[test]
 fn the_terminal_view_looks_up_on_each_event_while_empty_or_missed_with_an_agent_in_front() {
     let t0 = Instant::now();
     let mut c = ChatCore::new();
-    c.take_watch_lookup(&term("idle"), Some(Lookup::Empty { session: S1.into() }), t0);
+    c.take_watch_lookup(
+        &term("idle"),
+        Some(Lookup::Empty { session: S1.into() }),
+        t0,
+    );
     assert!(c.needs_watch(&term("working"), true));
     assert!(!c.needs_watch(&term("working"), false), "only on an event");
     c.take_watch_lookup(&term("idle"), Some(Lookup::Missed("no session file")), t0);
     assert!(c.needs_watch(&term("idle"), true));
-    let shell = Term { agent: None, ..term("idle") };
+    let shell = Term {
+        agent: None,
+        ..term("idle")
+    };
     assert!(!c.needs_watch(&shell, true), "no agent in front");
 }
 
@@ -528,7 +735,10 @@ fn a_lookup_from_the_terminal_view_leaves_the_chat_its_own_lookup_on_return() {
     let mut other = term("idle");
     other.pid = Some(5150);
     c.take_watch_lookup(&other, Some(found(S1)), t0 + Duration::from_secs(1));
-    assert!(c.needs_lookup(&other, false, t0 + Duration::from_secs(2)), "a lookup on return");
+    assert!(
+        c.needs_lookup(&other, false, t0 + Duration::from_secs(2)),
+        "a lookup on return"
+    );
 }
 
 // --- Held chats (D12; spec: "A chat is held while the terminal view shows") ---
@@ -539,11 +749,24 @@ fn on_return_a_chat_looks_up_and_reads_only_what_was_written_since() {
     let (mut c, first) = opened(&[asked("Hi")], t0);
     let at = end_of(&first);
     c.leave();
-    assert!(c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(1)), "a lookup on return");
+    assert!(
+        c.needs_lookup(&term("idle"), false, t0 + Duration::from_secs(1)),
+        "a lookup on return"
+    );
     c.take_lookup(&term("idle"), Some(found(S1)), t0 + Duration::from_secs(1));
     // First the log's size: an empty read at the held end.
-    assert_eq!(c.plan_read(), Some(Read { path: path(S1), start: at.to_string(), end: Some(at) }));
-    assert!(c.take_read(Ok(chunk(&[], at, at + 5000)), t0), "then the new lines");
+    assert_eq!(
+        c.plan_read(),
+        Some(Read {
+            path: path(S1),
+            start: at.to_string(),
+            end: Some(at)
+        })
+    );
+    assert!(
+        c.take_read(Ok(chunk(&[], at, at + 5000)), t0),
+        "then the new lines"
+    );
     assert_eq!(c.plan_read().unwrap().start, at.to_string());
     c.take_read(Ok(chunk(&[said("m1", "Two answers")], at, 0)), t0);
     assert_eq!(texts(&c.view()), ["user Hi", "said Two answers"]);
@@ -558,7 +781,11 @@ fn on_return_past_more_than_2_mb_the_last_2_mb_are_read_as_on_a_first_open() {
     c.take_lookup(&term("idle"), Some(found(S1)), t0);
     assert!(c.take_read(Ok(chunk(&[], at, at + FIRST_BUDGET + 1)), t0));
     assert_eq!(c.plan_read().unwrap().start, "-2000000");
-    assert_eq!(c.view().rows.len(), 0, "the held rows are not kept across the gap");
+    assert_eq!(
+        c.view().rows.len(),
+        0,
+        "the held rows are not kept across the gap"
+    );
 }
 
 #[test]
@@ -589,7 +816,10 @@ fn the_ninth_terminal_drops_the_one_viewed_longest_ago() {
     h.open("m/t8", || 8);
     let keys = h.keys();
     assert_eq!(keys.len(), HELD);
-    assert!(!keys.contains(&"m/t1".to_string()), "t1 was viewed longest ago");
+    assert!(
+        !keys.contains(&"m/t1".to_string()),
+        "t1 was viewed longest ago"
+    );
     assert!(keys.contains(&"m/t0".to_string()));
     assert_eq!(h.open("m/t1", || 11), 11, "read again when next opened");
 }

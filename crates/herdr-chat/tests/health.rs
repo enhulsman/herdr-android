@@ -10,7 +10,10 @@ fn j(s: &str) -> String {
 // ---- Claude Code lines
 
 fn asked(text: &str) -> String {
-    format!("{{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{{\"role\":\"user\",\"content\":{}}}}}", j(text))
+    format!(
+        "{{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{{\"role\":\"user\",\"content\":{}}}}}",
+        j(text)
+    )
 }
 fn said(id: &str, text: &str) -> String {
     format!(
@@ -32,7 +35,9 @@ fn failed(id: &str, out: &str) -> String {
 }
 /// A record this parser does not know, as a renamed message record would be.
 fn renamed(n: usize) -> String {
-    format!("{{\"type\":\"chat-turn\",\"sessionId\":\"s\",\"uuid\":\"r{n}\",\"body\":{{\"text\":\"Done.\"}}}}")
+    format!(
+        "{{\"type\":\"chat-turn\",\"sessionId\":\"s\",\"uuid\":\"r{n}\",\"body\":{{\"text\":\"Done.\"}}}}"
+    )
 }
 /// Bookkeeping: lines Claude Code writes around messages, never a row.
 fn snapshot(n: usize) -> String {
@@ -51,13 +56,21 @@ fn interrupted() -> String {
 // ---- Codex lines
 
 fn codex_item(item: &str) -> String {
-    format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"turn_id\":\"t\",\"item\":{item}}}}}")
+    format!(
+        "{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"turn_id\":\"t\",\"item\":{item}}}}}"
+    )
 }
 fn codex_asked(text: &str) -> String {
-    codex_item(&format!("{{\"type\":\"UserMessage\",\"id\":\"u\",\"content\":[{{\"type\":\"text\",\"text\":{}}}]}}", j(text)))
+    codex_item(&format!(
+        "{{\"type\":\"UserMessage\",\"id\":\"u\",\"content\":[{{\"type\":\"text\",\"text\":{}}}]}}",
+        j(text)
+    ))
 }
 fn codex_said(text: &str) -> String {
-    codex_item(&format!("{{\"type\":\"AgentMessage\",\"id\":\"a\",\"content\":[{{\"type\":\"Text\",\"text\":{}}}]}}", j(text)))
+    codex_item(&format!(
+        "{{\"type\":\"AgentMessage\",\"id\":\"a\",\"content\":[{{\"type\":\"Text\",\"text\":{}}}]}}",
+        j(text)
+    ))
 }
 fn codex_ran(cmd: &str, source: &str) -> String {
     codex_item(&format!(
@@ -82,7 +95,11 @@ struct Log {
 
 impl Log {
     fn new() -> Self {
-        Log { text: String::new(), at: Vec::new(), lines: Vec::new() }
+        Log {
+            text: String::new(),
+            at: Vec::new(),
+            lines: Vec::new(),
+        }
     }
     /// Lines written to the log; returns the index of the first.
     fn write(&mut self, lines: &[String]) -> usize {
@@ -97,7 +114,10 @@ impl Log {
     }
     /// Lines `from..to` as one read.
     fn read(&self, p: &mut Parser, from: usize, to: usize) {
-        let text: String = self.lines[from..to].iter().map(|l| format!("{l}\n")).collect();
+        let text: String = self.lines[from..to]
+            .iter()
+            .map(|l| format!("{l}\n"))
+            .collect();
         p.feed_lines(&text, &self.at[from..to]);
     }
     /// Write `lines` and read them at once.
@@ -115,7 +135,10 @@ fn broken(p: &Parser) -> bool {
 fn claude_session() -> (Log, Parser) {
     let mut log = Log::new();
     let mut p = Parser::new(Agent::Claude);
-    log.add(&mut p, &[asked("Add a health route"), said("a", "Added `/health`.")]);
+    log.add(
+        &mut p,
+        &[asked("Add a health route"), said("a", "Added `/health`.")],
+    );
     assert_eq!(p.health(), Health::Ok);
     (log, p)
 }
@@ -125,7 +148,12 @@ fn codex_session() -> (Log, Parser) {
     let mut p = Parser::new(Agent::Codex);
     log.add(
         &mut p,
-        &[codex_event("task_started"), codex_asked("Add a health route"), codex_said("Added `/health`."), codex_event("task_complete")],
+        &[
+            codex_event("task_started"),
+            codex_asked("Add a health route"),
+            codex_said("Added `/health`."),
+            codex_event("task_complete"),
+        ],
     );
     assert_eq!(p.health(), Health::Ok);
     (log, p)
@@ -188,9 +216,17 @@ fn bookkeeping_only_from_the_start_is_broken() {
 fn a_log_mostly_in_no_known_shape_clears_once_most_lines_are_known() {
     let mut log = Log::new();
     let mut p = Parser::new(Agent::Claude);
-    log.add(&mut p, &(0..6).map(|i| format!("not json {i}")).collect::<Vec<_>>());
+    log.add(
+        &mut p,
+        &(0..6).map(|i| format!("not json {i}")).collect::<Vec<_>>(),
+    );
     assert!(broken(&p));
-    log.add(&mut p, &(0..8).map(|i| said(&i.to_string(), "ok")).collect::<Vec<_>>());
+    log.add(
+        &mut p,
+        &(0..8)
+            .map(|i| said(&i.to_string(), "ok"))
+            .collect::<Vec<_>>(),
+    );
     assert!(!broken(&p), "{:?}", p.health());
 }
 
@@ -198,17 +234,27 @@ fn a_log_mostly_in_no_known_shape_clears_once_most_lines_are_known() {
 
 #[test]
 fn renamed_message_records_after_messages_were_shown_break_the_view() {
-    for (agent, (mut log, mut p)) in [(Agent::Claude, claude_session()), (Agent::Codex, codex_session())] {
+    for (agent, (mut log, mut p)) in [
+        (Agent::Claude, claude_session()),
+        (Agent::Codex, codex_session()),
+    ] {
         let shown = p.items().to_vec();
         renamed_turn(&mut log, &mut p, agent);
         assert!(broken(&p), "{agent:?}: {:?}", p.health());
-        assert_eq!(p.items(), shown.as_slice(), "{agent:?}: what was read stays");
+        assert_eq!(
+            p.items(),
+            shown.as_slice(),
+            "{agent:?}: what was read stays"
+        );
     }
 }
 
 #[test]
 fn a_turn_broken_view_stays_broken_across_reads_with_no_new_row() {
-    for (agent, (mut log, mut p)) in [(Agent::Claude, claude_session()), (Agent::Codex, codex_session())] {
+    for (agent, (mut log, mut p)) in [
+        (Agent::Claude, claude_session()),
+        (Agent::Codex, codex_session()),
+    ] {
         renamed_turn(&mut log, &mut p, agent);
         for n in 0..5 {
             let line = match agent {
@@ -227,9 +273,19 @@ fn the_persons_own_message_or_shell_command_does_not_clear_it() {
     renamed_turn(&mut log, &mut p, Agent::Claude);
     log.add(&mut p, &[asked("Are you there?")]);
     assert!(broken(&p), "a person's row");
-    log.add(&mut p, &[asked("<bash-input>ls</bash-input>"), asked("<bash-stdout>src</bash-stdout><bash-stderr></bash-stderr>")]);
+    log.add(
+        &mut p,
+        &[
+            asked("<bash-input>ls</bash-input>"),
+            asked("<bash-stdout>src</bash-stdout><bash-stderr></bash-stderr>"),
+        ],
+    );
     assert!(broken(&p), "a `!` command");
-    assert!(matches!(p.items().last(), Some(Item::Tools { .. })), "both still read: {:?}", p.items());
+    assert!(
+        matches!(p.items().last(), Some(Item::Tools { .. })),
+        "both still read: {:?}",
+        p.items()
+    );
 
     let (mut log, mut p) = codex_session();
     renamed_turn(&mut log, &mut p, Agent::Codex);
@@ -280,7 +336,10 @@ fn a_turn_broken_view_is_still_broken_in_a_read_back() {
 #[test]
 fn turn_broken_outranks_degraded() {
     let (mut log, mut p) = codex_session();
-    log.add(&mut p, &[codex_item("{\"type\":\"ShinyNewThing\",\"id\":\"x\"}")]);
+    log.add(
+        &mut p,
+        &[codex_item("{\"type\":\"ShinyNewThing\",\"id\":\"x\"}")],
+    );
     assert!(matches!(p.health(), Health::Degraded { .. }));
     renamed_turn(&mut log, &mut p, Agent::Codex);
     assert!(broken(&p), "{:?}", p.health());
@@ -297,15 +356,28 @@ fn an_interrupt_before_any_text_is_not_broken() {
     log.add(&mut p, &[interrupted()]);
     p.turn_ended();
     assert_eq!(p.health(), Health::Ok);
-    assert_eq!(p.items().last(), Some(&Item::Note { text: "Interrupted".into() }));
+    assert_eq!(
+        p.items().last(),
+        Some(&Item::Note {
+            text: "Interrupted".into()
+        })
+    );
 
     let (mut log, mut p) = codex_session();
-    log.add(&mut p, &[codex_event("task_started"), codex_asked("Write the docs")]);
+    log.add(
+        &mut p,
+        &[codex_event("task_started"), codex_asked("Write the docs")],
+    );
     p.turn_started(false);
     log.add(&mut p, &[codex_event("turn_aborted")]);
     p.turn_ended();
     assert_eq!(p.health(), Health::Ok);
-    assert_eq!(p.items().last(), Some(&Item::Note { text: "Interrupted".into() }));
+    assert_eq!(
+        p.items().last(),
+        Some(&Item::Note {
+            text: "Interrupted".into()
+        })
+    );
 }
 
 #[test]
@@ -328,7 +400,10 @@ fn compact_typed_in_the_terminal_is_not_broken() {
 fn a_turn_of_tool_calls_only_ending_in_a_failure_is_not_broken() {
     let (mut log, mut p) = claude_session();
     p.turn_started(false);
-    log.add(&mut p, &[ran("t1", "cargo build"), failed("t1", "error[E0425]")]);
+    log.add(
+        &mut p,
+        &[ran("t1", "cargo build"), failed("t1", "error[E0425]")],
+    );
     p.turn_ended();
     assert_eq!(p.health(), Health::Ok);
 
@@ -337,7 +412,14 @@ fn a_turn_of_tool_calls_only_ending_in_a_failure_is_not_broken() {
     let (mut log, mut p) = claude_session();
     log.add(&mut p, &[ran("t1", "cargo build")]);
     p.turn_started(false);
-    log.add(&mut p, &[failed("t1", "error"), ran("t2", "cargo build"), failed("t2", "error")]);
+    log.add(
+        &mut p,
+        &[
+            failed("t1", "error"),
+            ran("t2", "cargo build"),
+            failed("t2", "error"),
+        ],
+    );
     p.turn_ended();
     assert_eq!(p.health(), Health::Ok);
 }
@@ -353,7 +435,10 @@ fn a_codex_shell_command_typed_in_the_terminal_is_not_broken() {
 
 #[test]
 fn turns_started_from_the_chat_by_a_shell_or_slash_command_are_skipped() {
-    for (agent, (mut log, mut p)) in [(Agent::Claude, claude_session()), (Agent::Codex, codex_session())] {
+    for (agent, (mut log, mut p)) in [
+        (Agent::Claude, claude_session()),
+        (Agent::Codex, codex_session()),
+    ] {
         // `/usage` writes nothing until its dialog closes; a `!` command in
         // Codex may write after the status settles.
         p.turn_started(true);

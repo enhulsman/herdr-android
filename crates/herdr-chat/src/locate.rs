@@ -100,7 +100,9 @@ pub fn decide(p: &Probe) -> Lookup {
 /// foreground process, `out` what [`SCRIPT`] printed (none when the desk did
 /// not answer).
 pub fn lookup(agent: Option<crate::Agent>, out: Option<&str>) -> Lookup {
-    let Some(agent) = agent else { return Lookup::None };
+    let Some(agent) = agent else {
+        return Lookup::None;
+    };
     match out {
         Some(out) => decide_for(agent, &parse_probe(out)),
         None => Lookup::Missed("the desk did not answer"),
@@ -208,7 +210,9 @@ fn claude(p: &Probe) -> Lookup {
 /// The thread id at the end of a rollout or lock file name.
 fn thread_id(path: &str) -> Option<&str> {
     let name = path.rsplit('/').next()?;
-    let stem = name.strip_suffix(".jsonl").or_else(|| name.strip_suffix(".lock"))?;
+    let stem = name
+        .strip_suffix(".jsonl")
+        .or_else(|| name.strip_suffix(".lock"))?;
     (stem.len() >= 36).then(|| &stem[stem.len() - 36..])
 }
 

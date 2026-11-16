@@ -643,7 +643,10 @@ async fn stepping_back_while_typing_reattaches_as_a_watcher_and_types_nothing() 
     assert_eq!(params["observe"], true);
     let (mut viewer, attached) = stepped.await.unwrap();
     let attached = attached.unwrap().unwrap();
-    assert_eq!((attached.mode, attached.cols, attached.rows), (Mode::Watching, 120, 40));
+    assert_eq!(
+        (attached.mode, attached.cols, attached.rows),
+        (Mode::Watching, 120, 40)
+    );
     assert_eq!(viewer.mode(), Mode::Watching);
     assert_sends_nothing(&marker(&client, &mut core).await, "stepping back");
 

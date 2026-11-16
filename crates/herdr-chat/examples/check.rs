@@ -8,13 +8,19 @@ use std::time::Instant;
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();
-    let agent = if a[1] == "codex" { Agent::Codex } else { Agent::Claude };
+    let agent = if a[1] == "codex" {
+        Agent::Codex
+    } else {
+        Agent::Claude
+    };
     let path = &a[2];
     // With a budget: one read of the last `budget` bytes, as the phone opens a
     // chat. Without: read on from each read's `next` to the end of the file,
     // as the phone does past a skipped record or the 7.5 MB read cap.
     let budget = a.get(3);
-    let mut offset = budget.map(|b| format!("-{b}")).unwrap_or_else(|| "0".into());
+    let mut offset = budget
+        .map(|b| format!("-{b}"))
+        .unwrap_or_else(|| "0".into());
     let t = Instant::now();
     let mut p = Parser::new(agent);
     let size;
@@ -37,12 +43,17 @@ fn main() {
         offset = chunk.next.to_string();
     }
     let ms = t.elapsed().as_millis();
-    let (mut u, mut s, mut tools, mut calls, mut notes, mut running, mut img) = (0, 0, 0, 0, 0, 0, 0);
+    let (mut u, mut s, mut tools, mut calls, mut notes, mut running, mut img) =
+        (0, 0, 0, 0, 0, 0, 0);
     for i in p.items() {
         match i {
             Item::User { images, text } => {
                 if text.starts_with('<') {
-                    let tag: String = text.chars().take_while(|c| *c != '>' && *c != ' ').take(30).collect();
+                    let tag: String = text
+                        .chars()
+                        .take_while(|c| *c != '>' && *c != ' ')
+                        .take(30)
+                        .collect();
                     eprintln!("tagged user text: {tag}");
                 }
                 u += 1;

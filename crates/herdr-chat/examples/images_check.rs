@@ -17,16 +17,37 @@ fn kind(b: &[u8]) -> &'static str {
         [0x89, b'P', b'N', b'G', ..] => "png",
         [0xff, 0xd8, ..] => "jpeg",
         [b'G', b'I', b'F', ..] => "gif",
-        [b'R', b'I', b'F', b'F', _, _, _, _, b'W', b'E', b'B', b'P', ..] => "webp",
+        [
+            b'R',
+            b'I',
+            b'F',
+            b'F',
+            _,
+            _,
+            _,
+            _,
+            b'W',
+            b'E',
+            b'B',
+            b'P',
+            ..,
+        ] => "webp",
         _ => "other",
     }
 }
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();
-    let agent = if a[1] == "codex" { Agent::Codex } else { Agent::Claude };
+    let agent = if a[1] == "codex" {
+        Agent::Codex
+    } else {
+        Agent::Claude
+    };
     let path = &a[2];
-    let offset = a.get(3).map(|b| format!("-{b}")).unwrap_or_else(|| "0".into());
+    let offset = a
+        .get(3)
+        .map(|b| format!("-{b}"))
+        .unwrap_or_else(|| "0".into());
     let raw = std::fs::metadata(path).unwrap().len();
     let out = sh(tail::SCRIPT, &[path, &offset]);
     let chunk = tail::parse_chunk(&String::from_utf8_lossy(&out)).expect("chunk");
@@ -44,13 +65,19 @@ fn main() {
             _ => {}
         }
     }
-    let (mut ok, mut gone, mut missing, mut inline, mut bytes, mut slowest) = (0, 0, 0, 0, 0usize, 0u128);
+    let (mut ok, mut gone, mut missing, mut inline, mut bytes, mut slowest) =
+        (0, 0, 0, 0, 0usize, 0u128);
     let mut kinds = std::collections::BTreeMap::new();
     for (_, m) in &all {
         let t = Instant::now();
         let got = match m {
-            Image::InLog { line, n, .. } => image::decode(&sh(image::LOG_SCRIPT, &[path, &line.to_string(), &n.to_string()])),
-            Image::File { path } => image::file_reply(&sh(image::FILE_SCRIPT, &[path, ""])).and_then(|(_, b)| b),
+            Image::InLog { line, n, .. } => image::decode(&sh(
+                image::LOG_SCRIPT,
+                &[path, &line.to_string(), &n.to_string()],
+            )),
+            Image::File { path, .. } => {
+                image::file_reply(&sh(image::FILE_SCRIPT, &[path, ""])).and_then(|(_, b)| b)
+            }
             Image::Inline { .. } => {
                 inline += 1;
                 continue;
@@ -76,7 +103,7 @@ fn main() {
         all.len(),
         all.iter().filter(|x| x.0 == "user").count(),
         all.iter().filter(|x| x.0 == "tool").count(),
-        if ok > 0 { bytes / ok / 1000 } else { 0 },
+        bytes.checked_div(ok).unwrap_or(0) / 1000,
         p.health()
     );
 }

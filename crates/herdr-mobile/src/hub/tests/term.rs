@@ -684,7 +684,7 @@ async fn stepping_back_watches_at_the_desks_size_and_leading_takes_over_again() 
     let mut core = rig.core().await;
     core.connect("0.1.15", vec![sized("t3", 80, 24)]).await;
     rig.until_state(WS, connected).await;
-    let o = open_with(&rig, true);
+    let mut o = open_with(&rig, true);
     core.attach(5, PHONE).await;
     o.screen.until_state(|s| s.phase == TermPhase::Typing).await;
 
@@ -693,7 +693,10 @@ async fn stepping_back_watches_at_the_desks_size_and_leading_takes_over_again() 
     assert_eq!((close.channel, close.kind), (5, wire::CLOSE));
     let params = core.attach(6, (80, 24)).await;
     assert_eq!(params["observe"], true);
-    let s = o.screen.until_state(|s| s.phase == TermPhase::Watching).await;
+    let s = o
+        .screen
+        .until_state(|s| s.phase == TermPhase::Watching)
+        .await;
     assert_eq!((s.cols, s.rows), (80, 24));
 
     o.cmds.send(Cmd::Lead).unwrap();

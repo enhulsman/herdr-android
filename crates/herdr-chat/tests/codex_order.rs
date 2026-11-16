@@ -11,15 +11,26 @@ fn event(kind: &str, turn: &str) -> String {
     format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"{kind}\",\"turn_id\":\"{turn}\"}}}}")
 }
 fn item(turn: &str, item: &str) -> String {
-    format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"turn_id\":\"{turn}\",\"item\":{item}}}}}")
+    format!(
+        "{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"turn_id\":\"{turn}\",\"item\":{item}}}}}"
+    )
 }
 fn asked(turn: &str, text: &str) -> String {
-    item(turn, &format!("{{\"type\":\"UserMessage\",\"id\":\"u-{text}\",\"content\":[{{\"type\":\"text\",\"text\":{}}}]}}", j(text)))
+    item(
+        turn,
+        &format!(
+            "{{\"type\":\"UserMessage\",\"id\":\"u-{text}\",\"content\":[{{\"type\":\"text\",\"text\":{}}}]}}",
+            j(text)
+        ),
+    )
 }
 fn said(turn: &str, phase: &str, text: &str) -> String {
     item(
         turn,
-        &format!("{{\"type\":\"AgentMessage\",\"id\":\"a-{text}\",\"phase\":\"{phase}\",\"content\":[{{\"type\":\"Text\",\"text\":{}}}]}}", j(text)),
+        &format!(
+            "{{\"type\":\"AgentMessage\",\"id\":\"a-{text}\",\"phase\":\"{phase}\",\"content\":[{{\"type\":\"Text\",\"text\":{}}}]}}",
+            j(text)
+        ),
     )
 }
 fn ran(turn: &str, id: &str, cmd: &str, source: &str) -> String {
@@ -33,7 +44,10 @@ fn ran(turn: &str, id: &str, cmd: &str, source: &str) -> String {
 }
 
 fn user(text: &str) -> Item {
-    Item::User { text: text.into(), images: vec![] }
+    Item::User {
+        text: text.into(),
+        images: vec![],
+    }
 }
 fn text(t: &str) -> Item {
     Item::Assistant { text: t.into() }

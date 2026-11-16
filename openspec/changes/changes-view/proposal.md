@@ -31,6 +31,9 @@ written here):
 5. **New files git does not track yet.** Shown as all added, cut off like
    other long diffs (as the Mac does), and any cut-off diff can be loaded in
    full: an agent's new file is often the change you most want to read.
+   Except over 8 MB, the most herdr-core returns in one call: such a diff
+   shows its start and says it is too large for the phone (Ezra,
+   2026-11-16).
 6. **Design first.** (a) One render (file list and a diff, both themes)
    signed off before building, as for the other screens. (b) Built from the
    design tokens and judged on the phone. *Pick (a)*: a small screen, cheap
@@ -45,7 +48,10 @@ each with its count of added and removed lines; tap one to read its diff,
 coloured as on the desk. Nothing on the screen changes the repository: no
 commit, no stage, no discard. It refreshes when the agent's state changes.
 Very long diffs show their first 2,000 lines, with a control to load the
-whole diff. Outside a git repository the screen says "Not a git repository".
+whole diff; a diff over 8 MB shows its start and says it is too large for
+the phone. Reading never blocks the agent's own git (no lock, no index
+write); filters the repository sets up, such as Git LFS, may run as they do
+for any `git status`. Outside a git repository the screen says "Not a git repository".
 
 ## Why
 

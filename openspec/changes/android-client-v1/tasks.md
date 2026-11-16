@@ -55,6 +55,4 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 - [ ] M4.4 Phone check
 
 ### M5. Changes view
-- [ ] M5.1 Tests: fixed git template, hostile repository, truncation, binary files
-- [ ] M5.2 Changes list and diff view
-- [ ] M5.3 Phone check: review an agent's changes before approving
+Moved to its own change, `openspec/changes/changes-view/` (2026-11-16).

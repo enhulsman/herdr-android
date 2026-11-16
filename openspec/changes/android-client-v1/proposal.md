@@ -23,7 +23,7 @@
 
 That is version 1. Version 1.1: **M4** spaces drawer, tab overview, sub-agent
 peek, wide layout for landscape and tablets, the other four themes; **M5** the
-view-only Changes panel.
+view-only Changes panel (now its own change, `changes-view`, in v1.0.0).
 
 Not planned: closing or killing anything, editing
 spaces/tabs, the Files panel, mods, the command palette, custom theme files,
@@ -56,7 +56,6 @@ New repository `herdr-android` with two deliverables:
 | `release` | CI build, approval-gated signing, GitHub releases, Obtainium, tests | v1 |
 | `appearance` | Themes and light/dark (v1: graphite, paper); wide layout (v1.1) | v1 / v1.1 |
 | `spaces` | Read-only spaces drawer, tab overview, peek | v1.1 |
-| `changes-view` | View-only git changes | v1.1 |
 
 ## Impact
 

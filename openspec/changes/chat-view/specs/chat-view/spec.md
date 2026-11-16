@@ -397,6 +397,10 @@ A bubble SHALL turn to "Not in the conversation yet", with a button to the
 terminal and a way to dismiss it, when it has not arrived 30 s after it was
 sent and is not shown as queued, or 30 s after the agent stopped working
 while it was queued. It SHALL turn into the real row if it still arrives.
+A `/` command the desk confirmed typing (not a send whose outcome is
+unknown) SHALL instead read "Sent to the terminal" at that point, with no
+buttons: commands such as `/usage` and `/exit` write no row. That bubble
+SHALL go once a newer row arrives, so it never sits under later messages.
 
 #### Scenario: A normal send
 - **WHEN** Ezra sends "Run the tests" to an idle agent
@@ -409,6 +413,10 @@ while it was queued. It SHALL turn into the real row if it still arrives.
 #### Scenario: Never arrives
 - **WHEN** a message sent to an idle agent has no matching row after 30 s and is not shown as queued
 - **THEN** the bubble reads "Not in the conversation yet" with a button to the terminal
+
+#### Scenario: A command the log never shows
+- **WHEN** Ezra sends `/usage`, the desk confirms it typed, and no row comes in 30 s
+- **THEN** the bubble reads "Sent to the terminal" with no buttons, and goes when the next message arrives
 
 ### Requirement: Slash and shell commands are sent as typed
 A message starting with `/` or `!` SHALL be sent as typed and shown as the

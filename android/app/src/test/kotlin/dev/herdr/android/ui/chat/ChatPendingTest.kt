@@ -294,6 +294,26 @@ class ChatPendingTest {
     }
 
     @Test
+    fun aCommandTheLogNeverShowsSettlesAsSentToTheTerminal() {
+        // Seen on the test phone: /usage and /exit write no row, so their
+        // bubbles read "Not in the conversation yet" though the desk typed them.
+        val rows = listOf(user("0:0", "hello"))
+        val p = send("/usage", rows, at = 0)
+        assertEquals(PendingState.Sending, p.state(now = 29_999))
+        assertEquals(PendingState.Sent, p.state(now = 30_000))
+        val unsure = pendingFor(1, "/usage", 0, rows, "idle", now = 0).typed(0, sure = false)
+        assertEquals("the outcome is unknown", PendingState.NotArrived, unsure.state(now = 30_000))
+        assertEquals("a message to the agent still warns", PendingState.NotArrived, send("Fix the retry", rows).state(now = 30_000))
+
+        assertEquals("kept with no newer row", 1, follow(listOf(p), rows, now = 31_000).size)
+        val newer = rows + user("1:0", "hi")
+        assertEquals("not before it settles", 1, follow(listOf(p), newer, now = 5_000).size)
+        assertEquals("goes when a newer row arrives", 0, follow(listOf(p), newer, now = 31_000).size)
+        assertEquals("an unsure one stays", 1, follow(listOf(unsure), newer, now = 31_000).size)
+        assertEquals("it no longer keeps the fast poll", 5_000L, pollMs("idle", listOf(p), now = 31_000))
+    }
+
+    @Test
     fun theWaitingLineCountsFromTheTapWhileTheSendStillRuns() {
         // Seen on the test phone: terminal.send answers a /usage after 5.2 s
         // (the core waits to see the program start working; a dialog never

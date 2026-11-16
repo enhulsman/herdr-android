@@ -141,8 +141,8 @@ class ChatState {
         refusal = refusalOf(r)
     }
 
-    /** `terminal.send` took it. */
-    fun typed(id: Long, now: Long) = update(id) { it.typed(now) }
+    /** `terminal.send` took it ([sure]), or may have (no answer in time). */
+    fun typed(id: Long, now: Long, sure: Boolean = true) = update(id) { it.typed(now, sure) }
 
     /**
      * The message the agent's input box still holds 1.5 s after it was typed

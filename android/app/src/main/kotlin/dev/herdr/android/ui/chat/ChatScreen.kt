@@ -379,6 +379,7 @@ private fun PendingBubble(p: Pending, now: Long, onTerminal: () -> Unit, onDismi
                 Status(NOT_ARRIVED)
                 Actions(onTerminal, onDismiss)
             }
+            PendingState.Sent -> Status(SENT_TO_TERMINAL)
         }
         if (p.waiting(now)) {
             BasicText(p.waitingText, style = HerdrType.secondary.copy(color = c.dimText, textAlign = TextAlign.End), modifier = Modifier.widthIn(max = BUBBLE_MAX))

@@ -7,7 +7,10 @@ import uniffi.herdr_mobile.ChatRow
 // Pure: the times are uptime milliseconds passed in by the caller.
 
 /** What a pending bubble reads. */
-enum class PendingState { Sending, Queued, NotArrived }
+enum class PendingState { Sending, Queued, NotArrived, Sent }
+
+/** A `/` command the desk typed that never got a row (`/usage`, `/exit`). */
+const val SENT_TO_TERMINAL = "Sent to the terminal"
 
 /** How long a message may stay away before its bubble says so. */
 const val ARRIVE_MS = 30_000L
@@ -48,6 +51,8 @@ data class Pending(
     val statusChanged: Boolean = false,
     val waitDismissed: Boolean = false,
     val enterPressed: Boolean = false,
+    /** The desk confirmed typing it (not a send whose outcome is unknown). */
+    val sure: Boolean = false,
 ) {
     private val trimmed get() = text.trim()
     val slash: Boolean get() = text.trimStart().startsWith("/")
@@ -58,7 +63,7 @@ data class Pending(
     /** A message to the agent itself, not a `/` or `!` command. */
     val plain: Boolean get() = slash.not() && command == null
 
-    fun typed(now: Long) = copy(typedAt = now)
+    fun typed(now: Long, sure: Boolean = true) = copy(typedAt = now, sure = sure)
     fun dismissWait() = copy(waitDismissed = true)
     fun enteredAgain() = copy(enterPressed = true)
 
@@ -80,9 +85,12 @@ data class Pending(
 
     fun state(now: Long): PendingState = when {
         queued -> PendingState.Queued
-        expired(now) -> PendingState.NotArrived
+        expired(now) -> if (slash && sure) PendingState.Sent else PendingState.NotArrived
         else -> PendingState.Sending
     }
+
+    /** Nothing more is coming for it: its bubble only waits for the person. */
+    fun settled(now: Long): Boolean = state(now).let { it == PendingState.NotArrived || it == PendingState.Sent }
 
     private fun expired(now: Long): Boolean {
         val typed = typedAt ?: return false
@@ -147,6 +155,8 @@ fun followPending(pending: List<Pending>, rows: List<ChatRow>, status: String, n
             taken += hit
             continue
         }
+        // A command the log never shows goes once a newer row is there.
+        if (p.state(now) == PendingState.Sent && after < rows.size) continue
         if (p.command != null) {
             val shells = ((from ?: 0) until rows.size).sumOf { p.shells(rows[it]) }
             if (shells > (if (from != null) p.shellsAt else 0)) continue
@@ -172,11 +182,11 @@ fun sendRefusal(pending: List<Pending>, now: Long): String? = if (pending.any { 
  * `!` command runs in the shell; blocked waits on the person.
  */
 fun busy(status: String, pending: List<Pending>, now: Long): Boolean =
-    status == "working" || pending.any { it.plain && it.state(now) != PendingState.NotArrived }
+    status == "working" || pending.any { it.plain && !it.settled(now) }
 
 /** The pause before the next poll while the chat shows. */
 fun pollMs(status: String, pending: List<Pending>, now: Long): Long =
-    if (status == "working" || pending.any { it.state(now) != PendingState.NotArrived }) 500L else 5_000L
+    if (status == "working" || pending.any { !it.settled(now) }) 500L else 5_000L
 
 /** The message as typed into the terminal: a space after a last word starting with `@`. */
 fun typedText(text: String): String {

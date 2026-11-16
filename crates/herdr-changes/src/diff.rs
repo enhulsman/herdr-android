@@ -63,7 +63,10 @@ pub fn parse_diff(kind: Kind, exec: Exec) -> Outcome<Diff> {
     }
     // Never more than the cap and the longest header are split off.
     let mut split = out.split(|&b| b == b'\n');
-    let mut parts: Vec<&[u8]> = split.by_ref().take(LINES_MAX + EXTENDED.len() + 3).collect();
+    let mut parts: Vec<&[u8]> = split
+        .by_ref()
+        .take(LINES_MAX + EXTENDED.len() + 3)
+        .collect();
     let more = split.next().is_some();
     // The part after the last line feed: empty, or a line cut off mid-way.
     if !more && parts.last().is_some_and(|p| p.is_empty() || truncated) {

@@ -30,6 +30,9 @@ pub enum Item {
     /// Tool calls in a row, shown folded as one line.
     Tools { calls: Vec<ToolCall> },
     Note { text: String },
+    /// A note the agent wrote for the person while it works: Claude Code's
+    /// thinking shown as updates (its terminal marks them "summary").
+    Update { text: String },
     /// A message from another agent: a subagent's report (named after the
     /// task it was given) or another session's message.
     AgentMessage { from: String, text: String },
@@ -323,7 +326,7 @@ impl Parser {
     }
 
     fn new_row(&mut self, item: Item) {
-        if matches!(item, Item::Assistant { .. } | Item::Note { .. }) {
+        if matches!(item, Item::Assistant { .. } | Item::Note { .. } | Item::Update { .. }) {
             self.agent_wrote();
         }
         self.items.push(item);
@@ -506,7 +509,7 @@ impl Parser {
             return;
         }
         if kind == "assistant" {
-            self.claude_assistant(msg);
+            self.claude_assistant(msg, v["thinkingDisplay"] == "updates");
         } else {
             self.claude_user(content);
             // A subagent's id, to name its report when it comes back.
@@ -521,11 +524,19 @@ impl Parser {
         }
     }
 
-    fn claude_assistant(&mut self, msg: &Value) {
+    fn claude_assistant(&mut self, msg: &Value, updates: bool) {
         let id = msg["id"].as_str().map(str::to_owned);
         for b in msg["content"].as_array().into_iter().flatten() {
             match b["type"].as_str().unwrap_or("") {
-                "thinking" | "redacted_thinking" => {}
+                // Reasoning stays hidden; in the updates display Claude Code
+                // keeps thinking empty but for the notes it shows the person.
+                "thinking" => {
+                    let t = b["thinking"].as_str().unwrap_or("").trim();
+                    if updates && !t.is_empty() {
+                        self.push(Item::Update { text: t.to_owned() });
+                    }
+                }
+                "redacted_thinking" => {}
                 "text" => {
                     let t = b["text"].as_str().unwrap_or("").trim();
                     if t.is_empty() {

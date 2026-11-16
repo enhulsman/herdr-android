@@ -251,12 +251,20 @@ ran ("Ran 7 commands, read 2 files, started 1 agent"), notes for slash
 command results, compaction and interruptions, and another agent's or a
 background task's message as its own kind of row named after its task.
 Thinking, meta records, sidechains and the compaction summary SHALL be left
-out. Text the person sent SHALL be shown without herdr-core's `<hc>` wrapper
+out, except the notes Claude Code writes for the person while it works when
+it shows thinking as updates (a thinking block with text in a record whose
+`thinkingDisplay` is `updates`; its terminal marks them "summary"): each
+SHALL show as a row of its own in the agent's words, a step quieter than an
+answer, and the turn's answer SHALL still count as to come after it. Text the person sent SHALL be shown without herdr-core's `<hc>` wrapper
 or Claude Code's `<pasted_content>` wrapper. A message the agent queued
 (Claude Code's queued command) SHALL show once as the person's message.
 A long press on a message SHALL copy it; text SHALL be selectable, inline
 code included. A single line break inside a paragraph SHALL show as a new
 line, as the agents' terminals show it, not be joined into one line.
+
+#### Scenario: A thinking update
+- **WHEN** Claude Code, showing thinking as updates, writes "Writing the tests first." in the middle of a turn
+- **THEN** the chat shows that line, quieter than the answers, where the terminal shows it, and no other thinking
 
 #### Scenario: Lines without a blank line between them
 - **WHEN** an answer ends with "**Done:** …", "**Running:** …" and "**Next:** …" on lines of their own, with no blank line between them

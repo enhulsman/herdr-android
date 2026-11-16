@@ -216,8 +216,8 @@ data class TurnEnd(val at: Long, val last: ChatRow?)
 
 fun TurnEnd?.holds(now: Long): Boolean = this != null && now - at < ANSWER_MS
 
-/** Last rows after which the turn's answer is still to come: the message, a tool row, an agent's card. */
-private val ANSWER_DUE = setOf("user", "tools", "agent")
+/** Last rows after which the turn's answer is still to come: the message, a tool row, an agent's card, an update. */
+private val ANSWER_DUE = setOf("user", "tools", "agent", "update")
 
 /**
  * The turn end after a poll that read [status] and [rows], the poll before it

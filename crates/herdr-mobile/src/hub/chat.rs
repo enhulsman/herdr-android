@@ -215,6 +215,7 @@ fn chat_row(r: &Row, session: &str) -> ChatRow {
         Item::Assistant { text } => row("said", text),
         Item::AgentMessage { from, text } => ChatRow { from: from.clone(), ..row("agent", text) },
         Item::Note { text } => row("note", text),
+        Item::Update { text } => row("update", text),
         Item::Tools { calls } => ChatRow {
             calls: calls
                 .iter()

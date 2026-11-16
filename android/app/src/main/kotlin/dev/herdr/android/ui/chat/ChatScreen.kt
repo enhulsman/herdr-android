@@ -310,6 +310,8 @@ private fun RowContent(row: ChatRow, state: ChatState, images: ChatImageSource, 
     when (row.kind) {
         "user" -> UserBubble(row, images) { key -> front { state.viewer = Viewer(row.key, key) } }
         "said" -> Copyable(row.text) { Said(row.text) }
+        // A note Claude Code writes while it works: the agent's own words, a step quieter, as its terminal shows them.
+        "update" -> Copyable(row.text) { MdText(inline(row.text), HerdrType.body.copy(color = HerdrTheme.colors.dimText)) }
         "agent" -> AgentCard(row)
         "tools" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ToolLine(row.calls, live = shimmers(row.calls, working), animate) { front { state.openTools(row) } }

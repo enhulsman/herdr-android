@@ -182,6 +182,40 @@ button{font-family:inherit;color:inherit}
 .agentsnote{grid-column:1/-1;font-size:13px;color:var(--dim);padding:2px 2px 0}
 .err{margin:10px 16px 0;border-radius:10px;border-left:3px solid var(--blocked);background:color-mix(in srgb,var(--blocked) 9%,var(--popover));padding:9px 12px;font-size:13.5px;line-height:1.4}
 .fp{font-family:"JetBrains Mono",monospace;font-size:13.5px;line-height:1.6;background:var(--canvas);border:1px solid var(--border);border-radius:12px;padding:12px 14px;color:var(--fg);word-break:break-all}
+/* Changes view (changes-view, 2026-11) */
+.vswitch{height:34px;padding:0 12px;border-radius:10px;background:var(--raised);display:flex;align-items:center;font-size:12.5px;font-weight:600;flex:none}
+.gauge{font-size:13px;color:var(--dim);flex:none;padding:0 4px}
+.chg{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:none}
+.chg svg{width:21px;height:21px}
+.chg.hint{outline:1.5px dashed var(--accent);outline-offset:-3px}
+.ctop{flex:none;display:flex;align-items:center;gap:6px;height:64px;padding:0 16px 0 4px;background:var(--chrome)}
+.ctop .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ctop .name{font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctop .sub{font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbody{flex:1;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+.frow{display:flex;align-items:center;gap:12px;min-height:60px;padding:0 20px;border-bottom:1px solid var(--border)}
+.frow .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.frow .file{font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frow .dir{font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frow .dir .w{color:var(--muted)}
+.frow .w.new,.frow .w.added{color:var(--a2)}.frow .w.deleted,.frow .w.conflict{color:var(--a1)}
+.frow.flat .file{color:var(--muted)}
+.cnt{font-family:"JetBrains Mono",monospace;font-size:13px;display:flex;gap:7px;flex:none}
+.cnt .p{color:var(--a2)}.cnt .m{color:var(--a1)}.cnt .n{color:var(--dim)}
+.cnote{padding:14px 20px;font-size:13px;color:var(--dim)}
+.diff{font-family:"JetBrains Mono",monospace;font-variant-ligatures:none;font-size:12.2px;line-height:1.45;color:var(--term-fg);padding:6px 0 0}
+.dl{display:flex;padding:0 10px 0 0;white-space:pre;min-height:1.45em}
+.dl .g{width:22px;flex:none;text-align:center;color:var(--dim)}
+.dl.add{background:color-mix(in srgb,var(--a2) 16%,transparent)}.dl.add .g{color:var(--a2)}
+.dl.del{background:color-mix(in srgb,var(--a1) 16%,transparent)}.dl.del .g{color:var(--a1)}
+.dl .wrap{color:var(--dim)}
+.hunk{margin:10px 0 4px;padding:3px 10px 3px 22px;background:var(--canvas);border-top:1px solid var(--border);border-bottom:1px solid var(--border);color:var(--dim);font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dnote{padding:3px 10px 3px 22px;color:var(--dim);font-family:Geist,sans-serif;font-size:12.5px;font-style:italic}
+.cr{font-family:Geist,sans-serif;font-size:9.5px;font-weight:600;color:var(--dim);border:1px solid var(--input);border-radius:4px;padding:0 3px;margin-left:4px;vertical-align:1px}
+.more{font-family:Geist,sans-serif;margin:14px 16px 10px;height:44px;border-radius:12px;border:1px solid var(--input);display:flex;align-items:center;justify-content:center;font-size:14.5px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 40px;text-align:center}
+.empty .t{font-size:17px;font-weight:500}
+.empty .s{font-size:14px;color:var(--muted);line-height:1.45}
 </style>
 </head>
 <body>
@@ -550,6 +584,169 @@ function newOff(){
   </div>`;
 }
 
+// ---------- changes-view: the Changes button and screen ----------
+ico.changes = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 10.5v5M9.5 13h5M9.5 17.5h5"/></svg>';
+// The terminal and chat title bar as it is since chat-view, with the Changes button before the switch.
+const ctitle = (view, hint=false) => `
+  <div class="ttop">
+    <button class="iconbtn" aria-label="Back" style="color:var(--fg)">${ico.back}</button>
+    <img src="icons/claude.svg" style="width:20px;height:20px;margin-right:6px" alt="">
+    <div class="txt" style="min-width:0"><span class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs nav</span><span class="sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">website · workstation</span></div>
+    <span class="pill blocked">Needs you</span>
+    ${view==='chat'?'<span class="gauge">48k</span>':''}
+    <span class="chg${hint?' hint':''}" aria-label="Show the files this agent changed">${ico.changes}</span>
+    <span class="vswitch">${view==='chat'?'Terminal':'Chat'}</span>
+  </div>`;
+function changesButton(){
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${ctitle('terminal', true)}
+    <div style="flex:1;display:flex;flex-direction:column;position:relative;background:var(--bg)">
+      ${terminal(96, 6.8)}
+    </div>
+    ${navbar()}
+  </div>`;
+}
+const ctop = (name, sub) => `<div class="ctop">
+    <button class="iconbtn" aria-label="Back" style="color:var(--fg)">${ico.back}</button>
+    <div class="txt"><span class="name">${name}</span><span class="sub">${sub}</span></div>
+  </div>`;
+const cnt = (p, m) => `<span class="cnt">${p!=null?`<span class="p">+${p}</span>`:''}${m!=null?`<span class="m">−${m}</span>`:''}</span>`;
+const frow = (file, dir, word, p, m, flat=false) => `<div class="frow${flat?' flat':''}">
+    <div class="txt"><span class="file">${file}</span><span class="dir">${dir?dir+' · ':''}<span class="w ${word}">${word}</span></span></div>
+    ${flat?'':cnt(p,m)}
+  </div>`;
+function changesList(theme){
+  return `<div class="phone ${theme}">
+    ${sysbar()}
+    ${ctop('Changes','docs nav · website · 6 files')}
+    <div class="cbody">
+      ${frow('DocsNav.astro','src/components','changed',3,1)}
+      ${frow('Docs.astro','src/layouts','changed',12,4)}
+      ${frow('docs-nav.test.ts','tests','new',48,null)}
+      ${frow('nav.css','src/styles','deleted',null,22)}
+      ${frow('logo.png','public','changed',null,null)}
+      ${frow('theme','vendor','submodule',null,null)}
+    </div>
+    ${navbar()}
+  </div>`;
+}
+const dl = (k, t) => `<div class="dl ${k}"><span class="g">${k==='add'?'+':k==='del'?'−':''}</span><span>${t}</span></div>`;
+const dw = (k, t) => `<div class="dl ${k}"><span class="g"></span><span><span class="wrap">↪ </span>${t}</span></div>`;
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function changesDiff(theme){
+  return `<div class="phone ${theme}">
+    ${sysbar()}
+    ${ctop('DocsNav.astro','src/components · changed · +3 −1')}
+    <div class="cbody"><div class="diff">
+      <div class="hunk" style="margin-top:4px">@@ -38,9 +38,11 @@ const { active } = Astro.props;</div>
+      ${dl('', esc('---'))}
+      ${dl('', '')}
+      ${dl('', esc('<nav class="docs-nav" aria-label="Docs">'))}
+      ${dl('del', esc('  <a href="/guide">Guide</a>'))}
+      ${dl('add', esc('  <a href="/guide" aria-current={active === "guide"'))}
+      ${dw('add', esc('? "page" : undefined}>Guide</a>'))}
+      ${dl('add', esc('  <a href="/api" aria-current={active === "api" ?'))}
+      ${dw('add', esc('"page" : undefined}>API</a>'))}
+      ${dl('add', esc('  <a href="/faq" aria-current={active === "faq" ?'))}
+      ${dw('add', esc('"page" : undefined}>FAQ</a>'))}
+      ${dl('', esc('</nav>'))}
+      ${dl('', '')}
+      ${dl('', esc('<style>'))}
+      <div class="hunk">@@ -71,4 +73,4 @@ .docs-nav a {</div>
+      ${dl('', esc('  padding: 6px 10px;'))}
+      ${dl('', esc('  border-radius: 6px;'))}
+      ${dl('', esc('}'))}
+      ${dl('del', esc('.docs-nav a.active {'))}
+      ${dl('add', esc('.docs-nav a[aria-current="page"] {'))}
+      ${dl('', esc('  color: var(--accent);'))}
+      ${dl('', esc('}'))}
+      ${dl('', esc('</style>'))}
+      <div class="dnote">No newline at end of file</div>
+    </div></div>
+    ${navbar()}
+  </div>`;
+}
+function changesLong(){
+  const lines = [];
+  for (let i=0;i<14;i++){
+    const v = (7+i%5)+'.'+(i*3%10)+'.'+(i%7);
+    const w = (8+i%5)+'.'+(i*7%10)+'.'+(i%4);
+    lines.push(dl('', esc(`    "node_modules/pkg-${String.fromCharCode(97+i)}${i}": {`)));
+    lines.push(dl('del', esc(`      "version": "${v}",`)));
+    lines.push(dl('add', esc(`      "version": "${w}",`)));
+  }
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${ctop('package-lock.json','changed · +11,204 −8,733')}
+    <div class="cbody"><div class="diff">
+      ${lines.slice(0,40).join('')}
+      <div class="more">Show the whole diff (20,118 lines)</div>
+    </div></div>
+    ${navbar()}
+  </div>`;
+}
+function changesState(kind){
+  const body = {
+    none: ['No changes since the last commit','Committed changes do not show here.'],
+    norepo: ['Not a git repository',''],
+    error: ['Could not read the changes','fatal: detected dubious ownership in repository at \'/home/dev/src/website\''],
+    loading: ['','Reading the changes…'],
+  }[kind];
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${ctop('Changes', kind==='norepo'?'scratch · workstation':'docs nav · website')}
+    <div class="cbody"><div class="empty">
+      ${body[0]?`<span class="t">${body[0]}</span>`:''}
+      ${body[1]?`<span class="s"${kind==='error'?' style="font-family:JetBrains Mono,monospace;font-size:12.5px"':''}>${body[1]}</span>`:''}
+      ${kind==='error'?'<button class="btn" style="margin-top:10px">Retry</button>':''}
+    </div></div>
+    ${navbar()}
+  </div>`;
+}
+function changesKinds(){
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${ctop('Changes','api tests · api · 1,000+ files')}
+    <div class="cbody">
+      ${frow('client.ts','src','conflict',14,6)}
+      ${frow('run.sh','scripts','changed',null,null)}
+      ${frow('empty.txt','fixtures','new',null,null)}
+      ${frow('upstream-sdk/','','repository',null,null,true)}
+      ${frow('report-0001.json','out','new',212,null)}
+      ${frow('report-0002.json','out','new',212,null)}
+      <div class="cnote">Showing the first 1,000 changed files</div>
+    </div>
+    ${navbar()}
+  </div>`;
+}
+function changesSmall(){
+  return `<div class="phone graphite">
+    ${sysbar()}
+    ${ctop('run.sh','scripts · changed')}
+    <div class="cbody"><div class="empty" style="flex:none;padding:28px 40px 12px"><span class="s">Only the file mode changed (100644 to 100755)</span></div>
+    <div class="diff" style="border-top:1px solid var(--border);margin-top:8px">
+      <div class="hunk" style="margin-top:0">submodule vendor/theme</div>
+      <div class="dnote" style="font-style:normal">Submodule: 3f2a9c1 to 8b04d7e</div>
+      <div class="hunk">fixtures/notes.txt</div>
+      ${dl('del', 'first line')}
+      ${dl('add', 'first line<span class="cr">CR</span>')}
+      ${dl('del', 'second line')}
+      ${dl('add', 'second line<span class="cr">CR</span>')}
+      <div class="hunk">public/logo.png</div>
+      <div class="dnote" style="font-style:normal">Binary file, not shown</div>
+      <div class="hunk">fixtures/empty.txt</div>
+      <div class="dnote" style="font-style:normal">Empty file</div>
+      <div class="hunk">src/client.ts</div>
+      <div class="dnote" style="font-style:normal">No longer changed</div>
+      <div class="hunk">out/huge.log</div>
+      ${dl('add', '2026-11-16T09:12:01Z start worker 3')}
+      <div class="dnote" style="font-style:normal">Too large to show on the phone</div>
+    </div></div>
+    ${navbar()}
+  </div>`;
+}
+
 const SCREENS = [
   ['1-home-dark','1 Agent list (graphite)',()=>home('graphite')],
   ['2-home-light','2 Agent list (paper)',()=>home('paper')],
@@ -564,6 +761,17 @@ const SCREENS = [
   ['10-new-folders','10 New terminal: no spaces, checking agents',newFolders],
   ['11-new-error','11 New terminal: could not start',newError],
   ['12-new-off','12 New, nothing connected',newOff],
+  ['13-changes-button','13 Changes button in the title bar',changesButton],
+  ['14-changes-list-dark','14 Changes list (graphite)',()=>changesList('graphite')],
+  ['15-changes-list-light','15 Changes list (paper)',()=>changesList('paper')],
+  ['16-changes-diff-dark','16 A diff, wrapped (graphite)',()=>changesDiff('graphite')],
+  ['17-changes-diff-light','17 A diff, wrapped (paper)',()=>changesDiff('paper')],
+  ['18-changes-long','18 A long diff: Show the whole diff',changesLong],
+  ['19-changes-none','19 No changes',()=>changesState('none')],
+  ['20-changes-norepo','20 Not a git repository',()=>changesState('norepo')],
+  ['21-changes-error','21 Could not read the changes',()=>changesState('error')],
+  ['22-changes-kinds','22 Other kinds and the 1,000 cap',changesKinds],
+  ['23-changes-notes','23 Texts for the other cases (sheet of examples)',changesSmall],
 ];
 const want = new URLSearchParams(location.search).get('s');
 document.body.className = want ? 'single' : 'gallery';

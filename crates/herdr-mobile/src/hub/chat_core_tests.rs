@@ -137,6 +137,40 @@ fn empty_turns_missed_when_the_first_turn_ends_without_a_log() {
 }
 
 #[test]
+fn clear_from_the_chat_stays_empty_until_its_log_is_written() {
+    // Seen on the test phone: "No conversation found" for 2 s after /clear.
+    // A poll reads the status, then looks up: the poll that saw the /clear
+    // turn end already held the new session, whose log is written ~1 s later.
+    let t0 = Instant::now();
+    let at = |ms| t0 + Duration::from_millis(ms);
+    let (mut c, _) = opened(&[asked("Hi")], t0);
+    c.sent("/clear", at(100));
+    c.take_lookup(&term("working"), Some(found(S1)), at(300));
+    c.see(&term("working"), at(300));
+    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(800));
+    c.see(&term("idle"), at(800));
+    assert_eq!(c.view().found, Kind::Empty);
+    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(1300));
+    assert_eq!(c.view().found, Kind::Empty, "the turn that ended was the old session's");
+    c.take_lookup(&term("idle"), Some(found(S2)), at(2000));
+    assert_eq!(c.view().found, Kind::Found);
+}
+
+#[test]
+fn a_session_that_changed_during_a_turn_is_not_judged_by_it() {
+    // The same, typed at the desk: no command sent from the chat.
+    let t0 = Instant::now();
+    let at = |s| t0 + Duration::from_secs(s);
+    let (mut c, _) = opened(&[asked("Hi")], t0);
+    c.take_lookup(&term("working"), Some(found(S1)), at(1));
+    c.see(&term("working"), at(1));
+    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(2));
+    c.see(&term("idle"), at(2));
+    c.take_lookup(&term("idle"), Some(Lookup::Empty { session: S2.into() }), at(3));
+    assert_eq!(c.view().found, Kind::Empty);
+}
+
+#[test]
 fn a_new_session_replaces_the_held_conversation() {
     let t0 = Instant::now();
     let (mut c, _) = opened(&[asked("Hi"), said("m1", "Hello")], t0);

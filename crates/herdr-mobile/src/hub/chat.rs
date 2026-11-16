@@ -126,6 +126,17 @@ pub enum ChatRefusal {
     Failed { reason: String },
 }
 
+/// What became of a send, for the chat.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum ChatSent {
+    /// The desk typed it.
+    Typed,
+    /// It may be typed (no answer in time, or the connection went): followed as sent.
+    Unsure,
+    /// Nothing was typed; the draft comes back.
+    Refused { refusal: ChatRefusal },
+}
+
 #[derive(uniffi::Object)]
 pub struct Chat {
     core: Arc<HubCore>,
@@ -509,30 +520,31 @@ impl Chat {
         })
     }
 
-    /// Sends `text` as the person's message (design D4); `None` when typed.
-    pub fn send(&self, text: String) -> Option<ChatRefusal> {
+    /// Sends `text` as the person's message (design D4).
+    pub fn send(&self, text: String) -> ChatSent {
         self.send_with_images(text, vec![])
     }
 
     /// Checks the target, puts each image beside the terminal
     /// (`terminal.put`), checks again, and sends the message with the
     /// images' paths first, one per line: Claude Code attaches a pasted line
-    /// that is an image path as the image itself. `None` when typed.
-    pub fn send_with_images(&self, text: String, images: Vec<ChatUpload>) -> Option<ChatRefusal> {
+    /// that is an image path as the image itself.
+    pub fn send_with_images(&self, text: String, images: Vec<ChatUpload>) -> ChatSent {
         let core = self.core.clone();
         core.runtime().block_on(async {
-            let failed = |reason: String| Some(ChatRefusal::Failed { reason });
+            let no = |refusal: ChatRefusal| ChatSent::Refused { refusal };
+            let failed = |reason: String| no(ChatRefusal::Failed { reason });
             let Some(conn) = self.core.live_conn(&self.machine) else {
                 return failed("Not connected".into());
             };
             let c = conn.client;
             let Some((agent, session)) = self.state.lock().unwrap().shown() else {
-                return Some(ChatRefusal::Changed);
+                return no(ChatRefusal::Changed);
             };
             let target = match self.check(&c).await {
                 Ok((t, start, l)) => match send::first_check(agent, &session, &seen(&t, start, &l)) {
                     Ok(target) => target,
-                    Err(r) => return Some(refusal(r)),
+                    Err(r) => return no(refusal(r)),
                 },
                 Err(e) => return failed(e),
             };
@@ -562,7 +574,7 @@ impl Chat {
             let guard = match self.check(&c).await {
                 Ok((t, start, l)) => match send::check_again(&target, &seen(&t, start, &l)) {
                     Ok(g) => g,
-                    Err(r) => return Some(refusal(r)),
+                    Err(r) => return no(refusal(r)),
                 },
                 Err(e) => return failed(e),
             };
@@ -571,10 +583,10 @@ impl Chat {
                 params["if"] = json!(st);
             }
             match send_outcome(&c.call("terminal.send", params).await) {
-                Sent::Typed | Sent::Unsure => {
+                sent @ (Sent::Typed | Sent::Unsure) => {
                     self.state.lock().unwrap().sent(&message, Instant::now());
                     *self.sent_to.lock().unwrap() = Some(target);
-                    None
+                    if sent == Sent::Typed { ChatSent::Typed } else { ChatSent::Unsure }
                 }
                 Sent::Refused(e) => failed(e),
             }

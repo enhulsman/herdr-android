@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import uniffi.herdr_mobile.ChatSent
 import kotlinx.coroutines.withContext
 import uniffi.herdr_mobile.Chat
 import uniffi.herdr_mobile.ChatPoll
@@ -172,8 +173,11 @@ fun ChatRoute(visit: ChatVisit, app: HerdrApp, header: TerminalHeader, actions: 
                 } else {
                     app.chatScope.launch {
                         val ups = out.attached.map { ChatUpload(it.name, it.bytes) }
-                        val refusal = withContext(Dispatchers.IO) { chat.sendWithImages(out.typed, ups) }
-                        if (refusal != null) state.refused(out, refusal) else state.typed(out.pending.id, SystemClock.uptimeMillis())
+                        when (val sent = withContext(Dispatchers.IO) { chat.sendWithImages(out.typed, ups) }) {
+                            is ChatSent.Refused -> state.refused(out, sent.refusal)
+                            ChatSent.Typed -> state.typed(out.pending.id, SystemClock.uptimeMillis(), sure = true)
+                            ChatSent.Unsure -> state.typed(out.pending.id, SystemClock.uptimeMillis(), sure = false)
+                        }
                     }
                 }
             }

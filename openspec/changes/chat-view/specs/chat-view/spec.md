@@ -418,7 +418,9 @@ a note. When a slash command has no row after 3 s, the chat SHALL show
 "Waiting for the terminal: /<command> may have opened a dialog there." with
 a button to the terminal and a Dismiss, kept in view while the chat follows
 the bottom. While that line shows and the agent's status has not changed
-since the command was sent, the message box SHALL refuse to send with
+since the command was sent (done and idle count as the same, and the
+"working" the send itself causes in its first second is not a change), the
+message box SHALL refuse to send with
 "Answer the dialog in the terminal first" and the terminal button, keeping
 the draft. The line SHALL end when the command's row arrives, the status
 changes, or the person taps Dismiss. A dialog opened at the desk, or one

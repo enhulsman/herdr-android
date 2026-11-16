@@ -53,6 +53,10 @@ data class Pending(
     val enterPressed: Boolean = false,
     /** The desk confirmed typing it (not a send whose outcome is unknown). */
     val sure: Boolean = false,
+    /** The screen was read once the wait began, so the waiting line may show. */
+    val boxChecked: Boolean = false,
+    /** The screen showed the agent's input box free once the wait began: no dialog. */
+    val freeSeen: Boolean = false,
 ) {
     private val trimmed get() = text.trim()
     val slash: Boolean get() = text.trimStart().startsWith("/")
@@ -65,6 +69,14 @@ data class Pending(
 
     fun typed(now: Long, sure: Boolean = true) = copy(typedAt = now, sure = sure)
     fun dismissWait() = copy(waitDismissed = true)
+
+    /**
+     * The terminal's screen [lines] read at [now]: once the wait has begun, a
+     * free input box ends it. Earlier the box is empty for a moment before a
+     * dialog opens, so a look then counts for nothing.
+     */
+    fun boxSeen(agent: String, lines: List<String>, now: Long): Pending =
+        if (!waitOpen || now - sentAt < WAIT_MS) this else copy(boxChecked = true, freeSeen = boxFree(agent, lines))
     fun enteredAgain() = copy(enterPressed = true)
 
     /** The person's row for it: the same text, or images and no text for a photo sent alone. */
@@ -99,7 +111,7 @@ data class Pending(
     }
 
     /** A slash command whose wait has not ended (dismissed, or the status moved); it may not have begun. */
-    val waitOpen: Boolean get() = slash && !waitDismissed && !statusChanged
+    val waitOpen: Boolean get() = slash && !waitDismissed && !statusChanged && !freeSeen
 
     /**
      * The slash command shows nothing yet: it most likely opened a dialog in
@@ -108,6 +120,9 @@ data class Pending(
      * seconds, and a second send meanwhile would land in the dialog.
      */
     fun waiting(now: Long): Boolean = waitOpen && now - sentAt >= WAIT_MS
+
+    /** The waiting line shows: still waiting, and the screen showed no free box. */
+    fun showsWait(now: Long): Boolean = waiting(now) && boxChecked
 
     val waitingText: String
         get() = "Waiting for the terminal: ${trimmed.substringBefore(' ')} may have opened a dialog there."
@@ -269,13 +284,7 @@ fun codexQueued(p: Pending, status: String, lines: List<String>): Boolean =
  */
 fun boxHolds(agent: String, lines: List<String>, text: String, images: Int): Boolean {
     val content: String = when (agent) {
-        "claude" -> {
-            val rules = lines.indices.filter { i -> lines[i].isNotBlank() && lines[i].trim().all { it == '─' } }
-            if (rules.size < 2) return false
-            val box = lines.subList(rules[rules.size - 2] + 1, rules.last())
-            if (box.isEmpty() || !box[0].trimStart().startsWith(CLAUDE_PROMPT)) return false
-            (listOf(box[0].trimStart().removePrefix(CLAUDE_PROMPT.toString())) + box.drop(1)).joinToString("\n")
-        }
+        "claude" -> claudeBox(lines) ?: return false
         "codex" -> {
             // Its box has no closing rule: the message ends at a line's end, hints may follow.
             val at = lines.indices.lastOrNull { lines[it].trimStart().startsWith(CODEX_PROMPT) } ?: return false
@@ -288,4 +297,29 @@ fun boxHolds(agent: String, lines: List<String>, text: String, images: Int): Boo
     val shown = if (images > 0) content.replace(PLACEHOLDERS, "") else content
     val want = bare(text)
     return want.isNotEmpty() && bare(shown) == want
+}
+
+/** What Claude Code's input box holds after its prompt mark, between its last two rules; null when no box shows. */
+private fun claudeBox(lines: List<String>): String? {
+    val rules = lines.indices.filter { i -> lines[i].isNotBlank() && lines[i].trim().all { it == '─' } }
+    if (rules.size < 2) return null
+    val box = lines.subList(rules[rules.size - 2] + 1, rules.last())
+    if (box.isEmpty() || !box[0].trimStart().startsWith(CLAUDE_PROMPT)) return null
+    return (listOf(box[0].trimStart().removePrefix(CLAUDE_PROMPT.toString())) + box.drop(1)).joinToString("\n")
+}
+
+private val CODEX_FOOTER = Regex("\\? for shortcuts|Context \\d+% left")
+
+/**
+ * No dialog covers the agent's input box: Claude Code's box shows and holds
+ * nothing (its dialogs replace it); Codex's status footer shows under its last
+ * prompt (its pickers replace the footer, and its empty box holds a placeholder).
+ */
+fun boxFree(agent: String, lines: List<String>): Boolean = when (agent) {
+    "claude" -> claudeBox(lines)?.isBlank() == true
+    "codex" -> {
+        val at = lines.indices.lastOrNull { lines[it].trimStart().startsWith(CODEX_PROMPT) }
+        at != null && lines.drop(at + 1).any { CODEX_FOOTER.containsMatchIn(it) }
+    }
+    else -> false
 }

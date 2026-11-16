@@ -361,6 +361,65 @@ class ChatPendingTest {
         assertEquals(DIALOG_FIRST, sendRefusal(listOf(back), now = 3_500))
     }
 
+    // --- the input box on screen ---
+
+    private val claudeIdle = listOf("● Done.", "", "─".repeat(40), "❯ ", "─".repeat(40), "  Haiku 5.5 medium | ~/work")
+    private val claudeTyped = listOf("─".repeat(40), "❯ half a message", "─".repeat(40), "  Haiku")
+    private val claudeDialog = listOf("● Done.", "", "   Subagents               % of usage", "   general-purpose    6%", "", "   Esc to cancel")
+    private val codexIdle = listOf(
+        "› hello", "", "• Hello.", "", "› Ask Codex to do anything", "",
+        "  GPT-6.1-Sol medium · Context 98% left · weekly 85% left · ~/work · Ready", "  ← for agents · ? for shortcuts",
+    )
+    private val codexPicker = listOf(
+        "› hello", "", "  Select Model and Effort", "› 1. GPT-6.1-Sol (current)  Latest workhorse model",
+        "  2. GPT-6-Astra            Frontier intelligence", "  enter select · esc back",
+    )
+
+    @Test
+    fun theInputBoxIsFreeWhenNoDialogCoversIt() {
+        assertTrue(boxFree("claude", claudeIdle))
+        assertFalse("text in the box", boxFree("claude", claudeTyped))
+        assertFalse("a dialog replaces the box", boxFree("claude", claudeDialog))
+        assertTrue(boxFree("codex", codexIdle))
+        assertFalse("a picker replaces the footer", boxFree("codex", codexPicker))
+        assertFalse(boxFree("codex", emptyList()))
+    }
+
+    @Test
+    fun aCommandThatOnlyPrintsShowsNoWaitingLine() {
+        // Seen on the test phone: Codex's /status prints and leaves the box free,
+        // yet the line asked for a Dismiss before the next send.
+        val p = send("/status", emptyList(), status = "idle", at = 0)
+        assertTrue("refused from 3 s, before the screen is read", p.waiting(now = 3_000))
+        assertFalse("but the line waits for a look at the screen", p.showsWait(now = 3_000))
+        val free = p.boxSeen("codex", codexIdle, now = 3_200)
+        assertFalse(free.waiting(now = 3_200))
+        assertFalse(free.showsWait(now = 3_200))
+        assertNull(sendRefusal(listOf(free), now = 3_200))
+        assertFalse("its wait is over", free.waitOpen)
+    }
+
+    @Test
+    fun aDialogKeepsTheLineUntilItClosesAtTheDesk() {
+        val p = send("/model", emptyList(), status = "idle", at = 0)
+        val dialog = p.boxSeen("codex", codexPicker, now = 3_200)
+        assertTrue(dialog.showsWait(now = 3_200))
+        assertEquals(DIALOG_FIRST, sendRefusal(listOf(dialog), now = 3_200))
+        val closed = dialog.boxSeen("codex", codexIdle, now = 9_000)
+        assertFalse("Esc at the desk ends it", closed.showsWait(now = 9_000))
+        assertNull(sendRefusal(listOf(closed), now = 9_000))
+    }
+
+    @Test
+    fun aLookBeforeTheThreeSecondsCountsForNothing() {
+        // Right after typing the box is empty for a moment before the dialog opens.
+        val p = send("/usage", emptyList(), status = "idle", at = 0)
+        val early = p.boxSeen("claude", claudeIdle, now = 1_500)
+        assertEquals(p, early)
+        assertTrue(early.boxSeen("claude", claudeDialog, now = 3_000).showsWait(now = 3_000))
+        assertEquals("not a slash command", send("Say hi", emptyList()), send("Say hi", emptyList()).boxSeen("claude", claudeIdle, now = 5_000))
+    }
+
     @Test
     fun doneAndIdleAreTheSameStatusForTheWaitingLine() {
         val p = send("/usage", emptyList(), status = "done", at = 0)

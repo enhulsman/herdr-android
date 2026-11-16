@@ -25,6 +25,12 @@ changes between releases.
 - **Typing:** the phone keyboard and two rows of terminal keys (esc, ctrl, alt,
   tab, arrows, ^C and more). A compose sheet takes long prompts with
   autocorrect and dictation, and pastes them without pressing enter.
+- **Chat:** switch an agent (Claude Code or Codex) between its terminal and a
+  chat of its conversation: your messages as bubbles, answers as formatted
+  text, tool calls folded into a line you can open, images you can open full
+  screen, and a working line while the agent works. Answer from a message
+  box, photos included; `/` and `!` commands work as in the agent's own box.
+  When the app cannot read an agent's log, the terminal is all you see.
 - **Alerts:** "Needs you" with sound, "Finished" silently, and a quiet warning
   when a machine has gone silent for 13 hours. Alerts name the session and
   where it sits. Tap an alert to open that agent's terminal. Mute per machine, and a test alert that checks the whole
@@ -73,10 +79,8 @@ go to the app's notifications, open "Finished", and set it to alerting.
 
 ## Roadmap
 
-Version 1.0 completes the loop: a chat view beside the terminal that you
-can also answer from, muting a session, and a view of an
-agent's git changes, plus the work that lets someone else set the app up
-without help.
+Version 1.0 completes the loop: a view of an agent's git changes, plus the
+work that lets someone else set the app up without help.
 
 What is planned and what is being worked on now are tracked in the open:
 the [v1.0.0 milestone](https://github.com/enhulsman/herdr-android/milestone/1)
@@ -84,7 +88,7 @@ and the [roadmap board](https://github.com/users/enhulsman/projects/4). Ideas
 and bug reports are welcome as issues.
 
 **Not planned:** closing or killing agents, editing spaces and tabs, a file
-browser, custom theme files, image paste.
+browser, custom theme files, pasting images into the terminal.
 
 ## Repository
 

@@ -122,7 +122,8 @@ pub struct Chunk {
 pub fn parse_chunk(out: &str) -> Option<Chunk> {
     let mut lines = out.lines();
     let size = lines.next()?.strip_prefix("size ")?.trim().parse().ok()?;
-    let (mut text, mut offsets, mut skipped, mut from, mut next) = (String::new(), Vec::new(), None, None, None);
+    let (mut text, mut offsets, mut skipped, mut from, mut next) =
+        (String::new(), Vec::new(), None, None, None);
     for l in lines {
         if let Some(r) = l.strip_prefix("from ") {
             from = Some(r.trim().parse().ok()?);
@@ -138,5 +139,12 @@ pub fn parse_chunk(out: &str) -> Option<Chunk> {
             text.push('\n');
         }
     }
-    Some(Chunk { text, offsets, skipped, from: from?, next: next?, size })
+    Some(Chunk {
+        text,
+        offsets,
+        skipped,
+        from: from?,
+        next: next?,
+        size,
+    })
 }

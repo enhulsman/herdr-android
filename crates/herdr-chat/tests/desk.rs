@@ -15,7 +15,11 @@ fn run(script: &str, args: &[&str]) -> String {
         .env("LC_ALL", "C.UTF-8")
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8(out.stdout).unwrap()
 }
 
@@ -42,7 +46,14 @@ fn tail_gives_only_whole_new_lines_and_where_to_go_on() {
     let c2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &c.next.to_string()])).unwrap();
     assert_eq!(
         c2,
-        Chunk { text: String::new(), offsets: vec![], skipped: None, from: c.next, next: c.next, size: c.size }
+        Chunk {
+            text: String::new(),
+            offsets: vec![],
+            skipped: None,
+            from: c.next,
+            next: c.next,
+            size: c.size
+        }
     );
 }
 
@@ -52,10 +63,20 @@ fn tail_gives_each_kept_line_its_byte_offset() {
     let f = temp("t8.jsonl", text.as_bytes());
     let path = f.to_str().unwrap();
     let c = tail::parse_chunk(&run(tail::SCRIPT, &[path, "0"])).unwrap();
-    assert_eq!(c.offsets, at, "one offset per line, where the line starts in the file");
-    assert_eq!(c.text, text, "the text is the lines alone, without their offsets");
+    assert_eq!(
+        c.offsets, at,
+        "one offset per line, where the line starts in the file"
+    );
+    assert_eq!(
+        c.text, text,
+        "the text is the lines alone, without their offsets"
+    );
     // A read from the middle of line 3 to line 8: lines 4 to 7, their own offsets.
-    let c = tail::parse_chunk(&run(tail::SCRIPT, &[path, &(at[3] + 5).to_string(), &at[8].to_string()])).unwrap();
+    let c = tail::parse_chunk(&run(
+        tail::SCRIPT,
+        &[path, &(at[3] + 5).to_string(), &at[8].to_string()],
+    ))
+    .unwrap();
     assert_eq!(c.offsets, at[4..8]);
 }
 
@@ -78,16 +99,36 @@ fn token_count(n: u32) -> String {
 
 #[test]
 fn tail_keeps_only_the_last_codex_token_count_of_a_read() {
-    let msg = |n: u32| format!("{{\"timestamp\":\"t\",\"type\":\"event_msg\",\"payload\":{{\"type\":\"agent_message\",\"message\":\"m{n}\"}}}}\n");
-    let lines = [msg(1), token_count(100), msg(2), token_count(200), msg(3), token_count(300), msg(4)];
+    let msg = |n: u32| {
+        format!(
+            "{{\"timestamp\":\"t\",\"type\":\"event_msg\",\"payload\":{{\"type\":\"agent_message\",\"message\":\"m{n}\"}}}}\n"
+        )
+    };
+    let lines = [
+        msg(1),
+        token_count(100),
+        msg(2),
+        token_count(200),
+        msg(3),
+        token_count(300),
+        msg(4),
+    ];
     let mut at = vec![0u64];
     for l in &lines {
         at.push(at.last().unwrap() + l.len() as u64);
     }
     let f = temp("t10.jsonl", lines.concat().as_bytes());
     let c = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), "0"])).unwrap();
-    assert!(!c.text.contains("\"input_tokens\":100") && !c.text.contains("\"input_tokens\":200"), "{}", c.text);
-    assert!(c.text.contains("\"input_tokens\":300"), "the last one stays: {}", c.text);
+    assert!(
+        !c.text.contains("\"input_tokens\":100") && !c.text.contains("\"input_tokens\":200"),
+        "{}",
+        c.text
+    );
+    assert!(
+        c.text.contains("\"input_tokens\":300"),
+        "the last one stays: {}",
+        c.text
+    );
     for m in ["m1", "m2", "m3", "m4"] {
         assert!(c.text.contains(m));
     }
@@ -96,7 +137,13 @@ fn tail_keeps_only_the_last_codex_token_count_of_a_read() {
     assert_eq!(kept.len(), 5);
     let tc = kept.iter().position(|l| l.contains("token_count")).unwrap();
     assert_eq!(c.offsets[tc], at[5]);
-    let mut msgs: Vec<u64> = c.offsets.iter().enumerate().filter(|(i, _)| *i != tc).map(|(_, o)| *o).collect();
+    let mut msgs: Vec<u64> = c
+        .offsets
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != tc)
+        .map(|(_, o)| *o)
+        .collect();
     msgs.sort();
     assert_eq!(msgs, vec![at[0], at[2], at[4], at[6]]);
     assert_eq!(c.next, *at.last().unwrap());
@@ -113,7 +160,10 @@ fn tail_with_no_token_count_keeps_everything_as_before() {
 /// A user line of about `bytes` bytes (plain text, no image data).
 fn big_line(bytes: usize, tag: &str) -> String {
     let pad = bytes.saturating_sub(40);
-    format!("{{\"type\":\"user\",\"tag\":\"{tag}\",\"pad\":\"{}\"}}\n", "x".repeat(pad))
+    format!(
+        "{{\"type\":\"user\",\"tag\":\"{tag}\",\"pad\":\"{}\"}}\n",
+        "x".repeat(pad)
+    )
 }
 
 #[test]
@@ -122,7 +172,11 @@ fn tail_spans_at_most_the_read_limit() {
     let f = temp("t12.jsonl", line.repeat(9).as_bytes());
     let c = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), "0"])).unwrap();
     let per = line.len() as u64;
-    assert_eq!(c.next, per * (tail::READ_MAX / per), "whole lines up to the limit, no more");
+    assert_eq!(
+        c.next,
+        per * (tail::READ_MAX / per),
+        "whole lines up to the limit, no more"
+    );
     assert_eq!(c.offsets.len() as u64, tail::READ_MAX / per);
     assert!(c.skipped.is_none());
 }
@@ -144,9 +198,17 @@ fn tail_skips_a_record_over_the_read_limit_and_goes_on_after_it() {
 
     // Reached first.
     let r2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &at_b.to_string()])).unwrap();
-    assert_eq!(r2.skipped, Some((at_b, b.len() as u64)), "the record is reported by offset and length");
+    assert_eq!(
+        r2.skipped,
+        Some((at_b, b.len() as u64)),
+        "the record is reported by offset and length"
+    );
     assert_eq!(r2.text, "");
-    assert_eq!((r2.from, r2.next), (at_b, at_c), "the next read goes on after it");
+    assert_eq!(
+        (r2.from, r2.next),
+        (at_b, at_c),
+        "the next read goes on after it"
+    );
 
     let r3 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &r2.next.to_string()])).unwrap();
     assert_eq!(r3.text, c_line);
@@ -155,15 +217,25 @@ fn tail_skips_a_record_over_the_read_limit_and_goes_on_after_it() {
 #[test]
 fn tail_passes_an_oversized_record_the_chat_never_shows_without_a_note() {
     let a = big_line(100, "a");
-    let req = format!("{{\"type\":\"api-request\",\"pad\":\"{}\"}}\n", "x".repeat(tail::READ_MAX as usize + (1 << 20)));
+    let req = format!(
+        "{{\"type\":\"api-request\",\"pad\":\"{}\"}}\n",
+        "x".repeat(tail::READ_MAX as usize + (1 << 20))
+    );
     let c_line = big_line(100, "c");
     let f = temp("t13r.jsonl", format!("{a}{req}{c_line}").as_bytes());
     let path = f.to_str().unwrap();
     let at_c = (a.len() + req.len()) as u64;
     let r1 = tail::parse_chunk(&run(tail::SCRIPT, &[path, "0"])).unwrap();
-    assert_eq!((r1.text.as_str(), r1.skipped, r1.next), (a.as_str(), None, at_c));
+    assert_eq!(
+        (r1.text.as_str(), r1.skipped, r1.next),
+        (a.as_str(), None, at_c)
+    );
     let r2 = tail::parse_chunk(&run(tail::SCRIPT, &[path, &a.len().to_string()])).unwrap();
-    assert_eq!((r2.skipped, r2.from, r2.next), (None, a.len() as u64, at_c), "reached first: passed over too");
+    assert_eq!(
+        (r2.skipped, r2.from, r2.next),
+        (None, a.len() as u64, at_c),
+        "reached first: passed over too"
+    );
 }
 
 #[test]
@@ -173,7 +245,11 @@ fn tail_waits_for_an_oversized_record_still_being_written() {
     b.pop(); // no newline yet: the agent is mid-write
     let f = temp("t14.jsonl", format!("{a}{b}").as_bytes());
     let at_b = a.len() as u64;
-    let r = tail::parse_chunk(&run(tail::SCRIPT, &[f.to_str().unwrap(), &at_b.to_string()])).unwrap();
+    let r = tail::parse_chunk(&run(
+        tail::SCRIPT,
+        &[f.to_str().unwrap(), &at_b.to_string()],
+    ))
+    .unwrap();
     assert!(r.skipped.is_none(), "not skipped before it is whole");
     assert_eq!(r.next, at_b);
 }
@@ -191,9 +267,15 @@ fn tail_starting_inside_an_oversized_record_moves_past_it_without_a_note() {
     let inside = (a.len() + 1000).to_string();
     let r = tail::parse_chunk(&run(tail::SCRIPT, &[path, &inside])).unwrap();
     assert!(r.skipped.is_none());
-    assert!(r.next >= at_c && r.next <= at_c + c_line.len() as u64, "past the cut record: {}", r.next);
+    assert!(
+        r.next >= at_c && r.next <= at_c + c_line.len() as u64,
+        "past the cut record: {}",
+        r.next
+    );
     let all = if r.next == at_c {
-        tail::parse_chunk(&run(tail::SCRIPT, &[path, &r.next.to_string()])).unwrap().text
+        tail::parse_chunk(&run(tail::SCRIPT, &[path, &r.next.to_string()]))
+            .unwrap()
+            .text
     } else {
         r.text.clone()
     };
@@ -215,7 +297,11 @@ fn tail_output_with_its_offsets_fits_what_exec_keeps() {
     let (mut at, mut lines, mut reads) = (0u64, 0usize, 0);
     while at < body.len() as u64 {
         let out = run(tail::SCRIPT, &[path, &at.to_string()]);
-        assert!(out.len() < EXEC_KEEPS, "read {reads} printed {} bytes", out.len());
+        assert!(
+            out.len() < EXEC_KEEPS,
+            "read {reads} printed {} bytes",
+            out.len()
+        );
         let c = tail::parse_chunk(&out).unwrap();
         assert!(c.next > at, "a read goes on");
         lines += c.offsets.len();
@@ -238,7 +324,10 @@ fn ten_lines() -> (String, Vec<u64>) {
     let mut starts = Vec::new();
     for n in 0..10 {
         starts.push(text.len() as u64);
-        text.push_str(&format!("{{\"type\":\"user\",\"n\":{n},\"pad\":\"{}\"}}\n", "y".repeat(n * 7)));
+        text.push_str(&format!(
+            "{{\"type\":\"user\",\"n\":{n},\"pad\":\"{}\"}}\n",
+            "y".repeat(n * 7)
+        ));
     }
     (text, starts)
 }
@@ -262,7 +351,11 @@ fn tail_keeps_a_first_line_that_starts_exactly_at_start() {
     let (text, at) = ten_lines();
     let f = temp("t6.jsonl", text.as_bytes());
     let path = f.to_str().unwrap();
-    let c = tail::parse_chunk(&run(tail::SCRIPT, &[path, &at[3].to_string(), &at[5].to_string()])).unwrap();
+    let c = tail::parse_chunk(&run(
+        tail::SCRIPT,
+        &[path, &at[3].to_string(), &at[5].to_string()],
+    ))
+    .unwrap();
     assert_eq!(c.text, text[at[3] as usize..at[5] as usize]);
     assert_eq!((c.from, c.next), (at[3], at[5]));
     // A last-N read that lands exactly on a line start keeps that line too.
@@ -308,7 +401,11 @@ fn tail_drops_request_records_and_long_image_data() {
     assert!(!c.text.contains(&image[..300]));
     // The emptied field says where the bytes are: line offset, field index.
     let at = lines.find("{\"type\":\"user\",\"message").unwrap();
-    assert!(c.text.contains(&format!("\"data\":\"@{at}:0\"")), "{}", c.text);
+    assert!(
+        c.text.contains(&format!("\"data\":\"@{at}:0\"")),
+        "{}",
+        c.text
+    );
     assert!(c.text.contains("\"data\":\"abc=\""), "short data stays");
     assert_eq!(c.next, lines.len() as u64, "dropped lines still advance");
 }
@@ -323,8 +420,16 @@ fn tail_from_the_end_of_a_long_file_reads_only_the_last_part() {
     assert_eq!(c.size, size);
     assert_eq!(c.next, size);
     assert!(c.text.len() <= 1000 && !c.text.is_empty());
-    assert!(c.text.starts_with("{\"type\""), "starts at a line: {:.40}", c.text);
-    assert!(c.from > 0 && c.from % line.len() as u64 == 0, "from is that line's start: {}", c.from);
+    assert!(
+        c.text.starts_with("{\"type\""),
+        "starts at a line: {:.40}",
+        c.text
+    );
+    assert!(
+        c.from > 0 && c.from.is_multiple_of(line.len() as u64),
+        "from is that line's start: {}",
+        c.from
+    );
 }
 
 #[test]
@@ -345,8 +450,15 @@ fn locate_script_reports_this_process() {
 
 /// Base64 of `n` bytes counting up, long enough to be emptied by the tail.
 fn blob(n: usize, seed: u8) -> (Vec<u8>, String) {
-    let bytes: Vec<u8> = (0..n).map(|i| (i as u8).wrapping_mul(7).wrapping_add(seed)).collect();
-    let out = Command::new("base64").arg("-w0").stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().unwrap();
+    let bytes: Vec<u8> = (0..n)
+        .map(|i| (i as u8).wrapping_mul(7).wrapping_add(seed))
+        .collect();
+    let out = Command::new("base64")
+        .arg("-w0")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
     out.stdin.as_ref().unwrap().write_all(&bytes).unwrap();
     let b64 = String::from_utf8(out.wait_with_output().unwrap().stdout).unwrap();
     (bytes, b64)
@@ -382,8 +494,15 @@ fn an_emptied_image_comes_back_whole_through_its_reference() {
         let r = refs(&c.text);
         assert_eq!(r.len(), 3, "{}", c.text);
         for ((line, n), want) in r.iter().take(2).zip([&one, &two]) {
-            let got = run_bytes(image::LOG_SCRIPT, &[path, &line.to_string(), &n.to_string()]);
-            assert_eq!(&image::decode(&got).unwrap(), want, "start {start}, ref {line}:{n}");
+            let got = run_bytes(
+                image::LOG_SCRIPT,
+                &[path, &line.to_string(), &n.to_string()],
+            );
+            assert_eq!(
+                &image::decode(&got).unwrap(),
+                want,
+                "start {start}, ref {line}:{n}"
+            );
         }
     }
 }
@@ -401,7 +520,8 @@ fn an_image_reference_past_the_line_gives_nothing() {
 fn an_image_file_is_read_whole_after_its_time_and_a_missing_one_is_none() {
     let (bytes, _) = blob(20000, 3);
     let f = temp("i3.png", &bytes);
-    let (tag, got) = image::file_reply(&run_bytes(image::FILE_SCRIPT, &[f.to_str().unwrap(), ""])).unwrap();
+    let (tag, got) =
+        image::file_reply(&run_bytes(image::FILE_SCRIPT, &[f.to_str().unwrap(), ""])).unwrap();
     assert_eq!(got, Some(bytes));
     assert!(!tag.is_empty());
     let out = run_bytes(image::FILE_SCRIPT, &["/nonexistent/x.png", ""]);
@@ -415,7 +535,10 @@ fn an_image_file_already_held_at_its_time_is_not_sent_again() {
     let f = temp("i4.png", &bytes);
     let p = f.to_str().unwrap();
     let (tag, _) = image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, ""])).unwrap();
-    assert_eq!(image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, &tag])), Some((tag.clone(), None)));
+    assert_eq!(
+        image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, &tag])),
+        Some((tag.clone(), None))
+    );
     // The same path written again (a Codex screenshot reused): sent again.
     std::fs::write(&f, b"another image").unwrap();
     let (again, got) = image::file_reply(&run_bytes(image::FILE_SCRIPT, &[p, &tag])).unwrap();
@@ -424,6 +547,12 @@ fn an_image_file_already_held_at_its_time_is_not_sent_again() {
 }
 
 fn run_bytes(script: &str, args: &[&str]) -> Vec<u8> {
-    let out = Command::new("sh").arg("-c").arg(script).arg("sh").args(args).output().unwrap();
+    let out = Command::new("sh")
+        .arg("-c")
+        .arg(script)
+        .arg("sh")
+        .args(args)
+        .output()
+        .unwrap();
     out.stdout
 }

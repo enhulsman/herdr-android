@@ -299,16 +299,17 @@ impl Hub {
     pub fn open_chat(&self, machine: String, address: String) -> Arc<hub::chat::Chat> {
         let key = format!("{machine}/{address}");
         let core = self.core.clone();
-        self.chats
-            .lock()
-            .unwrap()
-            .open(&key, || Arc::new(hub::chat::Chat::new(core, machine, address)))
+        self.chats.lock().unwrap().open(&key, || {
+            Arc::new(hub::chat::Chat::new(core, machine, address))
+        })
     }
 
     /// Android asked to free memory: every held chat but the one on screen
     /// goes.
     pub fn trim_chats(&self, shown_machine: Option<String>, shown_address: Option<String>) {
-        let shown = shown_machine.zip(shown_address).map(|(m, a)| format!("{m}/{a}"));
+        let shown = shown_machine
+            .zip(shown_address)
+            .map(|(m, a)| format!("{m}/{a}"));
         self.chats.lock().unwrap().trim(shown.as_deref());
     }
 

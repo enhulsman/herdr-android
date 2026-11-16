@@ -24,18 +24,32 @@ pub enum Agent {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Item {
-    User { text: String, images: Vec<Image> },
+    User {
+        text: String,
+        images: Vec<Image>,
+    },
     /// Markdown as the agent wrote it.
-    Assistant { text: String },
+    Assistant {
+        text: String,
+    },
     /// Tool calls in a row, shown folded as one line.
-    Tools { calls: Vec<ToolCall> },
-    Note { text: String },
+    Tools {
+        calls: Vec<ToolCall>,
+    },
+    Note {
+        text: String,
+    },
     /// A note the agent wrote for the person while it works: Claude Code's
     /// thinking shown as updates (its terminal marks them "summary").
-    Update { text: String },
+    Update {
+        text: String,
+    },
     /// A message from another agent: a subagent's report (named after the
     /// task it was given) or another session's message.
-    AgentMessage { from: String, text: String },
+    AgentMessage {
+        from: String,
+        text: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,11 +69,17 @@ pub struct ToolCall {
 pub enum Image {
     /// Base64 in the log, left on the desk by the tail script: the line that
     /// starts at byte `line`, its `n`th base64 field ([`image::LOG_SCRIPT`]).
-    InLog { line: u64, n: u32, media_type: String },
+    InLog {
+        line: u64,
+        n: u32,
+        media_type: String,
+    },
     /// Short enough that the tail script kept the base64.
     Inline { media_type: String, data: String },
-    /// A file on the agent's machine ([`image::FILE_SCRIPT`]).
-    File { path: String },
+    /// A file on the agent's machine ([`image::FILE_SCRIPT`]), named in the
+    /// log line that starts at byte `line`: one path viewed twice is two
+    /// images.
+    File { path: String, line: u64 },
     /// Emptied with no way back, or a shape this parser does not know.
     Missing,
 }
@@ -68,9 +88,13 @@ pub enum Image {
 pub enum Health {
     Ok,
     /// Readable, with this many parts it did not know (left out).
-    Degraded { unknown: u32 },
+    Degraded {
+        unknown: u32,
+    },
     /// Not this format any more: show the terminal instead.
-    Broken { reason: String },
+    Broken {
+        reason: String,
+    },
 }
 
 /// How full the session's context is (design D8): the tokens the last
@@ -234,7 +258,11 @@ impl Parser {
     /// Claude Code: the texts typed while the agent worked that it has not
     /// taken in yet, oldest first (design D10). Empty for Codex.
     pub fn queued(&self) -> Vec<String> {
-        self.queue.iter().filter(|t| !t.is_empty()).cloned().collect()
+        self.queue
+            .iter()
+            .filter(|t| !t.is_empty())
+            .cloned()
+            .collect()
     }
 
     pub fn gauge(&self) -> Option<Gauge> {
@@ -254,7 +282,9 @@ impl Parser {
     /// records are no longer read, and the log is Broken until the agent
     /// produces a row again.
     pub fn turn_ended(&mut self) {
-        let Some((mark, skip)) = self.turn.take() else { return };
+        let Some((mark, skip)) = self.turn.take() else {
+            return;
+        };
         let changed = self.srcs.iter().flatten().any(|&at| at >= mark);
         if !skip && !changed {
             self.turn_broken.get_or_insert(self.pos);
@@ -326,7 +356,10 @@ impl Parser {
     }
 
     fn new_row(&mut self, item: Item) {
-        if matches!(item, Item::Assistant { .. } | Item::Note { .. } | Item::Update { .. }) {
+        if matches!(
+            item,
+            Item::Assistant { .. } | Item::Note { .. } | Item::Update { .. }
+        ) {
             self.agent_wrote();
         }
         self.items.push(item);
@@ -377,7 +410,9 @@ impl Parser {
     /// else a new row there. Rows after it move down one.
     fn add_call_before(&mut self, answer: usize, call: ToolCall) {
         self.agent_wrote();
-        if let Some(Item::Tools { calls }) = answer.checked_sub(1).and_then(|i| self.items.get_mut(i)) {
+        if let Some(Item::Tools { calls }) =
+            answer.checked_sub(1).and_then(|i| self.items.get_mut(i))
+        {
             calls.push(call);
             self.touch(answer - 1);
             return;
@@ -419,7 +454,10 @@ impl Parser {
     fn claude(&mut self, v: &Value) {
         let kind = v["type"].as_str().unwrap_or("");
         if v.get("sessionId").is_some()
-            || matches!(kind, "user" | "assistant" | "system" | "file-history-snapshot")
+            || matches!(
+                kind,
+                "user" | "assistant" | "system" | "file-history-snapshot"
+            )
         {
             self.recognised += 1;
         }
@@ -477,7 +515,10 @@ impl Parser {
         let msg = &v["message"];
         let content = &msg["content"];
         if msg["role"].as_str().is_none() || !(content.is_string() || content.is_array()) {
-            return self.break_with(format!("line {}: message without role or content", self.lines));
+            return self.break_with(format!(
+                "line {}: message without role or content",
+                self.lines
+            ));
         }
         if v["isSidechain"] == true {
             return;
@@ -486,21 +527,31 @@ impl Parser {
             // Input plus cache tokens: what the request sent. A record with
             // none (an error the harness wrote) is not a request.
             let u = &msg["usage"];
-            let used: u64 = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
-                .iter()
-                .filter_map(|k| u[k].as_u64())
-                .sum();
+            let used: u64 = [
+                "input_tokens",
+                "cache_creation_input_tokens",
+                "cache_read_input_tokens",
+            ]
+            .iter()
+            .filter_map(|k| u[k].as_u64())
+            .sum();
             if used > 0 {
                 self.gauge = Some(Gauge { used, window: None });
             }
         }
-        if let Some(row) = content.as_str().and_then(|t| self.injected.get(t.trim()).copied()) {
+        if let Some(row) = content
+            .as_str()
+            .and_then(|t| self.injected.get(t.trim()).copied())
+        {
             if let Some(i) = row {
                 self.touch(i);
             }
             return;
         }
-        if let Some(text) = content.as_str().filter(|t| kind == "user" && t.contains("<agent-message from=\"")) {
+        if let Some(text) = content
+            .as_str()
+            .filter(|t| kind == "user" && t.contains("<agent-message from=\""))
+        {
             return self.claude_agent_message(text);
         }
         // The summary a compaction writes is not the person's; the boundary
@@ -543,7 +594,9 @@ impl Parser {
                         continue;
                     }
                     match (self.items.last_mut(), &self.last_text_id) {
-                        (Some(Item::Assistant { text }), Some(last)) if Some(last) == id.as_ref() => {
+                        (Some(Item::Assistant { text }), Some(last))
+                            if Some(last) == id.as_ref() =>
+                        {
                             text.push_str("\n\n");
                             text.push_str(t);
                             self.touch(self.items.len() - 1);
@@ -596,8 +649,12 @@ impl Parser {
     }
 
     fn claude_agent_message(&mut self, s: &str) {
-        let Some(rest) = s.split("<agent-message from=\"").nth(1) else { return };
-        let Some((from, rest)) = rest.split_once("\">") else { return };
+        let Some(rest) = s.split("<agent-message from=\"").nth(1) else {
+            return;
+        };
+        let Some((from, rest)) = rest.split_once("\">") else {
+            return;
+        };
         let body = rest.split("</agent-message>").next().unwrap_or("");
         let text = match body.split_once("The report follows:\n") {
             // A subagent's hand-back: the harness indents each line by two.
@@ -608,7 +665,11 @@ impl Parser {
                 .join("\n"),
             None => body.to_owned(),
         };
-        let from = self.agents.get(from).cloned().unwrap_or_else(|| from.to_owned());
+        let from = self
+            .agents
+            .get(from)
+            .cloned()
+            .unwrap_or_else(|| from.to_owned());
         self.push(Item::AgentMessage {
             from,
             text: text.trim().to_owned(),
@@ -621,7 +682,9 @@ impl Parser {
         let prompt = &a["prompt"];
         let kind = a["origin"]["kind"].as_str().unwrap_or("");
         match (kind, prompt.as_str()) {
-            ("human", Some(_)) | ("human", None) if prompt.is_string() || prompt.is_array() => self.claude_user(prompt),
+            ("human", Some(_)) | ("human", None) if prompt.is_string() || prompt.is_array() => {
+                self.claude_user(prompt)
+            }
             (_, Some(s)) => {
                 let t = s.trim();
                 if let Some(row) = self.injected.get(t).copied() {
@@ -647,12 +710,17 @@ impl Parser {
         if let Some(s) = content.as_str() {
             let t = s.trim_start();
             if t.starts_with("[Request interrupted by user") {
-                self.push(Item::Note { text: "Interrupted".into() });
+                self.push(Item::Note {
+                    text: "Interrupted".into(),
+                });
                 return;
             }
             if t.starts_with("<task-notification>") {
-                let summary = between(t, "<summary>", "</summary>").unwrap_or("A background task finished");
-                self.push(Item::Note { text: summary.trim().to_owned() });
+                let summary =
+                    between(t, "<summary>", "</summary>").unwrap_or("A background task finished");
+                self.push(Item::Note {
+                    text: summary.trim().to_owned(),
+                });
                 return;
             }
             if let Some(cmd) = between(t, "<bash-input>", "</bash-input>") {
@@ -678,10 +746,19 @@ impl Parser {
                 return;
             }
             if t.starts_with("<bash-stdout>") || t.starts_with("<bash-stderr>") {
-                let out = between(t, "<bash-stdout>", "</bash-stdout>").unwrap_or("").trim_end();
-                let err = between(t, "<bash-stderr>", "</bash-stderr>").unwrap_or("").trim_end();
+                let out = between(t, "<bash-stdout>", "</bash-stdout>")
+                    .unwrap_or("")
+                    .trim_end();
+                let err = between(t, "<bash-stderr>", "</bash-stderr>")
+                    .unwrap_or("")
+                    .trim_end();
                 if let Some(call) = self.call_mut(BASH) {
-                    call.output = [out, err].iter().filter(|x| !x.is_empty()).copied().collect::<Vec<_>>().join("\n");
+                    call.output = [out, err]
+                        .iter()
+                        .filter(|x| !x.is_empty())
+                        .copied()
+                        .collect::<Vec<_>>()
+                        .join("\n");
                     call.failed = out.is_empty() && !err.is_empty();
                     call.done = true;
                 }
@@ -690,13 +767,26 @@ impl Parser {
             }
             if let Some(rest) = t.strip_prefix("<command-name>") {
                 let cmd = rest.split("</command-name>").next().unwrap_or("").trim();
-                let args = between(t, "<command-args>", "</command-args>").unwrap_or("").trim();
-                let text = if args.is_empty() { cmd.to_owned() } else { format!("{cmd} {args}") };
-                self.push(Item::User { text, images: vec![] });
-            } else if let Some(out) = between(t, "<local-command-stdout>", "</local-command-stdout>") {
+                let args = between(t, "<command-args>", "</command-args>")
+                    .unwrap_or("")
+                    .trim();
+                let text = if args.is_empty() {
+                    cmd.to_owned()
+                } else {
+                    format!("{cmd} {args}")
+                };
+                self.push(Item::User {
+                    text,
+                    images: vec![],
+                });
+            } else if let Some(out) =
+                between(t, "<local-command-stdout>", "</local-command-stdout>")
+            {
                 let out = strip_ansi(out);
                 if !out.trim().is_empty() {
-                    self.push(Item::Note { text: out.trim().to_owned() });
+                    self.push(Item::Note {
+                        text: out.trim().to_owned(),
+                    });
                 }
             } else if !t.starts_with("<local-command") {
                 self.push(Item::User {
@@ -710,8 +800,14 @@ impl Parser {
         let mut images = Vec::new();
         for b in content.as_array().into_iter().flatten() {
             match b["type"].as_str().unwrap_or("") {
-                "text" if b["text"].as_str().is_some_and(|t| t.trim_start().starts_with("[Request interrupted by user")) => {
-                    self.push(Item::Note { text: "Interrupted".into() });
+                "text"
+                    if b["text"].as_str().is_some_and(|t| {
+                        t.trim_start().starts_with("[Request interrupted by user")
+                    }) =>
+                {
+                    self.push(Item::Note {
+                        text: "Interrupted".into(),
+                    });
                 }
                 "text" => {
                     let t = strip_image_marks(&unwrap_sent(b["text"].as_str().unwrap_or("")));
@@ -751,7 +847,9 @@ impl Parser {
     // ---- Codex
 
     fn codex(&mut self, v: &Value) {
-        let Some(kind) = v["type"].as_str() else { return };
+        let Some(kind) = v["type"].as_str() else {
+            return;
+        };
         if v.get("payload").is_none() {
             return;
         }
@@ -772,7 +870,9 @@ impl Parser {
             // Not seen in a log yet (task 2.8 checks it): assumed from Codex's
             // own event name.
             "event_msg" if p["type"] == "turn_aborted" => {
-                self.push(Item::Note { text: "Interrupted".into() });
+                self.push(Item::Note {
+                    text: "Interrupted".into(),
+                });
             }
             "event_msg" if p["type"] == "token_count" => {
                 let info = &p["info"];
@@ -809,7 +909,7 @@ impl Parser {
         };
         match t {
             "UserMessage" => {
-                let (shown, mut sent) = leading_image_paths(&text());
+                let (shown, mut sent) = leading_image_paths(&text(), self.at);
                 // Not seen in a log yet: shown as an image that cannot be fetched.
                 let images = item["content"]
                     .as_array()
@@ -891,7 +991,10 @@ impl Parser {
             "ImageView" => {
                 // A path, or (0.169) a file URL.
                 let raw = item["path"].as_str().unwrap_or("");
-                let path = raw.strip_prefix("file://").map(percent_decode).unwrap_or_else(|| raw.to_owned());
+                let path = raw
+                    .strip_prefix("file://")
+                    .map(percent_decode)
+                    .unwrap_or_else(|| raw.to_owned());
                 let shown = self.relative(&path);
                 self.add_call(
                     None,
@@ -902,7 +1005,10 @@ impl Parser {
                         output: String::new(),
                         done: true,
                         failed: false,
-                        images: vec![Image::File { path }],
+                        images: vec![Image::File {
+                            path,
+                            line: self.at,
+                        }],
                     },
                     true,
                 );
@@ -967,7 +1073,8 @@ fn tool_output(c: &Value) -> String {
     c.as_array()
         .into_iter()
         .flatten()
-        .filter_map(|b| (b["type"] == "text").then(|| b["text"].as_str().unwrap_or("")))
+        .filter(|&b| b["type"] == "text")
+        .map(|b| b["text"].as_str().unwrap_or(""))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -977,10 +1084,14 @@ fn claude_image(b: &Value) -> Image {
     let src = &b["source"];
     let media_type = src["media_type"].as_str().unwrap_or("image/png").to_owned();
     let data = src["data"].as_str().unwrap_or("");
-    if let Some((line, n)) = data.strip_prefix('@').and_then(|r| r.split_once(':')) {
-        if let (Ok(line), Ok(n)) = (line.parse(), n.parse()) {
-            return Image::InLog { line, n, media_type };
-        }
+    if let Some((line, n)) = data.strip_prefix('@').and_then(|r| r.split_once(':'))
+        && let (Ok(line), Ok(n)) = (line.parse(), n.parse())
+    {
+        return Image::InLog {
+            line,
+            n,
+            media_type,
+        };
     }
     if data.is_empty() || src["type"] != "base64" {
         return Image::Missing;
@@ -1014,18 +1125,23 @@ fn strip_image_marks(s: &str) -> String {
 /// Lines at the start of a message that are absolute paths to images (the
 /// phone puts each attached image's path before the text): taken out of the
 /// text and returned as images.
-fn leading_image_paths(text: &str) -> (String, Vec<Image>) {
+fn leading_image_paths(text: &str, at: u64) -> (String, Vec<Image>) {
     let mut images = Vec::new();
     let mut rest = text;
     loop {
         let (line, after) = rest.split_once('\n').unwrap_or((rest, ""));
         let l = line.trim().to_ascii_lowercase();
         let image = line.trim().starts_with('/')
-            && [".png", ".jpg", ".jpeg", ".gif", ".webp"].iter().any(|e| l.ends_with(e));
+            && [".png", ".jpg", ".jpeg", ".gif", ".webp"]
+                .iter()
+                .any(|e| l.ends_with(e));
         if !image {
             return (rest.trim().to_owned(), images);
         }
-        images.push(Image::File { path: line.trim().to_owned() });
+        images.push(Image::File {
+            path: line.trim().to_owned(),
+            line: at,
+        });
         rest = after;
     }
 }
@@ -1037,12 +1153,13 @@ fn percent_decode(s: &str) -> String {
     let mut i = 0;
     while i < b.len() {
         let hex = |c: u8| (c as char).to_digit(16);
-        if b[i] == b'%' && i + 2 < b.len() {
-            if let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2])) {
-                out.push((h * 16 + l) as u8);
-                i += 3;
-                continue;
-            }
+        if b[i] == b'%'
+            && i + 2 < b.len()
+            && let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2]))
+        {
+            out.push((h * 16 + l) as u8);
+            i += 3;
+            continue;
         }
         out.push(b[i]);
         i += 1;
@@ -1056,17 +1173,16 @@ pub fn unwrap_sent(s: &str) -> String {
     let mut t = s.trim().to_owned();
     loop {
         let before = t.clone();
-        if let Some(rest) = t.strip_prefix("<pasted_content id=\"") {
-            if let (Some(open), Some(close)) = (rest.find("\">"), rest.rfind("</pasted_content")) {
-                if open + 2 <= close {
-                    t = rest[open + 2..close].trim().to_owned();
-                }
-            }
+        if let Some(rest) = t.strip_prefix("<pasted_content id=\"")
+            && let (Some(open), Some(close)) = (rest.find("\">"), rest.rfind("</pasted_content"))
+            && open + 2 <= close
+        {
+            t = rest[open + 2..close].trim().to_owned();
         }
-        if let Some(rest) = t.strip_prefix("<hc from=\"") {
-            if let (Some(open), Some(stripped)) = (rest.find("\">"), rest.strip_suffix("</hc>")) {
-                t = stripped[open + 2..].trim().to_owned();
-            }
+        if let Some(rest) = t.strip_prefix("<hc from=\"")
+            && let (Some(open), Some(stripped)) = (rest.find("\">"), rest.strip_suffix("</hc>"))
+        {
+            t = stripped[open + 2..].trim().to_owned();
         }
         if t == before {
             return t;
@@ -1090,7 +1206,9 @@ pub fn keep_keys(held: &[Key], first: &[Key], sources: &[Vec<u64>]) -> Vec<Key> 
     }
     for (i, slot) in got.iter_mut().enumerate() {
         if slot.is_none()
-            && let Some(k) = held.iter().find(|k| !used.contains(*k) && sources[i].contains(&k.0))
+            && let Some(k) = held
+                .iter()
+                .find(|k| !used.contains(*k) && sources[i].contains(&k.0))
         {
             used.insert(*k);
             *slot = Some(*k);

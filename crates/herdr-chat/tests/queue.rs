@@ -6,7 +6,9 @@
 use herdr_chat::{Agent, Parser};
 
 fn op(operation: &str, content: Option<&str>) -> String {
-    let content = content.map(|c| format!(",\"content\":{}", serde_json::to_string(c).unwrap())).unwrap_or_default();
+    let content = content
+        .map(|c| format!(",\"content\":{}", serde_json::to_string(c).unwrap()))
+        .unwrap_or_default();
     format!(
         "{{\"type\":\"queue-operation\",\"operation\":\"{operation}\",\"timestamp\":\"2026-11-14T16:52:11.022Z\",\"sessionId\":\"s\"{content}}}"
     )
@@ -40,26 +42,42 @@ fn remove_takes_the_matching_text_and_dequeue_the_oldest() {
         op("remove", Some("second")),
     ]);
     assert_eq!(p.queued(), ["first", "third"]);
-    let p = parse(&[op("enqueue", Some("first")), op("enqueue", Some("second")), op("dequeue", None)]);
+    let p = parse(&[
+        op("enqueue", Some("first")),
+        op("enqueue", Some("second")),
+        op("dequeue", None),
+    ]);
     assert_eq!(p.queued(), ["second"]);
 }
 
 #[test]
 fn pop_all_empties_the_queue() {
-    let p = parse(&[op("enqueue", Some("a")), op("enqueue", Some("b")), op("popAll", Some("a\nb"))]);
+    let p = parse(&[
+        op("enqueue", Some("a")),
+        op("enqueue", Some("b")),
+        op("popAll", Some("a\nb")),
+    ]);
     assert!(p.queued().is_empty());
 }
 
 #[test]
 fn records_whose_start_was_not_read_are_ignored() {
     // A read starting mid-queue: the dequeue or remove of an unseen enqueue.
-    let p = parse(&[op("dequeue", None), op("remove", Some("never seen")), op("enqueue", Some("later"))]);
+    let p = parse(&[
+        op("dequeue", None),
+        op("remove", Some("never seen")),
+        op("enqueue", Some("later")),
+    ]);
     assert_eq!(p.queued(), ["later"]);
 }
 
 #[test]
 fn an_enqueue_without_text_holds_a_place_for_its_dequeue() {
-    let p = parse(&[op("enqueue", None), op("enqueue", Some("typed")), op("dequeue", None)]);
+    let p = parse(&[
+        op("enqueue", None),
+        op("enqueue", Some("typed")),
+        op("dequeue", None),
+    ]);
     assert_eq!(p.queued(), ["typed"]);
 }
 
@@ -71,7 +89,9 @@ fn a_queued_text_is_the_persons_own() {
 
 #[test]
 fn queue_records_are_known_and_make_no_row() {
-    let lines: Vec<String> = (0..10).map(|i| op("enqueue", Some(&format!("m{i}")))).collect();
+    let lines: Vec<String> = (0..10)
+        .map(|i| op("enqueue", Some(&format!("m{i}"))))
+        .collect();
     let p = parse(&lines);
     assert!(p.items().is_empty());
     assert_eq!(p.queued().len(), 10);

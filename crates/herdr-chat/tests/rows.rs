@@ -95,7 +95,11 @@ fn a_folded_tool_row_records_every_call_and_result_line() {
 
 #[test]
 fn two_rows_from_one_line_get_their_index_within_it() {
-    let lines = vec![asked("Go"), said_and_ran("a", "Running it", "t1", "make"), tool_result("t1", "ok")];
+    let lines = vec![
+        asked("Go"),
+        said_and_ran("a", "Running it", "t1", "make"),
+        tool_result("t1", "ok"),
+    ];
     let (_, at) = log(&lines);
     let p = parse_from(&lines, 0);
     assert_eq!(p.items().len(), 3);
@@ -125,11 +129,26 @@ fn a_folded_tool_row_gaining_older_calls_keeps_its_key_and_place() {
 
     // Reading back parses everything held again, from the start.
     let back = parse_from(&lines, 0);
-    assert_eq!(calls(&back.items()[1]), 4, "the older calls join the same row");
+    assert_eq!(
+        calls(&back.items()[1]),
+        4,
+        "the older calls join the same row"
+    );
     let keys = keep_keys(&held, back.first_keys(), back.sources());
-    assert_eq!(keys[1], held[0], "the tool row keeps the key it was first seen with");
-    assert_eq!(&keys[1..], &held[..], "every held row keeps its key, in the same order");
-    assert_eq!(keys[0], back.first_keys()[0], "the new older row keys itself");
+    assert_eq!(
+        keys[1], held[0],
+        "the tool row keeps the key it was first seen with"
+    );
+    assert_eq!(
+        &keys[1..],
+        &held[..],
+        "every held row keeps its key, in the same order"
+    );
+    assert_eq!(
+        keys[0],
+        back.first_keys()[0],
+        "the new older row keys itself"
+    );
 }
 
 #[test]
@@ -145,14 +164,31 @@ fn a_persons_row_meeting_its_older_queued_copy_is_one_row_with_the_screen_key() 
     let (_, at) = log(&lines);
     // On screen: the window from the repeated user record on.
     let window = parse_from(&lines, 3);
-    assert_eq!(window.items()[0], Item::Note { text: "Agent \"Docs\" finished".into() });
+    assert_eq!(
+        window.items()[0],
+        Item::Note {
+            text: "Agent \"Docs\" finished".into()
+        }
+    );
     let held = window.first_keys().to_vec();
 
     let back = parse_from(&lines, 0);
-    let notes = back.items().iter().filter(|i| matches!(i, Item::Note { .. })).count();
+    let notes = back
+        .items()
+        .iter()
+        .filter(|i| matches!(i, Item::Note { .. }))
+        .count();
     assert_eq!(notes, 1, "one row, not the copy and the record");
-    let i = back.items().iter().position(|i| matches!(i, Item::Note { .. })).unwrap();
-    assert_eq!(back.sources()[i], vec![at[1], at[3]], "the merged row has both lines");
+    let i = back
+        .items()
+        .iter()
+        .position(|i| matches!(i, Item::Note { .. }))
+        .unwrap();
+    assert_eq!(
+        back.sources()[i],
+        vec![at[1], at[3]],
+        "the merged row has both lines"
+    );
     let keys = keep_keys(&held, back.first_keys(), back.sources());
     assert_eq!(keys[i], held[0], "it keeps the key it had on screen");
     assert_eq!(keys.iter().collect::<HashSet<_>>().len(), keys.len());
@@ -161,7 +197,10 @@ fn a_persons_row_meeting_its_older_queued_copy_is_one_row_with_the_screen_key() 
 #[test]
 fn a_peer_message_and_its_repeat_are_one_row_with_both_lines() {
     let peer = "<agent-message from=\"docs-writer\">Check the README</agent-message>";
-    let lines = vec![queued("{\"kind\":\"peer\",\"name\":\"docs-writer\"}", peer), asked(peer)];
+    let lines = vec![
+        queued("{\"kind\":\"peer\",\"name\":\"docs-writer\"}", peer),
+        asked(peer),
+    ];
     let (_, at) = log(&lines);
     let p = parse_from(&lines, 0);
     assert_eq!(p.items().len(), 1);
@@ -174,7 +213,12 @@ fn long_log() -> Vec<String> {
     for t in 0..12 {
         lines.push(asked(&format!("Question {t}")));
         if t % 3 == 0 {
-            lines.push(said_and_ran(&format!("s{t}"), "Checking", &format!("u{t}"), "git status"));
+            lines.push(said_and_ran(
+                &format!("s{t}"),
+                "Checking",
+                &format!("u{t}"),
+                "git status",
+            ));
             lines.push(tool_result(&format!("u{t}"), "clean"));
         }
         for c in 0..(t % 4) {
@@ -204,9 +248,16 @@ fn a_log_read_in_one_go_and_read_back_in_pieces_gives_the_same_rows() {
         let p = parse_from(&lines, from);
         let next = keep_keys(&keys, p.first_keys(), p.sources());
         for k in &keys {
-            assert!(next.contains(k), "held key {k:?} lost reading back to line {from}");
+            assert!(
+                next.contains(k),
+                "held key {k:?} lost reading back to line {from}"
+            );
         }
-        assert_eq!(next.iter().collect::<HashSet<_>>().len(), next.len(), "keys stay unique");
+        assert_eq!(
+            next.iter().collect::<HashSet<_>>().len(),
+            next.len(),
+            "keys stay unique"
+        );
         keys = next;
         items = p.items().to_vec();
         sources = p.sources().to_vec();
@@ -221,7 +272,10 @@ fn keep_keys_gives_a_held_key_once_and_new_rows_their_own() {
     let held: Vec<Key> = vec![(100, 0), (100, 1)];
     let first: Vec<Key> = vec![(40, 0), (100, 0), (100, 1)];
     let sources = vec![vec![40], vec![100], vec![100, 140]];
-    assert_eq!(keep_keys(&held, &first, &sources), vec![(40, 0), (100, 0), (100, 1)]);
+    assert_eq!(
+        keep_keys(&held, &first, &sources),
+        vec![(40, 0), (100, 0), (100, 1)]
+    );
     // A fresh row holding two held rows' lines takes the first held one.
     let held: Vec<Key> = vec![(10, 0), (30, 0)];
     let first: Vec<Key> = vec![(10, 0)];

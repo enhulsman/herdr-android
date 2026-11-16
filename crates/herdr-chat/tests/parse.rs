@@ -154,11 +154,10 @@ fn codex_session_uses_its_completed_items() {
         panic!("{:?}", items[4])
     };
     assert_eq!(calls[0].title, "View shots/home page.png");
-    assert_eq!(
-        calls[0].images,
-        vec![Image::File {
-            path: "/work/api/shots/home page.png".into()
-        }]
+    assert!(
+        matches!(&calls[0].images[..], [Image::File { path, .. }] if path == "/work/api/shots/home page.png"),
+        "{:?}",
+        calls[0].images
     );
     assert_eq!(items.len(), 5, "{items:#?}");
     // The injected AGENTS.md "user" message is not the person's.
@@ -177,13 +176,20 @@ fn one_line_that_is_not_json_is_left_out_but_many_break_the_view() {
     // One bad line (a write cut short) must not hide the whole session.
     let mut p = parse(Agent::Claude, CLAUDE);
     p.feed("{\"type\":\"user\", this is not json\n");
-    assert!(matches!(p.health(), Health::Degraded { .. }), "{:?}", p.health());
+    assert!(
+        matches!(p.health(), Health::Degraded { .. }),
+        "{:?}",
+        p.health()
+    );
     let n = p.items().len();
     p.feed("{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{\"role\":\"user\",\"content\":\"Still here\"}}\n");
     assert_eq!(p.items().len(), n + 1);
     // Mostly not JSON: not this format at all.
     let junk: String = (0..10).map(|i| format!("not json {i}\n")).collect();
-    assert!(matches!(parse(Agent::Claude, &junk).health(), Health::Broken { .. }));
+    assert!(matches!(
+        parse(Agent::Claude, &junk).health(),
+        Health::Broken { .. }
+    ));
 }
 
 fn queued(origin: &str, prompt: &str) -> String {
@@ -203,7 +209,10 @@ fn user_line(text: &str) -> String {
 #[test]
 fn a_message_sent_while_the_agent_works_is_the_persons_message() {
     // Claude Code writes a message typed mid-turn only as a queued command.
-    let p = parse(Agent::Claude, &queued("{\"kind\":\"human\"}", "Say SECOND."));
+    let p = parse(
+        Agent::Claude,
+        &queued("{\"kind\":\"human\"}", "Say SECOND."),
+    );
     assert_eq!(p.items(), &[user("Say SECOND.")]);
     // With images: the prompt is a list of blocks.
     let blocks = "{\"type\":\"attachment\",\"sessionId\":\"s\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":[{\"type\":\"text\",\"text\":\"And this\"}],\"origin\":{\"kind\":\"human\"}}}\n";
@@ -223,8 +232,13 @@ fn queued_notices_and_peer_messages_show_once() {
     assert_eq!(
         p.items(),
         &[
-            Item::Note { text: "Agent \"Docs\" finished".into() },
-            Item::AgentMessage { from: "docs-writer".into(), text: "Check the README".into() },
+            Item::Note {
+                text: "Agent \"Docs\" finished".into()
+            },
+            Item::AgentMessage {
+                from: "docs-writer".into(),
+                text: "Check the README".into()
+            },
         ]
     );
 }
@@ -234,7 +248,12 @@ fn the_compaction_summary_and_an_interrupt_are_not_the_persons_messages() {
     let summary = "{\"type\":\"user\",\"sessionId\":\"s\",\"isCompactSummary\":true,\"message\":{\"role\":\"user\",\"content\":\"This session is being continued from a previous conversation.\"}}\n";
     let interrupt = "{\"type\":\"user\",\"sessionId\":\"s\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[Request interrupted by user for tool use]\"}]}}\n";
     let p = parse(Agent::Claude, &format!("{summary}{interrupt}"));
-    assert_eq!(p.items(), &[Item::Note { text: "Interrupted".into() }]);
+    assert_eq!(
+        p.items(),
+        &[Item::Note {
+            text: "Interrupted".into()
+        }]
+    );
 }
 
 #[test]
@@ -320,7 +339,10 @@ fn a_shell_command_the_person_ran_is_their_message_and_a_tool_call() {
     let Item::Tools { calls } = &items[1] else {
         panic!("{:?}", p.items())
     };
-    assert_eq!((calls[0].name.as_str(), calls[0].title.as_str()), ("Shell", "! ls src"));
+    assert_eq!(
+        (calls[0].name.as_str(), calls[0].title.as_str()),
+        ("Shell", "! ls src")
+    );
     assert_eq!(calls[0].output, "main.rs\nupload.rs");
     assert!(calls[0].done && !calls[0].failed);
     assert_eq!(items[2], user("!cat nope"));
@@ -335,7 +357,11 @@ fn a_shell_command_the_person_ran_is_their_message_and_a_tool_call() {
 
 fn claude_line(kind: &str, extra: &str, content: &str) -> String {
     let content = serde_json::to_string(content).unwrap();
-    let body = if kind == "system" { format!("\"content\":{content}") } else { format!("\"message\":{{\"role\":\"user\",\"content\":{content}}}") };
+    let body = if kind == "system" {
+        format!("\"content\":{content}")
+    } else {
+        format!("\"message\":{{\"role\":\"user\",\"content\":{content}}}")
+    };
     format!("{{\"type\":\"{kind}\",{extra}\"isSidechain\":false,\"sessionId\":\"s\",{body}}}\n")
 }
 
@@ -344,18 +370,32 @@ fn a_slash_command_is_the_persons_message_with_its_output_as_a_note() {
     let mut p = Parser::new(Agent::Claude);
     // `/clear` opens its new log with the command as a user record; `/usage`
     // writes both records as `system` / `local_command`, once its dialog closes.
-    p.feed(&claude_line("user", "", "<local-command-caveat>The command below was run directly.</local-command-caveat>"));
+    p.feed(&claude_line(
+        "user",
+        "",
+        "<local-command-caveat>The command below was run directly.</local-command-caveat>",
+    ));
     p.feed(&claude_line("user", "", "<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>"));
-    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<local-command-stdout></local-command-stdout>"));
+    p.feed(&claude_line(
+        "system",
+        "\"subtype\":\"local_command\",",
+        "<local-command-stdout></local-command-stdout>",
+    ));
     p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<command-name>/usage</command-name>\n<command-message>usage</command-message>\n<command-args></command-args>"));
-    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<local-command-stdout>Settings dialog dismissed</local-command-stdout>"));
+    p.feed(&claude_line(
+        "system",
+        "\"subtype\":\"local_command\",",
+        "<local-command-stdout>Settings dialog dismissed</local-command-stdout>",
+    ));
     p.feed(&claude_line("user", "", "<command-name>/model</command-name>\n<command-message>model</command-message>\n<command-args>haiku</command-args>"));
     assert_eq!(
         p.items(),
         &[
             user("/clear"),
             user("/usage"),
-            Item::Note { text: "Settings dialog dismissed".into() },
+            Item::Note {
+                text: "Settings dialog dismissed".into()
+            },
             user("/model haiku"),
         ]
     );
@@ -365,16 +405,53 @@ fn a_slash_command_is_the_persons_message_with_its_output_as_a_note() {
 fn a_codex_shell_command_the_person_ran_is_their_message() {
     let mut p = Parser::new(Agent::Codex);
     let item = |id: &str, cmd: &str, source: &str| {
-        format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"item\":{{\"type\":\"CommandExecution\",\"id\":\"{id}\",\"command\":[\"/bin/bash\",\"-lc\",\"{cmd}\"],\"parsed_cmd\":[{{\"type\":\"unknown\",\"cmd\":\"{cmd}\"}}],\"aggregated_output\":\"hi\\n\",\"exit_code\":0{source}}}}}}}\n")
+        format!(
+            "{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"item\":{{\"type\":\"CommandExecution\",\"id\":\"{id}\",\"command\":[\"/bin/bash\",\"-lc\",\"{cmd}\"],\"parsed_cmd\":[{{\"type\":\"unknown\",\"cmd\":\"{cmd}\"}}],\"aggregated_output\":\"hi\\n\",\"exit_code\":0{source}}}}}}}\n"
+        )
     };
     p.feed(&item("a", "echo hi", ",\"source\":\"user_shell\""));
     p.feed(&item("b", "ls", ""));
     let items = p.items();
     assert_eq!(items[0], user("!echo hi"));
-    let Item::Tools { calls } = &items[1] else { panic!("{items:?}") };
+    let Item::Tools { calls } = &items[1] else {
+        panic!("{items:?}")
+    };
     assert_eq!(calls.len(), 2, "the agent's own command folds in after it");
     assert_eq!(calls[0].title, "echo hi");
     assert_eq!(items.len(), 2, "{items:#?}");
+}
+
+#[test]
+fn one_path_viewed_twice_in_a_folded_row_is_two_images() {
+    // Codex overwrites a screenshot and views it again: both calls fold into
+    // one row, and each image must name its own record (Codex review).
+    let mut p = Parser::new(Agent::Codex);
+    let view = |id: &str| {
+        format!(
+            "{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_completed\",\"item\":{{\"type\":\"ImageView\",\"id\":\"{id}\",\"path\":\"/w/s.png\"}}}}}}\n"
+        )
+    };
+    let first = view("v1");
+    p.feed(&first);
+    p.feed(&view("v2"));
+    let Item::Tools { calls } = &p.items()[0] else {
+        panic!("{:?}", p.items())
+    };
+    assert_eq!(calls.len(), 2, "{calls:?}");
+    assert_eq!(
+        calls[0].images,
+        vec![Image::File {
+            path: "/w/s.png".into(),
+            line: 0
+        }]
+    );
+    assert_eq!(
+        calls[1].images,
+        vec![Image::File {
+            path: "/w/s.png".into(),
+            line: first.len() as u64
+        }]
+    );
 }
 
 #[test]
@@ -387,8 +464,14 @@ fn image_paths_sent_before_the_text_show_as_the_images() {
         &[Item::User {
             text: "What is this?\n/not/leading.png".into(),
             images: vec![
-                Image::File { path: "/files/t1/a.png".into() },
-                Image::File { path: "/files/t1/b photo.JPG".into() },
+                Image::File {
+                    path: "/files/t1/a.png".into(),
+                    line: 0
+                },
+                Image::File {
+                    path: "/files/t1/b photo.JPG".into(),
+                    line: 0
+                },
             ]
         }]
     );
@@ -399,21 +482,38 @@ fn many_lines_without_a_single_message_break_the_view() {
     // A renamed message record: the lines still look like this agent's, but
     // nothing becomes a message. Meta records alone are not enough to show.
     let claude: String = (0..40)
-        .map(|i| format!("{{\"type\":\"chat-turn\",\"sessionId\":\"s\",\"uuid\":\"u{i}\",\"body\":{{}}}}\n"))
+        .map(|i| {
+            format!(
+                "{{\"type\":\"chat-turn\",\"sessionId\":\"s\",\"uuid\":\"u{i}\",\"body\":{{}}}}\n"
+            )
+        })
         .collect();
     let p = parse(Agent::Claude, &claude);
-    assert!(matches!(p.health(), Health::Broken { .. }), "{:?}", p.health());
+    assert!(
+        matches!(p.health(), Health::Broken { .. }),
+        "{:?}",
+        p.health()
+    );
     let codex: String = (0..40)
-        .map(|i| format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_done\",\"n\":{i}}}}}\n"))
+        .map(|i| {
+            format!("{{\"type\":\"event_msg\",\"payload\":{{\"type\":\"item_done\",\"n\":{i}}}}}\n")
+        })
         .collect();
     let p = parse(Agent::Codex, &codex);
-    assert!(matches!(p.health(), Health::Broken { .. }), "{:?}", p.health());
+    assert!(
+        matches!(p.health(), Health::Broken { .. }),
+        "{:?}",
+        p.health()
+    );
 }
 
 #[test]
 fn a_few_meta_lines_before_the_first_message_are_fine() {
     // A session just started: settings and snapshots, no message yet.
-    let p = parse(Agent::Claude, "{\"type\":\"permission-mode\",\"sessionId\":\"s\"}\n{\"type\":\"file-history-snapshot\",\"messageId\":\"m\"}\n");
+    let p = parse(
+        Agent::Claude,
+        "{\"type\":\"permission-mode\",\"sessionId\":\"s\"}\n{\"type\":\"file-history-snapshot\",\"messageId\":\"m\"}\n",
+    );
     assert_eq!(p.health(), Health::Ok);
 }
 
@@ -422,26 +522,51 @@ fn local_command_output_is_a_note_without_colour_codes_and_empty_output_is_none(
     // As Claude Code 2.1.3xx writes `/usage` and `/fork` (118 records on the
     // desk, all one line); a coloured, multi-line output loses its escapes.
     let mut p = Parser::new(Agent::Claude);
-    p.feed(&claude_line("system", "\"subtype\":\"local_command\",\"level\":\"info\",", "<local-command-stdout></local-command-stdout>"));
-    p.feed(&claude_line("system", "\"subtype\":\"local_command\",\"level\":\"info\",", "<local-command-stdout>⑂ forked plan-review (4cf8)</local-command-stdout>"));
+    p.feed(&claude_line(
+        "system",
+        "\"subtype\":\"local_command\",\"level\":\"info\",",
+        "<local-command-stdout></local-command-stdout>",
+    ));
+    p.feed(&claude_line(
+        "system",
+        "\"subtype\":\"local_command\",\"level\":\"info\",",
+        "<local-command-stdout>⑂ forked plan-review (4cf8)</local-command-stdout>",
+    ));
     p.feed(&claude_line(
         "system",
         "\"subtype\":\"local_command\",",
         "<local-command-stdout>\u{1b}[1mContext\u{1b}[22m\n\u{1b}[38;2;136;136;136m⛁ 61k / 1M\u{1b}[39m (6%)\n</local-command-stdout>",
     ));
     // A subagent's command is not this conversation's.
-    p.feed(&claude_line("system", "\"subtype\":\"local_command\",", "<local-command-stdout>Not mine</local-command-stdout>").replace("\"isSidechain\":false", "\"isSidechain\":true"));
+    p.feed(
+        &claude_line(
+            "system",
+            "\"subtype\":\"local_command\",",
+            "<local-command-stdout>Not mine</local-command-stdout>",
+        )
+        .replace("\"isSidechain\":false", "\"isSidechain\":true"),
+    );
     assert_eq!(
         p.items(),
         &[
-            Item::Note { text: "⑂ forked plan-review (4cf8)".into() },
-            Item::Note { text: "Context\n⛁ 61k / 1M (6%)".into() },
+            Item::Note {
+                text: "⑂ forked plan-review (4cf8)".into()
+            },
+            Item::Note {
+                text: "Context\n⛁ 61k / 1M (6%)".into()
+            },
         ]
     );
 }
 
-fn thinking_line(display: Option<&str>, id: &str, thinking: &str, then_text: Option<&str>) -> String {
-    let mut content = vec![serde_json::json!({"type": "thinking", "thinking": thinking, "signature": "s"})];
+fn thinking_line(
+    display: Option<&str>,
+    id: &str,
+    thinking: &str,
+    then_text: Option<&str>,
+) -> String {
+    let mut content =
+        vec![serde_json::json!({"type": "thinking", "thinking": thinking, "signature": "s"})];
     if let Some(t) = then_text {
         content.push(serde_json::json!({"type": "text", "text": t}));
     }
@@ -461,22 +586,51 @@ fn a_thinking_update_is_its_own_row_and_other_thinking_stays_hidden() {
     // now and then a short note for the person, which its terminal shows.
     let mut p = Parser::new(Agent::Claude);
     p.feed(&thinking_line(Some("updates"), "m1", "", None));
-    p.feed(&thinking_line(Some("updates"), "m2", "  Writing the tests first.  ", None));
+    p.feed(&thinking_line(
+        Some("updates"),
+        "m2",
+        "  Writing the tests first.  ",
+        None,
+    ));
     p.feed(&thinking_line(None, "m3", "raw reasoning", None));
-    p.feed(&thinking_line(Some("summarized"), "m4", "a summary of reasoning", None));
-    assert_eq!(p.items(), &[Item::Update { text: "Writing the tests first.".into() }]);
+    p.feed(&thinking_line(
+        Some("summarized"),
+        "m4",
+        "a summary of reasoning",
+        None,
+    ));
+    assert_eq!(
+        p.items(),
+        &[Item::Update {
+            text: "Writing the tests first.".into()
+        }]
+    );
 }
 
 #[test]
 fn text_after_a_thinking_update_in_one_message_is_its_own_row() {
     let mut p = Parser::new(Agent::Claude);
-    p.feed(&thinking_line(Some("updates"), "m1", "Checking the lookup.", Some("Found it.")));
-    p.feed(&thinking_line(Some("updates"), "m1", "", Some("And fixed it.")));
+    p.feed(&thinking_line(
+        Some("updates"),
+        "m1",
+        "Checking the lookup.",
+        Some("Found it."),
+    ));
+    p.feed(&thinking_line(
+        Some("updates"),
+        "m1",
+        "",
+        Some("And fixed it."),
+    ));
     assert_eq!(
         p.items(),
         &[
-            Item::Update { text: "Checking the lookup.".into() },
-            Item::Assistant { text: "Found it.\n\nAnd fixed it.".into() },
+            Item::Update {
+                text: "Checking the lookup.".into()
+            },
+            Item::Assistant {
+                text: "Found it.\n\nAnd fixed it.".into()
+            },
         ]
     );
 }

@@ -25,7 +25,8 @@ fn claude_log_comes_from_the_pid_file() {
     assert_eq!(
         locate::decide(&p),
         Lookup::Found {
-            path: "/u/.claude/projects/-work-website/aaaaaaaa-1111-4111-8111-111111111111.jsonl".into(),
+            path: "/u/.claude/projects/-work-website/aaaaaaaa-1111-4111-8111-111111111111.jsonl"
+                .into(),
             session: "aaaaaaaa-1111-4111-8111-111111111111".into(),
         }
     );
@@ -35,8 +36,16 @@ fn claude_log_comes_from_the_pid_file() {
 fn claude_writes_proc_start_as_a_string() {
     // As Claude Code 2.1.322-2.1.323 write it: "procStart":"9001".
     let file = PIDFILE.replace("\"procStart\":9001", "\"procStart\":\"9001\"");
-    let p = claude_probe(&file, Some(9001), &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"]);
-    assert!(matches!(locate::decide(&p), Lookup::Found { .. }), "{:?}", locate::decide(&p));
+    let p = claude_probe(
+        &file,
+        Some(9001),
+        &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"],
+    );
+    assert!(
+        matches!(locate::decide(&p), Lookup::Found { .. }),
+        "{:?}",
+        locate::decide(&p)
+    );
     let p = claude_probe(&file, Some(9002), &["/x/a.jsonl"]);
     assert_eq!(locate::decide(&p), Lookup::Missed("process start differs"));
 }
@@ -45,7 +54,11 @@ fn claude_writes_proc_start_as_a_string() {
 fn a_reused_pid_does_not_match() {
     // The file names a process that started at another time: a stale file whose
     // pid now belongs to someone else.
-    let p = claude_probe(PIDFILE, Some(1234), &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"]);
+    let p = claude_probe(
+        PIDFILE,
+        Some(1234),
+        &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"],
+    );
     assert_eq!(locate::decide(&p), Lookup::Missed("process start differs"));
 }
 
@@ -167,9 +180,7 @@ fn a_shell_or_another_program_has_no_log() {
 
 #[test]
 fn the_desk_script_output_parses_into_a_probe() {
-    let out = format!(
-        "name codex\nfd 0 {L1}\nfd 100 {R1}\nfd 0 /dev/pts/3\n"
-    );
+    let out = format!("name codex\nfd 0 {L1}\nfd 100 {R1}\nfd 0 /dev/pts/3\n");
     let p = locate::parse_probe(&out);
     assert_eq!(p.name, "codex");
     assert_eq!(p.codex_open, vec![(L1.into(), 0), (R1.into(), 100)]);
@@ -184,10 +195,17 @@ fn the_desk_script_output_parses_into_a_probe() {
 #[test]
 fn a_launcher_wrapped_agent_is_located_as_that_agent() {
     // An npm install runs as `node .../cli.js`: the process name is node.
-    let mut p = claude_probe(PIDFILE, Some(9001), &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"]);
+    let mut p = claude_probe(
+        PIDFILE,
+        Some(9001),
+        &["/x/aaaaaaaa-1111-4111-8111-111111111111.jsonl"],
+    );
     p.name = "node".into();
     assert_eq!(locate::decide(&p), Lookup::None);
-    assert!(matches!(locate::decide_for(Agent::Claude, &p), Lookup::Found { .. }));
+    assert!(matches!(
+        locate::decide_for(Agent::Claude, &p),
+        Lookup::Found { .. }
+    ));
 }
 
 // ---- the four results (spec: the lookup's results)
@@ -195,58 +213,127 @@ fn a_launcher_wrapped_agent_is_located_as_that_agent() {
 #[test]
 fn an_unreadable_session_file_or_none_at_all_is_missed() {
     let p = claude_probe("{\"pid\":4242,\"procStart\":9001}", Some(9001), &[]);
-    assert!(matches!(locate::decide(&p), Lookup::Missed(_)), "no id: {:?}", locate::decide(&p));
+    assert!(
+        matches!(locate::decide(&p), Lookup::Missed(_)),
+        "no id: {:?}",
+        locate::decide(&p)
+    );
     let p = claude_probe("{\"pid\":42", Some(9001), &[]);
     assert!(matches!(locate::decide(&p), Lookup::Missed(_)), "not JSON");
     let mut p = claude_probe(PIDFILE, Some(9001), &[]);
     p.claude_pidfile = None;
-    assert!(matches!(locate::decide(&p), Lookup::Missed(_)), "no session file");
-    assert!(matches!(locate::decide(&codex_probe(&[])), Lookup::Missed(_)), "no rollout open");
+    assert!(
+        matches!(locate::decide(&p), Lookup::Missed(_)),
+        "no session file"
+    );
+    assert!(
+        matches!(locate::decide(&codex_probe(&[])), Lookup::Missed(_)),
+        "no rollout open"
+    );
 }
 
 #[test]
 fn the_lookup_is_none_without_an_agent_and_missed_when_the_desk_does_not_answer() {
     assert_eq!(locate::lookup(None, Some("name zsh\n")), Lookup::None);
-    assert!(matches!(locate::lookup(Some(Agent::Claude), None), Lookup::Missed(_)));
+    assert!(matches!(
+        locate::lookup(Some(Agent::Claude), None),
+        Lookup::Missed(_)
+    ));
     let out = format!("name claude\npidfile {PIDFILE}\nprocstart 9001\nlog /x/a.jsonl\n");
     assert_eq!(
         locate::lookup(Some(Agent::Claude), Some(&out)),
-        Lookup::Found { path: "/x/a.jsonl".into(), session: "aaaaaaaa-1111-4111-8111-111111111111".into() }
+        Lookup::Found {
+            path: "/x/a.jsonl".into(),
+            session: "aaaaaaaa-1111-4111-8111-111111111111".into()
+        }
     );
 }
 
 #[test]
 fn two_agents_in_one_folder_each_find_their_own_log() {
     let other = PIDFILE
-        .replace("aaaaaaaa-1111-4111-8111-111111111111", "bbbbbbbb-5555-4555-8555-555555555555")
+        .replace(
+            "aaaaaaaa-1111-4111-8111-111111111111",
+            "bbbbbbbb-5555-4555-8555-555555555555",
+        )
         .replace("4242", "4343")
         .replace("9001", "9100");
-    let a = claude_probe(PIDFILE, Some(9001), &["/u/.claude/projects/-work-website/aaaaaaaa-1111-4111-8111-111111111111.jsonl"]);
-    let b = claude_probe(&other, Some(9100), &["/u/.claude/projects/-work-website/bbbbbbbb-5555-4555-8555-555555555555.jsonl"]);
+    let a = claude_probe(
+        PIDFILE,
+        Some(9001),
+        &["/u/.claude/projects/-work-website/aaaaaaaa-1111-4111-8111-111111111111.jsonl"],
+    );
+    let b = claude_probe(
+        &other,
+        Some(9100),
+        &["/u/.claude/projects/-work-website/bbbbbbbb-5555-4555-8555-555555555555.jsonl"],
+    );
     let session = |l: Lookup| match l {
         Lookup::Found { session, .. } => session,
         other => panic!("{other:?}"),
     };
-    assert_eq!(session(locate::decide(&a)), "aaaaaaaa-1111-4111-8111-111111111111");
-    assert_eq!(session(locate::decide(&b)), "bbbbbbbb-5555-4555-8555-555555555555");
+    assert_eq!(
+        session(locate::decide(&a)),
+        "aaaaaaaa-1111-4111-8111-111111111111"
+    );
+    assert_eq!(
+        session(locate::decide(&b)),
+        "bbbbbbbb-5555-4555-8555-555555555555"
+    );
 }
 
 #[test]
 fn the_agent_in_front_by_name_or_by_the_script_node_runs() {
-    assert_eq!(locate::agent_in_front("claude", &["claude", "--continue"]), Some(Agent::Claude));
-    assert_eq!(locate::agent_in_front("codex", &["codex"]), Some(Agent::Codex));
-    let npm = ["node", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"];
+    assert_eq!(
+        locate::agent_in_front("claude", &["claude", "--continue"]),
+        Some(Agent::Claude)
+    );
+    assert_eq!(
+        locate::agent_in_front("codex", &["codex"]),
+        Some(Agent::Codex)
+    );
+    let npm = [
+        "node",
+        "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+    ];
     assert_eq!(locate::agent_in_front("node", &npm), Some(Agent::Claude));
-    assert_eq!(locate::agent_in_front("node", &["node", "/opt/bin/codex", "--no-daemon"]), Some(Agent::Codex));
-    assert_eq!(locate::agent_in_front("node", &["node", "/opt/lib/@openai/codex/bin/codex.js"]), Some(Agent::Codex));
+    assert_eq!(
+        locate::agent_in_front("node", &["node", "/opt/bin/codex", "--no-daemon"]),
+        Some(Agent::Codex)
+    );
+    assert_eq!(
+        locate::agent_in_front("node", &["node", "/opt/lib/@openai/codex/bin/codex.js"]),
+        Some(Agent::Codex)
+    );
     // Node names its main thread: /proc/<pid>/comm reads MainThread.
-    let nvm = ["/home/u/.nvm/versions/node/v24.15.0/bin/node", "/home/u/.npm-global/bin/claude"];
-    assert_eq!(locate::agent_in_front("MainThread", &nvm), Some(Agent::Claude));
-    assert_eq!(locate::agent_in_front("node", &["node", "server.js"]), None, "another node program");
-    assert_eq!(locate::agent_in_front("MainThread", &["/usr/bin/node", "src/cli.mjs", "--live"]), None);
+    let nvm = [
+        "/home/u/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/u/.npm-global/bin/claude",
+    ];
+    assert_eq!(
+        locate::agent_in_front("MainThread", &nvm),
+        Some(Agent::Claude)
+    );
+    assert_eq!(
+        locate::agent_in_front("node", &["node", "server.js"]),
+        None,
+        "another node program"
+    );
+    assert_eq!(
+        locate::agent_in_front("MainThread", &["/usr/bin/node", "src/cli.mjs", "--live"]),
+        None
+    );
     assert_eq!(locate::agent_in_front("zsh", &["-zsh"]), None);
-    assert_eq!(locate::agent_in_front("vim", &["vim", "claude.md"]), None, "an argument named after one is not it");
-    assert_eq!(locate::agent_in_front("less", &["less", "/usr/local/bin/codex"]), None, "only node's script counts");
+    assert_eq!(
+        locate::agent_in_front("vim", &["vim", "claude.md"]),
+        None,
+        "an argument named after one is not it"
+    );
+    assert_eq!(
+        locate::agent_in_front("less", &["less", "/usr/local/bin/codex"]),
+        None,
+        "only node's script counts"
+    );
 }
 
 // ---- Empty turns Missed after the first turn (spec)
@@ -254,7 +341,9 @@ fn the_agent_in_front_by_name_or_by_the_script_node_runs() {
 const SESSION: &str = "aaaaaaaa-1111-4111-8111-111111111111";
 
 fn empty() -> Lookup {
-    Lookup::Empty { session: SESSION.into() }
+    Lookup::Empty {
+        session: SESSION.into(),
+    }
 }
 
 #[test]
@@ -262,18 +351,29 @@ fn empty_turns_missed_when_the_first_turn_ends_without_a_log() {
     let mut g = EmptyGuard::default();
     assert_eq!(g.apply(empty()), empty(), "before any turn");
     g.turn_ended(&empty());
-    assert!(matches!(g.apply(empty()), Lookup::Missed(_)), "a misread id: the terminal, not an empty chat for good");
-    assert!(matches!(g.apply(empty()), Lookup::Missed(_)), "and it stays so");
+    assert!(
+        matches!(g.apply(empty()), Lookup::Missed(_)),
+        "a misread id: the terminal, not an empty chat for good"
+    );
+    assert!(
+        matches!(g.apply(empty()), Lookup::Missed(_)),
+        "and it stays so"
+    );
 }
 
 #[test]
 fn empty_that_finds_its_log_or_a_new_session_is_not_missed() {
     let mut g = EmptyGuard::default();
     g.turn_ended(&empty());
-    let found = Lookup::Found { path: "/x/a.jsonl".into(), session: SESSION.into() };
+    let found = Lookup::Found {
+        path: "/x/a.jsonl".into(),
+        session: SESSION.into(),
+    };
     assert_eq!(g.apply(found.clone()), found);
     // /clear: a new session id, Empty again until its own first turn ends.
-    let fresh = Lookup::Empty { session: "cccccccc-3333-4333-8333-333333333333".into() };
+    let fresh = Lookup::Empty {
+        session: "cccccccc-3333-4333-8333-333333333333".into(),
+    };
     assert_eq!(g.apply(fresh.clone()), fresh);
     // A turn that ended while the log was found judges nothing.
     let mut g = EmptyGuard::default();

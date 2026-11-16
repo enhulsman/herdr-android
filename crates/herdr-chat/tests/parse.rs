@@ -439,3 +439,44 @@ fn local_command_output_is_a_note_without_colour_codes_and_empty_output_is_none(
         ]
     );
 }
+
+fn thinking_line(display: Option<&str>, id: &str, thinking: &str, then_text: Option<&str>) -> String {
+    let mut content = vec![serde_json::json!({"type": "thinking", "thinking": thinking, "signature": "s"})];
+    if let Some(t) = then_text {
+        content.push(serde_json::json!({"type": "text", "text": t}));
+    }
+    let mut v = serde_json::json!({
+        "type": "assistant", "isSidechain": false, "sessionId": "s",
+        "message": {"id": id, "role": "assistant", "content": content},
+    });
+    if let Some(d) = display {
+        v["thinkingDisplay"] = d.into();
+    }
+    format!("{v}\n")
+}
+
+#[test]
+fn a_thinking_update_is_its_own_row_and_other_thinking_stays_hidden() {
+    // Claude Code with thinking shown as updates stores most thinking empty and
+    // now and then a short note for the person, which its terminal shows.
+    let mut p = Parser::new(Agent::Claude);
+    p.feed(&thinking_line(Some("updates"), "m1", "", None));
+    p.feed(&thinking_line(Some("updates"), "m2", "  Writing the tests first.  ", None));
+    p.feed(&thinking_line(None, "m3", "raw reasoning", None));
+    p.feed(&thinking_line(Some("summarized"), "m4", "a summary of reasoning", None));
+    assert_eq!(p.items(), &[Item::Update { text: "Writing the tests first.".into() }]);
+}
+
+#[test]
+fn text_after_a_thinking_update_in_one_message_is_its_own_row() {
+    let mut p = Parser::new(Agent::Claude);
+    p.feed(&thinking_line(Some("updates"), "m1", "Checking the lookup.", Some("Found it.")));
+    p.feed(&thinking_line(Some("updates"), "m1", "", Some("And fixed it.")));
+    assert_eq!(
+        p.items(),
+        &[
+            Item::Update { text: "Checking the lookup.".into() },
+            Item::Assistant { text: "Found it.\n\nAnd fixed it.".into() },
+        ]
+    );
+}

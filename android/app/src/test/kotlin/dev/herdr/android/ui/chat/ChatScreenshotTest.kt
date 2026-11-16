@@ -121,6 +121,12 @@ class ChatScreenshotTest {
     fun conversation() = capture("conversation", poll())
 
     @Test
+    fun thinkingUpdate() = capture(
+        "update",
+        poll(rows = rows.take(3) + row("150:0", "update", "The retry counter starts at the limit, so the loop never runs again; checking the test next.") + rows.drop(3)),
+    )
+
+    @Test
     fun noMessagesYet() = capture("empty", poll(rows = emptyList(), found = ChatFound.EMPTY, used = null))
 
     @Test

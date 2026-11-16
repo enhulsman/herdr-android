@@ -55,7 +55,7 @@ fn main() {
                 running += c.iter().filter(|c| !c.done).count();
                 img += c.iter().map(|c| c.images.len()).sum::<usize>()
             }
-            Item::Note { .. } => notes += 1,
+            Item::Note { .. } | Item::Update { .. } => notes += 1,
         }
     }
     println!(

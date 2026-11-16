@@ -459,6 +459,13 @@ class ChatPendingTest {
     }
 
     @Test
+    fun aThinkingUpdateLeavesTheAnswerToCome() {
+        val updated = turn + ChatRow("3:0", "update", "Writing the tests first.", "", emptyList(), emptyList())
+        val end = nextTurnEnd(null, "working", updated, "idle", updated, now = 10_000)
+        assertTrue("an update is not the answer", busy("idle", emptyList(), now = 10_000, ending = end))
+    }
+
+    @Test
     fun anAnswerReadWithTheIdleStatusHoldsNothing() {
         val answered = turn + said("3:0", "Done.")
         assertNull(nextTurnEnd(null, "working", turn, "done", answered, now = 10_000))

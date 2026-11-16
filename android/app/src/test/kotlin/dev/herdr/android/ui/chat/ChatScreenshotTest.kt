@@ -104,7 +104,7 @@ class ChatScreenshotTest {
             val s = state()
             captureRoboImage("src/test/snapshots/chat-$scene-${if (dark) "graphite" else "paper"}.png") {
                 HerdrTheme(dark = dark) {
-                    ChatScreen(header, actions, poll, s, source, now, onTerminal = {}, onPick = {}, onSend = {}, animate = false)
+                    ChatScreen(header, actions, poll, s, source, { now }, onTerminal = {}, onPick = {}, onSend = {}, animate = false)
                 }
             }
         }

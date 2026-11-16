@@ -11,20 +11,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.ui.agents.AgentKey
+import dev.herdr.android.ui.components.rememberStarted
+import dev.herdr.android.ui.components.rememberUptimeTicker
 import dev.herdr.android.ui.terminal.TerminalActions
 import dev.herdr.android.ui.terminal.TerminalHeader
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -136,19 +135,15 @@ fun ChatRoute(visit: ChatVisit, app: HerdrApp, header: TerminalHeader, actions: 
         }
     }
     val images = remember(visit) { DeskImages(visit.chat) }
-    val animate = remember(context) {
+    val motion = remember(context) {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
     }
+    // Loops run only on a started screen: with the screen off they kept the main thread busy.
+    val animate = motion && rememberStarted()
     // The clock for pending messages and the working line, ticking only while something waits.
-    var now by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
     val waiting = state.pending.isNotEmpty() || state.poll?.status == "working" || state.turnEnd != null
-    LaunchedEffect(waiting) {
-        now = SystemClock.uptimeMillis()
-        while (waiting) {
-            delay(250)
-            now = SystemClock.uptimeMillis()
-        }
-    }
+    val clock = rememberUptimeTicker(waiting, everyMs = 250)
+    val now = remember(clock) { { clock.value } }
     BackHandler(enabled = state.viewer != null || state.sheet != null) {
         when {
             state.viewer != null -> state.viewer = null

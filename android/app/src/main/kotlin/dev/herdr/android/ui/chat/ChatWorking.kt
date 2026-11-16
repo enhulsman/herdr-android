@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -66,16 +67,18 @@ private fun loop(animate: Boolean, ms: Int, still: Float, label: String): State<
 
 /**
  * Sheep hopping a fence, and the verb of the moment, counted from when the
- * line first showed. [now] is the screen's clock (uptime ms), ticked by the
- * route while the agent works; [animate] false holds the sheep still.
+ * line first showed. [now] reads the screen's clock (uptime ms), ticked by the
+ * route while the agent works; the line recomposes only when the verb
+ * changes. [animate] false holds the sheep still.
  */
 @Composable
-fun WorkingLine(now: Long, animate: Boolean, modifier: Modifier = Modifier) {
+fun WorkingLine(now: () -> Long, animate: Boolean, modifier: Modifier = Modifier) {
     val c = HerdrTheme.colors
-    val start = remember { now }
+    val start = remember { now() }
+    val verb by remember { derivedStateOf { workingVerb(now() - start) } }
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         HerdHop(c.fg, c.dimText, animate)
-        BasicText("${workingVerb(now - start)}…", style = HerdrType.secondary.copy(color = c.dimText))
+        BasicText("$verb…", style = HerdrType.secondary.copy(color = c.dimText))
     }
 }
 
@@ -83,7 +86,8 @@ fun WorkingLine(now: Long, animate: Boolean, modifier: Modifier = Modifier) {
 private fun HerdHop(sheep: Color, fence: Color, animate: Boolean) {
     // Held still with the first sheep over the fence.
     val t by loop(animate, 2_100, still = 0.5f, label = "hop")
-    Canvas(Modifier.size(width = 40.dp, height = 18.dp)) {
+    // Its own layer: each frame redraws the sheep alone, not every row in view.
+    Canvas(Modifier.size(width = 40.dp, height = 18.dp).graphicsLayer()) {
         val w = size.width
         val ground = size.height - 2.dp.toPx()
         val r = 2.6.dp.toPx()

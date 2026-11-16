@@ -135,7 +135,10 @@ class ChatScreenshotTest {
     fun notArrived() = capture("not-arrived", poll()) { sent("Run the tests again", ago = 31_000) }
 
     @Test
-    fun waitingLine() = capture("waiting", poll()) { sent("/usage", ago = 4_000) }
+    fun waitingLine() = capture("waiting", poll()) {
+        // The screen shows the /usage dialog in place of the input box.
+        sent("/usage", ago = 4_000).apply { sawScreen("claude", listOf("   Esc to cancel"), now) }
+    }
 
     @Test
     fun refusedSend() = capture("refused", poll(status = "blocked")) {

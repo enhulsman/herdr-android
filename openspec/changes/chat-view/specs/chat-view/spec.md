@@ -425,15 +425,21 @@ Claude Code's slash command output (its local command output) SHALL show as
 a note. When a slash command has no row after 3 s, the chat SHALL show
 "Waiting for the terminal: /<command> may have opened a dialog there." with
 a button to the terminal and a Dismiss, kept in view while the chat follows
-the bottom. While that line shows and the agent's status has not changed
+the bottom. From those 3 s until the line ends, while the agent's status has not changed
 since the command was sent (done and idle count as the same, and the
 "working" the send itself causes in its first second is not a change), the
 message box SHALL refuse to send with
 "Answer the dialog in the terminal first" and the terminal button, keeping
-the draft. The line SHALL end when the command's row arrives, the status
-changes, or the person taps Dismiss. A dialog opened at the desk, or one
-whose line was dismissed, is not seen by the chat; a send may then land in
-it (a known limit).
+the draft. The line SHALL show only once the terminal's screen, read at or
+after those 3 s, shows no free input box, and SHALL end when the command's
+row arrives, the status changes, the screen shows the agent's input box free,
+or the person taps Dismiss. The box is free when Claude Code's input box
+between its last two rules holds nothing after the prompt mark (its dialogs
+replace the box), or when Codex's status footer shows under its last prompt
+(its pickers replace the footer). Some commands only print into the
+terminal (Codex's `/status`), so their line never shows. A dialog opened at
+the desk, or one whose line was dismissed, is not seen by the chat; a send
+may then land in it (a known limit).
 
 #### Scenario: /usage
 - **WHEN** Ezra sends `/usage` to Claude Code and its dialog opens in the terminal
@@ -442,6 +448,14 @@ it (a known limit).
 #### Scenario: A slash command that writes no row
 - **WHEN** a slash command writes no row and leaves the status as it was
 - **THEN** after Dismiss the waiting line is gone and a send goes through
+
+#### Scenario: A command that only prints
+- **WHEN** Ezra sends `/status` to Codex, which prints it into the terminal and leaves its input box free
+- **THEN** no waiting line shows and the next send goes through
+
+#### Scenario: The dialog closed at the desk
+- **WHEN** the waiting line shows and the dialog is closed at the desk
+- **THEN** the line ends once the screen shows the input box free
 
 #### Scenario: A shell command
 - **WHEN** Ezra sends `!git status`

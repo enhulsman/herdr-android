@@ -160,6 +160,12 @@ class ChatState {
         return p.id
     }
 
+    /** The terminal's screen read at [now]: a slash command's wait ends at a free input box. */
+    fun sawScreen(agent: String, lines: List<String>, now: Long) {
+        val seen = pending.map { it.boxSeen(agent, lines, now) }
+        if (seen != pending) pending = seen
+    }
+
     fun update(id: Long, change: (Pending) -> Pending) {
         pending = pending.map { if (it.id == id) change(it) else it }
     }

@@ -95,6 +95,7 @@ fun ChatPolling(visit: ChatVisit, app: HerdrApp, screen: () -> List<String>) {
                     val now = SystemClock.uptimeMillis()
                     if (showing) {
                         state.pending = followPending(state.pending, p.rows, p.status, now, queuedBy(p, screen))
+                        if (state.pending.any { it.waitOpen }) state.sawScreen(p.agent, screen(), now)
                         if (state.enterAgain(p.agent, screen(), now, canSend = p.canSend && !p.exited) != null) {
                             withContext(Dispatchers.IO) { chat.enterAgain() }
                         }

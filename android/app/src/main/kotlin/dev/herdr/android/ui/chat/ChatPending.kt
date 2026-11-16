@@ -90,11 +90,16 @@ data class Pending(
         return now - typed >= ARRIVE_MS
     }
 
-    /** The slash command shows nothing yet: it most likely opened a dialog in the terminal. */
-    fun waiting(now: Long): Boolean {
-        val typed = typedAt ?: return false
-        return slash && !waitDismissed && !statusChanged && now - typed >= WAIT_MS
-    }
+    /** A slash command whose wait has not ended (dismissed, or the status moved); it may not have begun. */
+    val waitOpen: Boolean get() = slash && !waitDismissed && !statusChanged
+
+    /**
+     * The slash command shows nothing yet: it most likely opened a dialog in
+     * the terminal. Counted from the tap: `terminal.send` answers a command
+     * that never starts working only after the core has watched it for a few
+     * seconds, and a second send meanwhile would land in the dialog.
+     */
+    fun waiting(now: Long): Boolean = waitOpen && now - sentAt >= WAIT_MS
 
     val waitingText: String
         get() = "Waiting for the terminal: ${trimmed.substringBefore(' ')} may have opened a dialog there."

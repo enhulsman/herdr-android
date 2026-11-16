@@ -20,6 +20,36 @@ class ChatStateTest {
     private fun tools(key: String, vararg calls: ChatCall) = ChatRow(key, "tools", "", "", emptyList(), calls.toList())
 
     @Test
+    fun theDialogRefusalGoesWhenTheWaitingLineEnds() {
+        // Seen on the test phone: after Dismiss the line went, but
+        // "Answer the dialog in the terminal first" stayed under it.
+        val s = ChatState()
+        s.draft = "/usage"
+        val out = s.send(emptyList(), "idle", now = 0)!!
+        s.typed(out.pending.id, now = 5_000)
+        s.draft = "hi"
+        assertNull(s.send(emptyList(), "idle", now = 5_500))
+        assertEquals(DIALOG_FIRST, s.refusal?.text)
+        s.update(out.pending.id) { it.dismissWait() }
+        assertNull("dismissed", s.refusal)
+        assertEquals("the draft stays", "hi", s.draft)
+
+        val r = ChatState()
+        r.draft = "/usage"
+        r.send(emptyList(), "idle", now = 0)!!
+        r.draft = "hi"
+        r.send(emptyList(), "idle", now = 3_500)
+        assertEquals(DIALOG_FIRST, r.refusal?.text)
+        r.pending = emptyList()
+        assertNull("its row arrived", r.refusal)
+
+        val other = ChatState()
+        other.refusal = refusalOf(ChatRefusal.Exited)
+        other.pending = emptyList()
+        assertEquals("other refusals stay", refusalOf(ChatRefusal.Exited), other.refusal)
+    }
+
+    @Test
     fun oneToolOpensItsDetailAtOnce() {
         val s = ChatState()
         val one = tools("10:0", call("Run the tests"))

@@ -12,8 +12,9 @@
 #   scripts/fake-agent.sh stop            end and remove it
 #   scripts/fake-agent.sh --print <state> the bytes it would print (tests)
 #
-# herdr-push sends no alert for it: it alerts only for terminals in a Herdr app
-# pane. Use a real agent's "Finished" alert to check alerts.
+# Where a Herdr app layout exists, herdr-push sends no alert for it (it alerts
+# only for terminals in a Herdr app pane): use a real agent's "Finished" alert
+# there. On a machine with no layout, `set blocked` does alert.
 set -euo pipefail
 name=phonecheck
 fifo=${FAKE_AGENT_FIFO:-${XDG_RUNTIME_DIR:-/tmp}/herdr-fake-agent.fifo}

@@ -1,6 +1,7 @@
 # Releasing
 
-How a release reaches the phone, and what you check before installing it.
+How the maintainer makes a release. To install the app or `herdr-push`, see
+[install.md](install.md).
 The rules behind this are in `openspec/changes/android-client-v1/specs/release/spec.md`.
 
 ## Making a release
@@ -44,35 +45,13 @@ this; the script's header says how.
   `docs/release-signing-fingerprint.txt`. Until then every release stops before
   publishing.
 
-## Before installing an update
+## Checking a release you made
 
-Obtainium shows the update; it does not install it. Before tapping install, open
-the release on GitHub:
+Before installing a release on your own phone, open it on GitHub:
 
 1. The tag is one you pushed (its name and time match what you did).
-2. Its notes name a commit ("Built from commit ..."). Open that commit: GitHub
-   lists `main` among the branches that contain it.
+2. The checks for every user in [install.md](install.md#checking-a-release)
+   pass: its commit is on `main`, and the APK's certificate matches.
 
 If either check fails, do not install, and look at the repository's recent
 pushes and workflow runs.
-
-## Obtainium setup
-
-1. In Obtainium, add the app by this repository's GitHub URL.
-2. Optional: GitHub limits how often Obtainium may check without a token. If
-   checks fail, create a fine-grained personal access token with repository
-   access "Public repositories" and nothing else, and add it under Obtainium's
-   GitHub source settings.
-3. Leave background installing off. Obtainium may check for updates and notify
-   you, but you install by hand after the checks above.
-
-## Checking herdr-push on a machine
-
-```
-sha256sum --check --ignore-missing SHA256SUMS
-ssh-keygen -Y verify -f allowed_signers -I herdr-push -n herdr-push \
-  -s herdr-push-$(uname -m).sig < herdr-push-$(uname -m)
-```
-
-`allowed_signers` holds one line: `herdr-push` followed by the public half of
-`HERDR_PUSH_SIGNING_KEY`.

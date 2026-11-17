@@ -65,6 +65,7 @@ class ChatState {
     var olderLoads by mutableIntStateOf(0)
     var gaugeOpen by mutableStateOf(false)
     val live = LiveRows()
+    val announced = Announced()
     private var ids = 0L
 
     /** Where the chat was left: the first row in view and how far it was scrolled; null at the bottom. */

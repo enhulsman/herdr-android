@@ -98,7 +98,7 @@ class Alerts(
         if (store.registration == null) return
         for (machine in store.enrolled()) {
             val m = store.machine(machine)
-            val last = m.lastPushMs ?: continue
+            val last = m.lastPushMs ?: m.enrolledMs ?: continue
             if (nowMs - last < SILENCE_MS || m.healthShownForMs == last) continue
             store.markHealthShown(machine, last)
             sink.post(

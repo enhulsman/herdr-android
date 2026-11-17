@@ -175,7 +175,7 @@ class MachineStatusTest {
     fun anOlderCoreNamesBothVersionsAndOffersTryAgain() {
         val c = card(MachineState.TooOld(have = "0.1.2", need = "0.1.10"))
         assertEquals("herdr-core 0.1.2 is older than this app supports", c.statusText)
-        assertEquals("Update it to 0.1.10 or newer, then try again.", c.detail)
+        assertEquals("Update it to 0.1.10 or newer (herdr-core update on the machine), then try again.", c.detail)
         assertEquals(CardButton.TryAgain, c.button)
     }
 

@@ -259,6 +259,14 @@ class AlertsTest {
     }
 
     @Test
+    fun aSilentEnrolledMachineGetsOneNoticeNotOnePerCheck() {
+        store.enroll("workstation", NOW)
+        alerts.checkSilence(NOW + 13 * HOUR)
+        alerts.checkSilence(NOW + 14 * HOUR)
+        assertEquals(1, sink.posted.size)
+    }
+
+    @Test
     fun aMutedMachineStillGetsTheHealthNotice() {
         store.setMuted("workstation", true)
         store.enroll("workstation", NOW)

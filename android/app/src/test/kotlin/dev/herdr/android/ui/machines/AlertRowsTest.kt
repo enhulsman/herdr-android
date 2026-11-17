@@ -111,6 +111,14 @@ class AlertRowsTest {
     }
 
     @Test
+    fun theRegistrationTimeIsNotShownAsAPush() {
+        // Issue 21: "Registered, no push yet · last push here 12:32" with no push ever.
+        val m = MachineAlerts(enrolledMs = NOW - 300_000)
+        assertEquals("Registered, no push yet", card(view(status = status(null)), machine = m).alerts?.detail)
+        assertEquals("No answer from herdr-push", card(view(status = null), machine = m).alerts?.detail)
+    }
+
+    @Test
     fun connectedWithoutAStatusDocumentMeansNoWatcher() {
         assertEquals("No answer from herdr-push", card(view(status = null)).alerts?.detail)
     }
@@ -159,7 +167,7 @@ class AlertRowsTest {
     fun theTestRowFollowsTheRequest() {
         fun test(m: MachineAlerts, now: Long = NOW) = card(view(status = status("accepted 200")), machine = m, nowMs = now).test?.detail
         assertEquals("Waiting for the test alert", test(MachineAlerts(testAskedMs = NOW - 29_000)))
-        assertEquals("No test alert within 30 s", test(MachineAlerts(testAskedMs = NOW - 30_000)))
+        assertEquals("No test alert within 30 s · is herdr-push running there?", test(MachineAlerts(testAskedMs = NOW - 30_000)))
         assertEquals("Test received at-2", test(MachineAlerts(testAskedMs = NOW - 5_000, testReceivedMs = NOW - 2_000)))
         // An answer to an earlier request does not count for the new one.
         assertEquals("Waiting for the test alert", test(MachineAlerts(testAskedMs = NOW - 1_000, testReceivedMs = NOW - 9_000)))

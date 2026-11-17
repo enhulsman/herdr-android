@@ -24,9 +24,11 @@ sealed interface AlertSetup {
 /** What the phone recorded about one machine's alerts; times are ms since the epoch. */
 data class MachineAlerts(
     val muted: Boolean = false,
-    /** The last push of any kind from it, or when it was first registered there (the silence baseline). */
+    /** The last push of any kind from it; never the registration time (issue 21). */
     val lastPushMs: Long? = null,
-    /** The [lastPushMs] the "Alert health" notice was posted for: one notice per silence. */
+    /** When it first had the phone's registration: the silence baseline until a push comes. */
+    val enrolledMs: Long? = null,
+    /** The silence baseline the "Alert health" notice was posted for: one notice per silence. */
     val healthShownForMs: Long? = null,
     val testAskedMs: Long? = null,
     val testReceivedMs: Long? = null,
@@ -92,6 +94,7 @@ class PushStore(private val prefs: SharedPreferences) {
     fun machine(name: String): MachineAlerts = MachineAlerts(
         muted = prefs.getBoolean(MUTED + name, false),
         lastPushMs = long(LAST_PUSH + name),
+        enrolledMs = long(ENROLLED + name),
         healthShownForMs = long(HEALTH + name),
         testAskedMs = long(TEST_ASKED + name),
         testReceivedMs = long(TEST_RECEIVED + name),
@@ -103,12 +106,14 @@ class PushStore(private val prefs: SharedPreferences) {
 
     /** The machine has the phone's registration: silence counts from now unless a push came before. */
     fun enroll(name: String, nowMs: Long) {
-        if (!prefs.contains(LAST_PUSH + name)) recordPush(name, nowMs)
+        if (!prefs.contains(ENROLLED + name)) write { putLong(ENROLLED + name, nowMs) }
     }
 
-    /** The machines the silence check watches. */
+    /** The machines the silence check watches: registered there, or heard from. */
     fun enrolled(): List<String> =
-        prefs.all.keys.filter { it.startsWith(LAST_PUSH) }.map { it.removePrefix(LAST_PUSH) }.sorted()
+        prefs.all.keys.mapNotNull { key ->
+            listOf(LAST_PUSH, ENROLLED).firstOrNull { key.startsWith(it) }?.let { key.removePrefix(it) }
+        }.distinct().sorted()
 
     fun markHealthShown(name: String, forMs: Long) = write { putLong(HEALTH + name, forMs) }
 
@@ -135,10 +140,11 @@ class PushStore(private val prefs: SharedPreferences) {
         private const val PERMISSION_ASKED = "permission-asked"
         private const val MUTED = "machine.muted/"
         private const val LAST_PUSH = "machine.last-push/"
+        private const val ENROLLED = "machine.enrolled/"
         private const val HEALTH = "machine.health-shown/"
         private const val TEST_ASKED = "machine.test-asked/"
         private const val TEST_RECEIVED = "machine.test-received/"
-        private val MACHINE_PREFIXES = listOf(MUTED, LAST_PUSH, HEALTH, TEST_ASKED, TEST_RECEIVED)
+        private val MACHINE_PREFIXES = listOf(MUTED, LAST_PUSH, ENROLLED, HEALTH, TEST_ASKED, TEST_RECEIVED)
 
         fun open(context: Context) = PushStore(context.getSharedPreferences("alerts", Context.MODE_PRIVATE))
     }

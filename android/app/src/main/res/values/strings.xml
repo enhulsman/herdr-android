@@ -132,7 +132,7 @@
     <!-- Wording from the machine-connection spec ("herdr-core missing", "Older core"). -->
     <string name="status_not_installed">herdr-core not found on this machine</string>
     <string name="status_too_old">herdr-core %1$s is older than this app supports</string>
-    <string name="status_too_old_detail">Update it to %1$s or newer, then try again.</string>
+    <string name="status_too_old_detail">Update it to %1$s or newer (herdr-core update on the machine), then try again.</string>
     <string name="status_app_too_old">This app is too old for this machine\'s herdr-core</string>
     <string name="status_app_too_old_detail">Update the app to connect.</string>
     <!-- decisions.md 2026-11-01: GrapheneOS's per-app Network permission. -->
@@ -313,5 +313,5 @@
     <string name="alerts_test_idle">Checks the whole path to this phone</string>
     <string name="alerts_test_waiting">Waiting for the test alert</string>
     <string name="alerts_test_received">Test received %1$s</string>
-    <string name="alerts_test_missed">No test alert within 30 s</string>
+    <string name="alerts_test_missed">No test alert within 30 s · is herdr-push running there?</string>
 </resources>

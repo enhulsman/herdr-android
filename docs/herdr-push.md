@@ -100,9 +100,9 @@ path from the machine to the phone.
 7. In the app, tap "Turn on" on a machine card's Alerts row. It asks to allow
    notifications, then which UnifiedPush app to use if you have more than one.
    Then tap "Send" on "Send test alert"; the row says "Test received" when the
-   alert arrives. Until herdr-push runs on the machine, the row says "No
-   answer from herdr-push" and the test ends with "No test alert within 30 s";
-   a test sent then arrives once herdr-push starts.
+   alert arrives. Until herdr-push runs on the machine, the row says "No answer
+   from herdr-push" and the test ends with "No test alert within 30 s · is
+   herdr-push running there?"; a test sent then arrives once herdr-push starts.
 
 ## Checking it
 

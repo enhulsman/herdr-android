@@ -61,6 +61,10 @@ changes between releases.
 - herdr-core 0.1.15 or newer on a Linux or WSL machine, with an OpenSSH server
   the phone can reach (for example over Tailscale). Tailscale SSH does not work:
   it ignores the phone key.
+  Each release of the app is tested against herdr-core 0.1.15 and the newest
+  herdr-core of the day, and has been used daily with every version from 0.1.15
+  to 0.1.21. A newer herdr-core connects too; an older one is refused with a
+  message to update to 0.1.15 or newer.
 - For alerts: an ntfy server, the ntfy app on the phone, and `herdr-push` on
   each machine.
 - To install and update: [Obtainium](https://github.com/ImranR98/Obtainium).

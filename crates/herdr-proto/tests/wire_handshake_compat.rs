@@ -332,3 +332,22 @@ fn uses_lists_every_method_the_phone_calls() {
         .collect();
     assert!(missing.is_empty(), "called but not in USES: {missing:?}");
 }
+
+// ---- the supported range as the README states it (issue 25) ----
+
+#[test]
+fn the_readme_states_the_supported_range_from_min_core() {
+    let readme =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../README.md")).unwrap();
+    // Wrapped lines read as one line.
+    let readme = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+    let range = format!("herdr-core {} or newer", compat::MIN_CORE);
+    assert!(readme.contains(&range), "README must say \"{range}\"");
+    assert!(
+        readme.contains(&format!(
+            "refused with a message to update to {}",
+            compat::MIN_CORE
+        )),
+        "README must say what an older core gets"
+    );
+}

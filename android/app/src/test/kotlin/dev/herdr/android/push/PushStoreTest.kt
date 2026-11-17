@@ -57,11 +57,38 @@ class PushStoreTest {
         val s = open()
         s.enroll("workstation", 100)
         s.enroll("workstation", 200)
-        assertEquals(100L, s.machine("workstation").lastPushMs)
+        assertEquals(100L, s.machine("workstation").enrolledMs)
         s.recordPush("workstation", 300)
         s.enroll("workstation", 400)
+        assertEquals(100L, s.machine("workstation").enrolledMs)
         assertEquals(300L, s.machine("workstation").lastPushMs)
         assertEquals(listOf("workstation"), s.enrolled())
+    }
+
+    @Test
+    fun enrollingIsNotAPush() {
+        // Issue 21: the Alerts row showed "last push here" for the registration time.
+        val s = open()
+        s.enroll("workstation", 100)
+        assertEquals(null, s.machine("workstation").lastPushMs)
+        assertEquals(listOf("workstation"), s.enrolled())
+    }
+
+    @Test
+    fun aMachineWithOnlyAPushIsEnrolledToo() {
+        val s = open()
+        s.recordPush("server", 100)
+        s.enroll("workstation", 200)
+        assertEquals(listOf("server", "workstation"), s.enrolled())
+    }
+
+    @Test
+    fun aRemovedMachineTakesItsBaselineWith() {
+        val s = open()
+        s.enroll("workstation", 100)
+        s.keepMachines(emptySet())
+        assertEquals(MachineAlerts(), s.machine("workstation"))
+        assertEquals(emptyList<String>(), s.enrolled())
     }
 
     @Test

@@ -134,7 +134,7 @@ fun ChatScreen(
 ) {
     val c = HerdrTheme.colors
     // An exited agent's conversation stays, read-only (its lookup reads None).
-    val found = poll != null && (poll.found == ChatFound.FOUND || poll.found == ChatFound.EMPTY || poll.exited)
+    val found = !chatLooking(poll) && poll != null && (poll.found == ChatFound.FOUND || poll.found == ChatFound.EMPTY || poll.exited)
     val broken = poll?.health is ChatHealth.Broken
     Box(modifier.fillMaxSize().background(c.bg).coversBelow()) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
@@ -147,7 +147,7 @@ fun ChatScreen(
             if (found && poll?.health == ChatHealth.Degraded) Strip(DEGRADED)
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when {
-                    poll == null -> Centered(LOOKING)
+                    chatLooking(poll) -> Centered(LOOKING)
                     !found -> Centered(NO_CONVERSATION, onTerminal)
                     else -> Messages(poll, state, images, now, animate, onOlder, onTerminal)
                 }

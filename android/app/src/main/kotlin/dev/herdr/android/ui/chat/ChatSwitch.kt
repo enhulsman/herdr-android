@@ -18,26 +18,32 @@ fun switchShown(poll: ChatPoll, before: Boolean): Boolean {
     return found && (poll.health !is ChatHealth.Broken || before)
 }
 
+/** "Looking for the conversation…" until the desk has answered a lookup. */
+fun chatLooking(poll: ChatPoll?): Boolean = poll == null || !poll.answered
+
 /**
  * Which view one visit to a terminal shows, and whether the switch is
  * offered. [chosen] is the view chosen last, for every agent: with Chat
  * chosen a terminal opens on its chat when it has one, else on its terminal.
  * Until the first poll the chat shows as held ([held], design D12) or
- * "Looking for the conversation…"; the first poll decides, and after it only
- * a tap changes the view: an agent started in a watched shell leaves the
- * terminal on screen, and an exit or a lost log is said in the chat, never
- * by switching back unasked.
+ * "Looking for the conversation…"; the first answered poll decides, and
+ * after it only a tap changes the view: an agent started in a watched shell
+ * leaves the terminal on screen, and an exit or a lost log is said in the
+ * chat, never by switching back unasked. A poll the desk has not answered
+ * (the machine still connecting, issue 58) decides nothing.
  */
 class ChatSwitch(chosen: Boolean, held: ChatPoll?) {
     var chosen by mutableStateOf(chosen)
         private set
-    var offered by mutableStateOf(held?.let { switchShown(it, before = false) } ?: false)
+    private val answered = held?.takeIf { it.answered }
+    var offered by mutableStateOf(answered?.let { switchShown(it, before = false) } ?: false)
         private set
-    var chat by mutableStateOf(chosen && (held == null || offered))
+    var chat by mutableStateOf(chosen && (answered == null || offered))
         private set
     private var settled = false
 
     fun onPoll(poll: ChatPoll) {
+        if (!poll.answered) return
         offered = switchShown(poll, before = offered)
         if (!settled) {
             chat = chosen && offered

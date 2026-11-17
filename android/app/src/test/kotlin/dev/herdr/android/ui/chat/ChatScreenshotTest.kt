@@ -94,7 +94,7 @@ class ChatScreenshotTest {
         percent: UInt? = null,
         queued: List<String> = emptyList(),
     ) = ChatPoll(
-        found = found, agent = agent, title = "Upload retry fix", version = "2.1.325", status = status, health = health,
+        found = found, answered = true, agent = agent, title = "Upload retry fix", version = "2.1.325", status = status, health = health,
         problem = problem, exited = exited, canSend = !exited, cut = false, rows = rows,
         gaugeUsed = used, gaugeWindow = window, gaugePercent = percent, queued = queued, timings = "",
     )

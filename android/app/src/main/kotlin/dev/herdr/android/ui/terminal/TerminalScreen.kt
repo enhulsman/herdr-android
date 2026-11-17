@@ -72,8 +72,6 @@ import dev.herdr.android.R
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.ProgramIcon
 import dev.herdr.android.ui.agents.ProgramMark
-import dev.herdr.android.ui.agents.SheetTone
-import dev.herdr.android.ui.agents.StatePill
 import dev.herdr.android.ui.changes.ChangesButton
 import dev.herdr.android.ui.chat.ViewSwitch
 import dev.herdr.android.ui.components.Chevron
@@ -97,13 +95,11 @@ import kotlin.math.floor
 // (components.terminalTitleBar, queueStrip, watchingChip, sizeTag, keysRow,
 // composeSheet; layout.terminalPadding, terminalFit).
 
-/** The title bar's agent: name, mark, "folder · machine" and its state pill (none without status). */
+/** The title bar's agent: name, mark and "folder · machine"; its state shows on the screen below, not here (issue 57). */
 data class TerminalHeader(
     val name: String,
     val icon: ProgramIcon,
     val lineTwo: String,
-    val state: String?,
-    val tone: SheetTone,
 )
 
 data class TerminalUi(val key: AgentKey, val header: TerminalHeader, val queue: QueueStrip?)
@@ -228,7 +224,7 @@ interface TerminalInputHandle {
 // --- Title bar and queue strip ---------------------------------------------
 
 /**
- * The terminal's title bar, also the chat's: back, icon, name, status pill,
+ * The terminal's title bar, also the chat's: back, icon, name (no status pill, issue 57),
  * then [trailing] (the chat's gauge, the view switch); swipes step through
  * the agents.
  */
@@ -290,7 +286,6 @@ internal fun TitleBar(header: TerminalHeader, actions: TerminalActions, trailing
             BasicText(header.name, style = HerdrType.terminalTitle.copy(color = c.fg), maxLines = 1, overflow = TextOverflow.Ellipsis)
             BasicText(header.lineTwo, style = HerdrType.secondary.copy(color = c.dimText), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (header.state != null && header.tone != SheetTone.None) StatePill(header.state, header.tone)
         trailing()
     }
 }

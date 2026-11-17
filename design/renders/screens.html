@@ -360,7 +360,6 @@ const ttop = (status='blocked') => `
     <button class="iconbtn" aria-label="Back" style="color:var(--fg)">${ico.back}</button>
     <img src="icons/claude.svg" style="width:20px;height:20px;margin-right:6px" alt="">
     <div class="txt"><span class="name">docs nav</span><span class="sub">website · workstation</span></div>
-    <span class="pill blocked">Needs you</span>
   </div>
   <div class="queue"><b>1 more needs you</b><span class="rest">· next: api tests, question</span>${ico.up}</div>`;
 
@@ -592,7 +591,6 @@ const ctitle = (view, hint=false) => `
     <button class="iconbtn" aria-label="Back" style="color:var(--fg)">${ico.back}</button>
     <img src="icons/claude.svg" style="width:20px;height:20px;margin-right:6px" alt="">
     <div class="txt" style="min-width:0"><span class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs nav</span><span class="sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">website · workstation</span></div>
-    <span class="pill blocked">Needs you</span>
     ${view==='chat'?'<span class="gauge">48k</span>':''}
     <span class="chg${hint?' hint':''}" aria-label="Show the files this agent changed">${ico.changes}</span>
     <span class="vswitch">${view==='chat'?'Terminal':'Chat'}</span>

@@ -25,7 +25,6 @@ import dev.herdr.android.HerdrApp
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.AgentsHome
 import dev.herdr.android.ui.agents.ProgramIcon
-import dev.herdr.android.ui.agents.SheetTone
 import dev.herdr.android.ui.agents.agentSheet
 import dev.herdr.android.ui.agents.agentsUi
 import dev.herdr.android.ui.chat.ChatPolling
@@ -219,8 +218,8 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
 /** The title bar and queue strip for [key], from the hub's rows. */
 fun terminalUi(snapshot: HubSnapshot, key: AgentKey, res: android.content.res.Resources): TerminalUi {
     val sheet = agentSheet(agentsUi(snapshot, 0L, res, { "" }), key, res)
-    val header = sheet?.let { TerminalHeader(it.name, it.icon, it.lineTwo, it.state, it.tone) }
-        ?: TerminalHeader(key.address, ProgramIcon.Terminal, key.machine, null, SheetTone.None)
+    val header = sheet?.let { TerminalHeader(it.name, it.icon, it.lineTwo) }
+        ?: TerminalHeader(key.address, ProgramIcon.Terminal, key.machine)
     return TerminalUi(key, header, queueStrip(snapshot.agents, key))
 }
 

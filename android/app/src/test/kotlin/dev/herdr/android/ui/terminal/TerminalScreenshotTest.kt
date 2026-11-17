@@ -80,6 +80,19 @@ class TerminalScreenshotTest {
         capture("terminal-type-hidden-graphite", session, typing())
     }
 
+    /** accessibility spec, "The terminal screen fits the largest font size": 2x, title bar and keys row whole. */
+    @Test
+    fun typingLargestFontGraphite() {
+        RuntimeEnvironment.setFontScale(2f)
+        try {
+            val size = phoneSizeFor(heightDp = 915 - 64 - 34 - 48)
+            val session = session(TermPhase.Typing, SessionFixture.frame(size.cols, size.rows, wide = false, bottom = true))
+            capture("terminal-type-font2x-graphite", session, typing())
+        } finally {
+            RuntimeEnvironment.setFontScale(1f)
+        }
+    }
+
     /** Render 5: the compose sheet over the terminal, above the keyboard. */
     @Test
     fun composeGraphite() {

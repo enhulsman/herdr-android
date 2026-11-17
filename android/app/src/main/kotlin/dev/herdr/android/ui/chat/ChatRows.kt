@@ -86,6 +86,18 @@ class LiveRows {
     fun since(key: String): Long? = seen[key]
 }
 
+/**
+ * The answers a screen reader has announced (accessibility spec, "The chat
+ * announces new answers"): [next] gives the text of each live "said" row not
+ * announced yet, in order, and remembers it. History never counts.
+ */
+class Announced {
+    private val done = HashSet<String>()
+
+    fun next(rows: List<ChatRow>, live: LiveRows): List<String> =
+        rows.filter { it.kind == "said" && live.since(it.key) != null && done.add(it.key) }.map { it.text }
+}
+
 /** How far a row has come in: 1 for history or once [FADE_MS] has passed. */
 fun fadeIn(since: Long?, now: Long): Float =
     if (since == null) 1f else ((now - since).toFloat() / FADE_MS).coerceIn(0f, 1f)

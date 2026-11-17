@@ -232,6 +232,11 @@
     <!-- Screen reader labels for the terminal and the keys row. -->
     <string name="terminal_label">Terminal</string>
     <string name="key_esc">Escape. Hold to interrupt</string>
+    <string name="key_dash">Dash</string>
+    <string name="key_slash">Slash</string>
+    <string name="key_tilde">Tilde</string>
+    <string name="key_backslash">Backslash</string>
+    <string name="key_pipe">Pipe</string>
     <string name="key_tab">Tab</string>
     <string name="key_ctrl">Control</string>
     <string name="key_alt">Alt</string>

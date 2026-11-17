@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -76,6 +77,7 @@ import dev.herdr.android.ui.changes.ChangesButton
 import dev.herdr.android.ui.chat.ViewSwitch
 import dev.herdr.android.ui.components.Chevron
 import dev.herdr.android.ui.components.ChevronIcon
+import dev.herdr.android.ui.components.rememberScreenReaderOn
 import dev.herdr.android.ui.theme.HerdrBorder
 import dev.herdr.android.ui.theme.HerdrChipShadow
 import dev.herdr.android.ui.theme.HerdrLayout
@@ -87,6 +89,7 @@ import uniffi.herdr_mobile.RowKeyTap
 import uniffi.herdr_mobile.TermPhase
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlinx.coroutines.delay
 
 // The terminal screen (renders 3, 4, 4b, 5; terminal-view and terminal-input
 // specs): the title bar, the queue strip, the grid watched at desk size or
@@ -236,7 +239,8 @@ internal fun TitleBar(header: TerminalHeader, actions: TerminalActions, trailing
     Row(
         Modifier
             .fillMaxWidth()
-            .height(HerdrLayout.terminalTitleHeight)
+            // Grows with large font sizes, so the place line is never cut (accessibility spec).
+            .heightIn(min = HerdrLayout.terminalTitleHeight)
             .background(c.chrome)
             .pointerInput(actions) {
                 // Up and down step through the agents that want you; sideways through
@@ -350,6 +354,22 @@ private fun TerminalArea(
     val density = LocalDensity.current
     val renderer = rememberTerminalRenderer()
     val label = stringResource(R.string.terminal_label)
+    // A screen reader hears the visible text (accessibility spec), gathered at most once a second and only while one is on.
+    val readerOn = rememberScreenReaderOn()
+    var spoken by remember(session) { mutableStateOf("") }
+    if (readerOn) {
+        LaunchedEffect(session) {
+            var seen = -1
+            while (true) {
+                if (session.version != seen) {
+                    seen = session.version
+                    spoken = if (session.grid.isEmpty) "" else spokenScreen(session.grid.text())
+                }
+                delay(SPOKEN_REFRESH_MS)
+            }
+        }
+    }
+    val described = if (readerOn && spoken.isNotEmpty()) "$label\n$spoken" else label
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val widthPx = constraints.maxWidth.toFloat()
         val heightPx = constraints.maxHeight.toFloat()
@@ -378,7 +398,7 @@ private fun TerminalArea(
                 .fillMaxSize()
                 // A desk-sized grid while typing starts, or a zoomed one, never draws over the bars.
                 .clipToBounds()
-                .semantics { contentDescription = label }
+                .semantics { contentDescription = described }
                 // Keyed by what the handlers act on: moving to another agent's terminal swaps them.
                 .pointerInput(session, screen, screen.typing, padX, padTop, phoneFont) {
                     detectTapGestures(
@@ -612,7 +632,7 @@ private fun SelectionLayer(text: String, grid: TerminalGrid, onDone: () -> Unit)
 
 // --- Keys row ----------------------------------------------------------------
 
-private sealed interface RowKey {
+internal sealed interface RowKey {
     data class Tap(val label: String, val key: RowKeyTap, val description: Int? = null) : RowKey
     data object Keyboard : RowKey
     data object Compose : RowKey
@@ -623,25 +643,25 @@ private sealed interface RowKey {
  * Termux-like: modifiers and the stop and enter keys on the left, away from
  * the arrows; the keyboard key in the middle of the top row, compose under it.
  */
-private val KEY_LINES: List<List<RowKey>> = listOf(
+internal val KEY_LINES: List<List<RowKey>> = listOf(
     listOf(
         RowKey.Tap("esc", RowKeyTap.Esc, R.string.key_esc),
         RowKey.Tap("ctrl", RowKeyTap.Ctrl, R.string.key_ctrl),
         RowKey.Tap("alt", RowKeyTap.Alt, R.string.key_alt),
         RowKey.Tap("tab", RowKeyTap.Tab, R.string.key_tab),
         RowKey.Keyboard,
-        RowKey.Tap("-", RowKeyTap.Symbol("-")),
-        RowKey.Tap("/", RowKeyTap.Symbol("/")),
+        RowKey.Tap("-", RowKeyTap.Symbol("-"), R.string.key_dash),
+        RowKey.Tap("/", RowKeyTap.Symbol("/"), R.string.key_slash),
         RowKey.Tap("↑", RowKeyTap.Up, R.string.key_up),
-        RowKey.Tap("~", RowKeyTap.Symbol("~")),
+        RowKey.Tap("~", RowKeyTap.Symbol("~"), R.string.key_tilde),
     ),
     listOf(
         RowKey.Tap("^C", RowKeyTap.CtrlC, R.string.key_ctrl_c),
         RowKey.Tap("⇧⇥", RowKeyTap.ShiftTab, R.string.key_shift_tab),
-        RowKey.Tap("\\", RowKeyTap.Symbol("\\")),
+        RowKey.Tap("\\", RowKeyTap.Symbol("\\"), R.string.key_backslash),
         RowKey.Tap("⏎", RowKeyTap.Enter, R.string.key_enter),
         RowKey.Compose,
-        RowKey.Tap("|", RowKeyTap.Symbol("|")),
+        RowKey.Tap("|", RowKeyTap.Symbol("|"), R.string.key_pipe),
         RowKey.Tap("←", RowKeyTap.Left, R.string.key_left),
         RowKey.Tap("↓", RowKeyTap.Down, R.string.key_down),
         RowKey.Tap("→", RowKeyTap.Right, R.string.key_right),
@@ -723,7 +743,15 @@ private fun androidx.compose.foundation.layout.RowScope.Key(
             .then(if (spoken != null) Modifier.semantics { contentDescription = spoken } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        BasicText(label, style = HerdrType.keysRow.copy(color = if (latched) c.solidFg else c.fg), maxLines = 1)
+        // At large font sizes a label shrinks to fit its key rather than being cut ("ctr").
+        BasicText(
+            label,
+            style = HerdrType.keysRow.copy(color = if (latched) c.solidFg else c.fg),
+            maxLines = 1,
+            // No wrapping: a label too wide must count as overflowing its width, which shrinks it.
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(minFontSize = KEY_MIN_FONT, maxFontSize = HerdrType.keysRow.fontSize),
+        )
     }
 }
 
@@ -751,3 +779,9 @@ private fun Modifier.combinedClickableCompat(onClick: () -> Unit, onLongClick: (
     this.combinedClickable(role = Role.Button, onLongClick = onLongClick, onClick = onClick)
 
 private val SWIPE_STEP = 40.dp
+
+/** How often the text a screen reader hears from the terminal is gathered again. */
+private const val SPOKEN_REFRESH_MS = 1_000L
+
+/** The smallest a keys row label shrinks to at large font sizes. */
+private val KEY_MIN_FONT = 9.sp

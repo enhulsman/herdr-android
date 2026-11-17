@@ -123,7 +123,7 @@ fun ChangesScreen(
 private fun ChangesTitle(name: String, sub: String, onBack: () -> Unit) {
     val c = HerdrTheme.colors
     Row(
-        Modifier.fillMaxWidth().height(HerdrLayout.terminalTitleHeight).background(c.chrome)
+        Modifier.fillMaxWidth().heightIn(min = HerdrLayout.terminalTitleHeight).background(c.chrome)
             .padding(start = HerdrSpacing.s4, end = HerdrSpacing.s16),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -85,13 +85,13 @@ changes between releases.
    and user. Compare the host key fingerprint the app shows with the
    machine's own: on the machine,
    `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` prints it. Then tap
-   "Add the phone key", tap Copy, get the line to the machine (a note or
-   message to yourself works; the line is public), and add it there:
-   `echo '<the line>' >> ~/.ssh/authorized_keys`. The line lets the key run
-   only herdr-core: no shell session, no forwarding. herdr-core can still run
-   commands as that user, so treat the key like a shell login.
-   The first connection starts herdr-core, so the card may show "Unreachable"
-   once before it connects.
+   "Add the phone key", tap Copy, and get the line to the machine (a note or
+   message to yourself works; the line is public). On the machine, run
+   `mkdir -m 700 -p ~/.ssh && cat >> ~/.ssh/authorized_keys`, paste the line,
+   press Enter, then Ctrl-D. The line lets the key run only herdr-core: no
+   shell session, no forwarding. herdr-core can still run commands as that
+   user, so treat the key like a shell login. The first connection starts
+   herdr-core, so the card may show "Unreachable" once before it connects.
 3. **Turn on alerts:** install `herdr-push` on the machine and turn alerts on in
    the app; see [docs/herdr-push.md](docs/herdr-push.md).
 

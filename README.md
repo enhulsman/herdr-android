@@ -58,27 +58,40 @@ changes between releases.
 ## What you need
 
 - An Android phone on Android 12 or newer (arm64).
-- herdr-core 0.1.15 or newer on a Linux or WSL machine, with an OpenSSH server
-  the phone can reach (for example over Tailscale). Tailscale SSH does not work:
-  it ignores the phone key.
+- herdr-core 0.1.15 or newer
+  ([herdrdev/herdr-core](https://github.com/herdrdev/herdr-core)) on a Linux
+  or WSL machine. Install it as the user your agents run under:
+  `curl -fsSL https://releases.herdr.dev/core/install.sh | sh`. The `herdr`
+  terminal tool is a different program; the app does not need it.
   Each release of the app is tested against herdr-core 0.1.15 and the newest
   herdr-core of the day, and has been used daily with every version from 0.1.15
   to 0.1.21. A newer herdr-core connects too; an older one is refused with a
   message to update to 0.1.15 or newer.
+- An OpenSSH server on that machine the phone can reach (for example over
+  Tailscale). Tailscale SSH does not work: it ignores the phone key. If the
+  machine runs Tailscale SSH, use its LAN address, or an OpenSSH port
+  Tailscale does not take over.
 - For alerts: an ntfy server, the ntfy app on the phone, and `herdr-push` on
   each machine.
-- To install and update: [Obtainium](https://github.com/ImranR98/Obtainium).
+- To install and update: [Obtainium](https://github.com/ImranR98/Obtainium),
+  or adb on a computer.
 
 ## Setting up
 
-1. **Install the app** through Obtainium from this repository's releases; see
-   [docs/release.md](docs/release.md#obtainium-setup). Check each update before
-   installing it ([how](docs/release.md#before-installing-an-update)).
+1. **Install the app** through Obtainium, or with adb if Android blocks
+   Obtainium; see [docs/install.md](docs/install.md). Check the first install
+   and each update ([how](docs/install.md#checking-a-release)).
 2. **Add a machine:** in the app, tap "Add machine" and enter its address, port
-   and user. Compare the host key fingerprint with the machine's own, then
-   copy the phone key line into that user's `~/.ssh/authorized_keys`. The line
-   lets the key run only herdr-core: no shell session, no forwarding. herdr-core
-   can still run commands as that user, so treat the key like a shell login.
+   and user. Compare the host key fingerprint the app shows with the
+   machine's own: on the machine,
+   `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` prints it. Then tap
+   "Add the phone key", tap Copy, get the line to the machine (a note or
+   message to yourself works; the line is public), and add it there:
+   `echo '<the line>' >> ~/.ssh/authorized_keys`. The line lets the key run
+   only herdr-core: no shell session, no forwarding. herdr-core can still run
+   commands as that user, so treat the key like a shell login.
+   The first connection starts herdr-core, so the card may show "Unreachable"
+   once before it connects.
 3. **Turn on alerts:** install `herdr-push` on the machine and turn alerts on in
    the app; see [docs/herdr-push.md](docs/herdr-push.md).
 
@@ -103,7 +116,8 @@ browser, custom theme files, pasting images into the terminal.
 - `android/`: the app (Kotlin and Jetpack Compose).
 - `crates/`: the Rust core the app uses (SSH, the herdr-core protocol, the
   terminal engine) and `herdr-push`.
-- `docs/`: guides for releases and `herdr-push`, phone checklists, release notes.
+- `docs/`: guides for installing, releases and `herdr-push`, phone
+  checklists, release notes.
 - `openspec/`: the specification, and `decisions.md` the decisions behind it.
 - `design/`: the signed-off screen renders.
 - `THIRD_PARTY_NOTICES.md`: licences of the bundled material.

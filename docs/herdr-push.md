@@ -24,7 +24,9 @@ the time. Never screen text or the agent's message. ntfy only sees ciphertext.
 - It writes what ntfy last answered into the `hdroid-push-status` document on
   the core; the app shows "Last accepted by ntfy hh:mm" or "Alerts failing".
 - It only connects to an existing core and never starts one. With no core it
-  logs "no core" and tries again every 30 s.
+  logs "no core" and tries again every 30 s. The phone's first connection
+  starts herdr-core; after a reboot the core is down until the phone connects
+  again or you run `herdr-core server start`, and alerts wait until then.
 - After a restart it alerts only what it has not alerted before
   (`~/.local/state/herdr-push/state.json`).
 - A phone that turns alerts on while an agent is already waiting gets that
@@ -34,19 +36,23 @@ the time. Never screen text or the agent's message. ntfy only sees ciphertext.
 
 The app posts alerts on three notification channels, which you can tune in
 Android's settings: "Needs you" (with sound), "Finished" (silent) and "Alert
-health" (silent). Tapping an agent's alert opens its terminal. Each machine card
-has an Alerts row, "Mute alerts" (agents still go to the top of the list) and
-"Send test alert", which checks the whole path from the machine to the phone.
+health" (silent). Tapping an agent's alert opens its terminal. A battery saver
+that pauses the app (Extreme Battery Saver on a Pixel) holds alerts back until
+the app runs again. Each machine card has an Alerts row, "Mute alerts" (agents
+still go to the top of the list) and "Send test alert", which checks the whole
+path from the machine to the phone.
 
 ## Install
 
 1. Download the `herdr-push` for your machine (`uname -m` names it:
    `herdr-push-x86_64` or `herdr-push-aarch64`), its `.sig` and `SHA256SUMS`
-   from the release, and check them (see
-   [release.md](release.md#checking-herdr-push-on-a-machine)).
+   from the [latest release](https://github.com/enhulsman/herdr-android/releases/latest),
+   and check them (see
+   [install.md](install.md#checking-herdr-push-on-a-machine)).
 2. `install -m 755 herdr-push-$(uname -m) ~/.local/bin/herdr-push`
 3. Put the ntfy access token in `~/.config/herdr-push/ntfy-token` (mode 600).
-   Use a dedicated ntfy user that may only write to `up*` topics, never read:
+   Use a dedicated ntfy user that may only write to `up*` topics, never read.
+   On your own ntfy server, as its admin:
 
    ```
    ntfy user add herdr-push
@@ -54,10 +60,14 @@ has an Alerts row, "Mute alerts" (agents still go to the top of the list) and
    ntfy token add herdr-push
    ```
 
+   On a server someone else runs, ask its admin for such a user and a token:
+   herdr-push does not start without one.
+
 4. Write `~/.config/herdr-push/config`:
 
    ```
-   # The core to watch. Find it with: ls "$XDG_RUNTIME_DIR/herdr-core/"
+   # The core to watch. 1000 is your user id (id -u); find the socket with
+   # ls /run/user/$(id -u)/herdr-core/
    socket = /run/user/1000/herdr-core/default.sock
    # Where pushes may go: your ntfy server (https only, repeatable).
    allow = https://ntfy.example.org
@@ -70,10 +80,14 @@ has an Alerts row, "Mute alerts" (agents still go to the top of the list) and
    The socket is `$XDG_RUNTIME_DIR/herdr-core/<session>.sock`; the session is
    `default` unless you set `HC_SESSION`. A `socket` in herdr-core's own config
    or `HC_SOCKET` moves it.
-5. Install and start the service:
+5. Install and start the service. The unit file is
+   [contrib/herdr-push.service](../contrib/herdr-push.service) in this
+   repository:
 
    ```
-   cp contrib/herdr-push.service ~/.config/systemd/user/
+   mkdir -p ~/.config/systemd/user
+   curl -fsSL -o ~/.config/systemd/user/herdr-push.service \
+     https://raw.githubusercontent.com/enhulsman/herdr-android/main/contrib/herdr-push.service
    systemctl --user daemon-reload
    systemctl --user enable --now herdr-push
    loginctl enable-linger "$USER"   # keep it running without a login session
@@ -86,7 +100,9 @@ has an Alerts row, "Mute alerts" (agents still go to the top of the list) and
 7. In the app, tap "Turn on" on a machine card's Alerts row. It asks to allow
    notifications, then which UnifiedPush app to use if you have more than one.
    Then tap "Send" on "Send test alert"; the row says "Test received" when the
-   alert arrives.
+   alert arrives. Until herdr-push runs on the machine, the row says "No
+   answer from herdr-push" and the test ends with "No test alert within 30 s";
+   a test sent then arrives once herdr-push starts.
 
 ## Checking it
 

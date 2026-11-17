@@ -86,6 +86,9 @@ pub enum ChatHealth {
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ChatPoll {
     pub found: ChatFound,
+    /// The desk answered a lookup for this terminal, now or before. False
+    /// while the machine is still connecting: `found` then decides nothing.
+    pub answered: bool,
     /// "claude" or "codex"; empty when no log is held.
     pub agent: String,
     pub title: String,
@@ -793,6 +796,7 @@ impl Chat {
             && !matches!(health, ChatHealth::Broken { .. });
         ChatPoll {
             found,
+            answered: v.answered,
             agent: match v.agent {
                 Some(Agent::Claude) => "claude".into(),
                 Some(Agent::Codex) => "codex".into(),

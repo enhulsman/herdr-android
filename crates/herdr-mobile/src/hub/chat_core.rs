@@ -68,6 +68,10 @@ pub(crate) enum Kind {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct View {
     pub found: Kind,
+    /// The desk answered a lookup for this terminal, now or before: false
+    /// until it has (the machine still connecting), so [`View::found`] says
+    /// nothing yet (issue 58).
+    pub answered: bool,
     /// The agent whose log is held, if any.
     pub agent: Option<Agent>,
     pub rows: Vec<Row>,
@@ -491,9 +495,11 @@ impl ChatCore {
             Some(Lookup::Missed(_)) => Kind::Missed,
             Some(Lookup::None) | None => Kind::None,
         };
+        let answered = matches!(&self.lookup, Some(l) if *l != Lookup::Missed(NO_ANSWER));
         let Some(o) = self.log.as_ref() else {
             return View {
                 found,
+                answered,
                 agent: None,
                 rows: vec![],
                 health: Health::Ok,
@@ -544,6 +550,7 @@ impl ChatCore {
         }
         View {
             found,
+            answered,
             agent: Some(o.agent),
             rows,
             health: o.parser.health(),

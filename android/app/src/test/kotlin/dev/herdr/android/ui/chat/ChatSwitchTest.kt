@@ -16,8 +16,9 @@ class ChatSwitchTest {
         found: ChatFound = ChatFound.FOUND,
         health: ChatHealth = ChatHealth.Ok,
         exited: Boolean = false,
+        answered: Boolean = true,
     ) = ChatPoll(
-        found = found, agent = "claude", title = "", version = "", status = "idle", health = health, problem = "",
+        found = found, answered = answered, agent = "claude", title = "", version = "", status = "idle", health = health, problem = "",
         exited = exited, canSend = !exited, cut = false, rows = emptyList(), gaugeUsed = null, gaugeWindow = null,
         gaugePercent = null, queued = emptyList(), timings = "",
     )
@@ -144,5 +145,57 @@ class ChatSwitchTest {
         s.onPoll(poll(ChatFound.NONE, exited = true))
         assertFalse(s.chat)
         assertFalse(s.offered)
+    }
+
+    // Issue 58: back from another app after Android ended the app, the open
+    // terminal comes back with a new chat whose first polls run before the
+    // machine has reconnected. Those polls decide nothing.
+
+    private val notConnected get() = poll(ChatFound.NONE, answered = false)
+
+    @Test
+    fun aChatOpenedAgainBeforeTheMachineReconnectsStaysTheChat() {
+        val s = ChatSwitch(chosen = true, held = null)
+        s.onPoll(notConnected)
+        assertTrue("still looking for the conversation", s.chat)
+        s.onPoll(notConnected)
+        s.onPoll(poll())
+        assertTrue(s.chat)
+        assertTrue(s.offered)
+    }
+
+    @Test
+    fun theFirstAnsweredPollStillOpensAPlainShellOnItsTerminal() {
+        val s = ChatSwitch(chosen = true, held = null)
+        s.onPoll(notConnected)
+        s.onPoll(poll(ChatFound.NONE))
+        assertFalse(s.chat)
+        assertFalse(s.offered)
+    }
+
+    @Test
+    fun anUnansweredPollKeepsTheSwitchItShowed() {
+        val s = ChatSwitch(chosen = false, held = poll())
+        s.onPoll(notConnected)
+        assertTrue(s.offered)
+        assertFalse(s.chat)
+    }
+
+    @Test
+    fun anUnansweredHeldChatShowsAsLooking() {
+        val s = ChatSwitch(chosen = true, held = poll(ChatFound.MISSED, answered = false))
+        assertTrue(s.chat)
+        assertFalse(s.offered)
+        s.onPoll(poll())
+        assertTrue(s.chat)
+        assertTrue(s.offered)
+    }
+
+    @Test
+    fun theChatSaysLookingUntilTheDeskAnswers() {
+        assertTrue(chatLooking(null))
+        assertTrue("not \"No conversation found\"", chatLooking(notConnected))
+        assertFalse(chatLooking(poll()))
+        assertFalse(chatLooking(poll(ChatFound.MISSED)))
     }
 }

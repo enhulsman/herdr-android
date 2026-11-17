@@ -843,3 +843,28 @@ fn the_view_names_what_claude_code_holds_queued() {
     let (c, _) = opened(&[asked("Hi"), q], t0);
     assert_eq!(c.view().queued, ["Say SECOND"]);
 }
+
+// --- Answered (issue 58: a chat opened again before the machine reconnects) ---
+
+#[test]
+fn a_chat_is_answered_once_the_desk_answers_a_lookup() {
+    let t0 = Instant::now();
+    let mut c = ChatCore::new();
+    assert!(!c.view().answered, "nothing looked up yet: not connected");
+    c.take_lookup(&term("idle"), None, t0);
+    assert!(!c.view().answered, "the desk did not answer");
+    c.take_lookup(&term("idle"), Some(Lookup::Missed(NO_ANSWER)), t0);
+    assert!(
+        !c.view().answered,
+        "no answer, as the lookup script reports it"
+    );
+    c.take_lookup(&term("idle"), Some(found(S1)), t0);
+    assert!(c.view().answered);
+
+    let mut shell = ChatCore::new();
+    shell.take_lookup(&term("idle"), Some(Lookup::None), t0);
+    assert!(shell.view().answered, "a plain shell is an answer");
+    let mut missed = ChatCore::new();
+    missed.take_watch_lookup(&term("idle"), Some(Lookup::Missed("no session file")), t0);
+    assert!(missed.view().answered, "a missing log is an answer");
+}

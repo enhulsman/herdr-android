@@ -479,7 +479,7 @@
     },
     "terminalTitleBar": {
       "height": 64,
-      "parts": "back 48 target, agent mark, name 17/500 over 'space · machine' 13 dim, state pill"
+      "parts": "back 48 target, agent mark, name 17/500 over 'space · machine' 13 dim; no state pill (issue 57: the screen below shows the state)"
     },
     "queueStrip": {
       "signature": true,

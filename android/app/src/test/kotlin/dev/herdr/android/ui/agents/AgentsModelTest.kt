@@ -78,6 +78,8 @@ class AgentsModelTest {
         val header = dev.herdr.android.ui.terminal.terminalUi(s, AgentKey("workstation", "t1"), res).header
         assertEquals("Pricing page copy", header.name)
         assertEquals("website / 2 · workstation", header.lineTwo)
+        // Issue 57: the title bar shows no status pill; the screen below shows the state.
+        assertEquals("name, mark and place only", dev.herdr.android.ui.terminal.TerminalHeader(header.name, header.icon, header.lineTwo), header)
     }
 
     @Test

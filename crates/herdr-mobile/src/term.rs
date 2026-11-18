@@ -16,6 +16,7 @@
 //!   connection. Dropping the command sender ends the task and detaches.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use herdr_proto::rpc::{CallError, StreamItem};
@@ -75,6 +76,7 @@ pub(crate) fn spawn(
     phone: (u16, u16),
     lead: bool,
     sink: Arc<dyn TermSink>,
+    bracketed: Arc<AtomicBool>,
 ) -> mpsc::UnboundedSender<Cmd> {
     let (tx, rx) = mpsc::unbounded_channel();
     let task = Task {
@@ -85,6 +87,7 @@ pub(crate) fn spawn(
         lead,
         cmds: rx,
         sink,
+        bracketed,
         size: (0, 0),
     };
     hub.runtime().spawn(task.run());
@@ -110,6 +113,9 @@ struct Task {
     lead: bool,
     cmds: mpsc::UnboundedReceiver<Cmd>,
     sink: Arc<dyn TermSink>,
+    /// The program's bracketed paste mode, as of the last output: the view
+    /// refuses compose text with a line break without it.
+    bracketed: Arc<AtomicBool>,
     /// The size of the last frames, for states that do not change it.
     size: (u16, u16),
 }
@@ -244,6 +250,7 @@ impl Task {
     }
 
     fn fresh_vt(&mut self, attached: &Attached) -> Option<vt::Terminal> {
+        self.bracketed.store(false, Ordering::Relaxed);
         match vt::Terminal::new(attached.cols, attached.rows) {
             Ok(t) => {
                 let phase = match attached.mode {
@@ -288,6 +295,7 @@ impl Task {
                 item = viewer.recv() => match item {
                     StreamItem::Data(d) => {
                         vt.write(&d);
+                        self.bracketed.store(vt.bracketed_paste(), Ordering::Relaxed);
                         dirty = true;
                     }
                     StreamItem::Closed(_) => {
@@ -344,9 +352,12 @@ impl Task {
                                 return over;
                             }
                         }
+                        // Refused (nothing typed) when a line break would run as Enter;
+                        // the view already said so when the mode was off then.
                         Cmd::Paste(text) => {
-                            let bytes = vt::keys::paste_bytes(&text);
-                            if let Err(over) = self.input(&mut viewer, &mut vt, &mut dirty, &bytes).await {
+                            if let Some(bytes) = vt::keys::paste_bytes(&text, vt.bracketed_paste())
+                                && let Err(over) = self.input(&mut viewer, &mut vt, &mut dirty, &bytes).await
+                            {
                                 return over;
                             }
                         }

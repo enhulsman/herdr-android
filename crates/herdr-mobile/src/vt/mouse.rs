@@ -30,6 +30,22 @@ impl Terminal {
         on
     }
 
+    /// The program asked for bracketed paste (DEC mode 2004).
+    pub fn bracketed_paste(&self) -> bool {
+        let mut q = ffi::ModeConfig {
+            mode: ffi::MODE_BRACKETED_PASTE,
+            value: false,
+        };
+        unsafe {
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::TERMINAL_DATA_MODE,
+                (&raw mut q).cast::<c_void>(),
+            )
+        };
+        q.value
+    }
+
     fn alt_screen(&self) -> bool {
         let mut screen: i32 = ffi::SCREEN_PRIMARY;
         unsafe {

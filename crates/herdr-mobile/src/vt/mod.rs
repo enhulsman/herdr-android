@@ -687,6 +687,11 @@ mod tests {
             size("GhosttyMousePosition"),
             size_of::<ffi::MousePosition>()
         );
+        // The compose paste (keys.rs).
+        assert_eq!(
+            size("GhosttyTerminalModeConfig"),
+            size_of::<ffi::ModeConfig>()
+        );
         for (t, k, ours) in [
             (
                 "GhosttyTerminalData",
@@ -698,6 +703,7 @@ mod tests {
                 "MOUSE_TRACKING",
                 ffi::TERMINAL_DATA_MOUSE_TRACKING,
             ),
+            ("GhosttyTerminalData", "MODE", ffi::TERMINAL_DATA_MODE),
             ("GhosttyTerminalScreen", "ALTERNATE", ffi::SCREEN_ALTERNATE),
             (
                 "GhosttyMouseEncoderOption",

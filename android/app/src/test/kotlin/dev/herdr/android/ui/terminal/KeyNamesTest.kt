@@ -1,15 +1,15 @@
 package dev.herdr.android.ui.terminal
 
 import android.content.res.Resources
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 // accessibility spec, "Every key has a spoken name".
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class KeyNamesTest {
     private val res: Resources = RuntimeEnvironment.getApplication().resources
 

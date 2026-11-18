@@ -2,10 +2,10 @@ package dev.herdr.android
 
 import android.content.ComponentName
 import android.view.WindowManager.LayoutParams
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 /**
@@ -15,7 +15,7 @@ import org.robolectric.RuntimeEnvironment
  * window resizes for the keyboard on every screen, declared once in the manifest;
  * every screen pads for the keyboard itself (safe drawing insets).
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @Suppress("DEPRECATION") // getActivityInfo(_, Int): Robolectric 4.17 lacks the ComponentInfoFlags overload.
 class SoftInputModeTest {
     @Test

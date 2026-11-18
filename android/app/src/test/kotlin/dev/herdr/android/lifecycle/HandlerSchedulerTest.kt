@@ -2,16 +2,16 @@ package dev.herdr.android.lifecycle
 
 import android.os.Handler
 import android.os.Looper
+import dev.herdr.android.testing.HerdrTestRunner
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 
 // The in-process half of the 60 s suspension: a main-thread Handler posted for
 // the time left until the elapsed-realtime deadline.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class HandlerSchedulerTest {
     private val looper = shadowOf(Looper.getMainLooper())
     private val scheduler = HandlerScheduler(Handler(Looper.getMainLooper())) { 1_000L }

@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.connected
 import dev.herdr.android.ui.agents.row
@@ -12,13 +13,13 @@ import dev.herdr.android.ui.agents.snapshot
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.theme.HerdrType
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import uniffi.herdr_mobile.AgentAttention
@@ -30,11 +31,19 @@ import uniffi.herdr_mobile.TermState
 // first phone round found the terminal ignoring drags in every mode while the
 // screenshot tests and the layout maths passed, so these drive real
 // MotionEvents into the activity.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class TerminalTouchTest {
     private val key = AgentKey("workstation", "t1")
-    private val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+    private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+    private val activity = controller.get()
+
+    /** Ends the screen, so its composition does not run on into later tests. */
+    @After
+    fun closeScreen() {
+        controller.pause().stop().destroy()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
     private val hub = snapshot(machines = listOf(connected("workstation")), agents = listOf(row("t1", AgentAttention.WORKING)))
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()

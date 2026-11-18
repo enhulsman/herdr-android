@@ -1,13 +1,13 @@
 package dev.herdr.android.ui.chat
 
 import androidx.compose.ui.unit.dp
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import uniffi.herdr_mobile.ChatCall
 import uniffi.herdr_mobile.ChatRefusal
 import uniffi.herdr_mobile.ChatRow
@@ -16,7 +16,7 @@ import uniffi.herdr_mobile.ChatRow
 // texts (spec "The tool sheet shows each call", "Sending goes only to the
 // agent whose log is shown", "A context gauge shows in the top bar", "Photos
 // can be attached from the phone").
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class ChatStateTest {
     private fun call(title: String, done: Boolean = true, out: String = "") = ChatCall("Bash", title, title, out, done, false, emptyList())
     private fun tools(key: String, vararg calls: ChatCall) = ChatRow(key, "tools", "", "", emptyList(), calls.toList())

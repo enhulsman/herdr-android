@@ -3,11 +3,11 @@ package dev.herdr.android.ui.machines
 import dev.herdr.android.R
 import dev.herdr.android.stay.StayConnectedRow
 import dev.herdr.android.stay.StayConnectedSetting
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.HubSnapshot
 
@@ -15,7 +15,7 @@ import uniffi.herdr_mobile.HubSnapshot
 // row that toggles in place, its second line "Keeps the connection open in the
 // background", "Shows a notification, uses more battery" or "Notifications are
 // off" (permission refused or Status channel blocked).
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class StayConnectedRowTest {
     private val app = RuntimeEnvironment.getApplication()
     private val res = app.resources

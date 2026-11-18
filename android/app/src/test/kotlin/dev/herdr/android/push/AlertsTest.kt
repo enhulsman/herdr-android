@@ -2,13 +2,13 @@ package dev.herdr.android.push
 
 import android.content.Context
 import android.content.res.Resources
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.AgentKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.PushRegistration
 
@@ -20,7 +20,7 @@ import uniffi.herdr_mobile.PushRegistration
 // design-tokens.json notification: title "<agent> needs you" / "<agent>
 // finished", body "<kind> · <place> · <machine>" with absent parts left out,
 // never screen text or msg.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class AlertsTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val res: Resources = context.resources

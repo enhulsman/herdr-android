@@ -2,16 +2,16 @@ package dev.herdr.android.ui.theme
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 // The "Text contrast" setting on the Machines screen: Like the Mac (the tokens'
 // default) or Higher (accessibility.followUp). Stored in its own app-private
 // preferences file, nowhere else, and read back after a restart.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class ContrastSettingTest {
     private val app = RuntimeEnvironment.getApplication()
 

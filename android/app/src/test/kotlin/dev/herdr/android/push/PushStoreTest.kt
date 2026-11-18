@@ -1,13 +1,13 @@
 package dev.herdr.android.push
 
 import android.content.Context
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.PushRegistration
 
@@ -15,7 +15,7 @@ import uniffi.herdr_mobile.PushRegistration
 // runs with the app closed, and the silence check starts the process from a
 // job (alerts spec, "Silence is noticed without claiming a cause", "Mute per
 // machine", "A test alert proves the path").
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class PushStoreTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private fun open() = PushStore(context.getSharedPreferences("push-store-test", Context.MODE_PRIVATE))

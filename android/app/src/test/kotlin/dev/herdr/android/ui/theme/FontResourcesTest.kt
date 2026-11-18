@@ -4,12 +4,12 @@ import android.content.Context
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontListFontFamily
 import androidx.compose.ui.text.font.ResourceFont
+import dev.herdr.android.testing.HerdrTestRunner
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -18,7 +18,7 @@ import java.nio.ByteBuffer
 // Both bundled families load from resources at exactly the weights the tokens
 // use, and each resource really is that family at that weight (read from the
 // font's own name and OS/2 tables, so a swapped file is caught).
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FontResourcesTest {
     private val context: Context = RuntimeEnvironment.getApplication()

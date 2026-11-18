@@ -1,17 +1,17 @@
 package dev.herdr.android.ui.machines
 
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.theme.ContrastSetting
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.HubSnapshot
 
 // The "Higher text contrast" switch row under "This phone": off (like the Mac)
 // it says so on its second line, on it has none; a tap switches it in place.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class TextContrastRowTest {
     private val app = RuntimeEnvironment.getApplication()
     private val res = app.resources

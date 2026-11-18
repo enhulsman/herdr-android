@@ -2,13 +2,13 @@ package dev.herdr.android.ui.machines
 
 import android.content.res.Resources
 import dev.herdr.android.hub.snapshot
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.HubSnapshot
 import uniffi.herdr_mobile.MachineState
@@ -20,7 +20,7 @@ import uniffi.herdr_mobile.MachineView
 // off", not "connection failed"); the overnight run's J1 verdict (the Machines
 // screen must offer Unlock after a cancelled prompt). Render 7 for the wording
 // of the connected and unreachable lines.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class MachineStatusTest {
     private val res: Resources = RuntimeEnvironment.getApplication().resources
 

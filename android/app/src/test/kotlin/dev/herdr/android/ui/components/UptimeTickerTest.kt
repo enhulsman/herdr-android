@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshotFlow
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,7 +14,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 
@@ -21,7 +21,7 @@ import org.robolectric.android.controller.ActivityController
 // it ticks only while something waits and the screen is started. With the
 // screen off, the open chat of a working agent kept its main thread at about
 // 18% of a core through the clock and the working line's loops.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class UptimeTickerTest {
     private val hosts = mutableListOf<ActivityController<ComponentActivity>>()
 

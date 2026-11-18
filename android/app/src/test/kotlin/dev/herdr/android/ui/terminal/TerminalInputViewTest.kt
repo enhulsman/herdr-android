@@ -3,17 +3,17 @@ package dev.herdr.android.ui.terminal
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 // terminal-input spec, "The keyboard behaves like a terminal keyboard": the
 // terminal asks for a keyboard without suggestions or autocorrect, and maps
 // what it sends, backspace and enter included, to terminal keys.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class TerminalInputViewTest {
     private val sent = mutableListOf<String>()
     private val view = TerminalInputView(RuntimeEnvironment.getApplication()).apply {

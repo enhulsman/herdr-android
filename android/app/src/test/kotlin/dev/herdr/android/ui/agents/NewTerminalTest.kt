@@ -2,6 +2,7 @@ package dev.herdr.android.ui.agents
 
 import dev.herdr.android.hub.FakeHub
 import dev.herdr.android.hub.HubHost
+import dev.herdr.android.testing.HerdrTestRunner
 import java.util.concurrent.Executor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,7 +11,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.AgentsView
 import uniffi.herdr_mobile.HubException
@@ -25,7 +25,7 @@ import uniffi.herdr_mobile.PlaceNote
 // on a refusal, and on success the sheet closed and the new terminal handed
 // to the Agents home to open. The start runs on [work], here a queue the test
 // runs by hand, so a second tap lands while the first is in flight.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class NewTerminalTest {
     private val res = RuntimeEnvironment.getApplication().resources
     private val hub = FakeHub()

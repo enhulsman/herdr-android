@@ -8,13 +8,13 @@ import android.graphics.Shader
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.ProgramIcon
 import dev.herdr.android.ui.terminal.TerminalActions
 import dev.herdr.android.ui.terminal.TerminalHeader
 import dev.herdr.android.ui.theme.HerdrTheme
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uniffi.herdr_mobile.ChatCall
@@ -27,7 +27,7 @@ import uniffi.herdr_mobile.ChatRow
 
 // The chat screen with an invented session, in paper and graphite (task 4.2).
 // Goldens: src/test/snapshots/chat-<scene>-<theme>.png.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class ChatScreenshotTest {

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.connected
 import dev.herdr.android.ui.agents.row
@@ -15,7 +16,6 @@ import dev.herdr.android.ui.agents.snapshot
 import dev.herdr.android.ui.theme.HerdrTheme
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -31,7 +31,7 @@ import uniffi.herdr_mobile.TermState
 // wire format with an invented agent session. Reference phone 412 x 915 dp at
 // density 2, without system bars; the phone keyboard (drawn by Gboard in the
 // renders) is an empty area of its height. Goldens: src/test/snapshots/<name>.png.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class TerminalScreenshotTest {

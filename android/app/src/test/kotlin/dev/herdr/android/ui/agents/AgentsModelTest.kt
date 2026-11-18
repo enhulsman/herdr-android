@@ -1,5 +1,6 @@
 package dev.herdr.android.ui.agents
 
+import dev.herdr.android.testing.HerdrTestRunner
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -9,7 +10,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.AgentAttention
 import uniffi.herdr_mobile.HubSnapshot
@@ -20,7 +20,7 @@ import uniffi.herdr_mobile.MachineState
 // that the screen keeps that order and splits it into sections, and every text
 // a row shows: line two, the card's kind and request, the age, "as of hh:mm"
 // for a machine that is not connected, the unreachable notice and the empty states.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class AgentsModelTest {
     private val res = RuntimeEnvironment.getApplication().resources
 

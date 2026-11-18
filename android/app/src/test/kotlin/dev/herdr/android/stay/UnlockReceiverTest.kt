@@ -3,11 +3,11 @@ package dev.herdr.android.stay
 import android.content.Context
 import android.content.Intent
 import android.os.Looper
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 
@@ -16,7 +16,7 @@ import org.robolectric.Shadows.shadowOf
 // not the system uid, so a receiver registered not-exported never gets it
 // (phone check 4.2, Android 17: the broadcast skipped the receiver). It is a
 // protected broadcast, so exported lets no other app send it.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class UnlockReceiverTest {
     private val app = RuntimeEnvironment.getApplication()
 

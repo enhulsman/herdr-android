@@ -4,13 +4,13 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.herdr.android.push.AlertSetup
 import dev.herdr.android.push.MachineAlerts
 import dev.herdr.android.stay.StayConnectedRow
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.theme.Contrast
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.transfer.TransferResult
 import dev.herdr.android.ui.transfer.transferNotice
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -26,7 +26,7 @@ import uniffi.herdr_mobile.PushStatusView
 // states render 7 does not show, designed from the tokens. Reference phone: 412 x 915 dp at density 2,
 // the renders' size (the system bars are not drawn here).
 // Goldens: src/test/snapshots/machines-*.png (recordRoborazziDebug, verifyRoborazziDebug).
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class MachinesScreenshotTest {

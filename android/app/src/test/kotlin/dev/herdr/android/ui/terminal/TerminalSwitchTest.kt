@@ -13,12 +13,14 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.connected
 import dev.herdr.android.ui.agents.row
 import dev.herdr.android.ui.agents.snapshot
 import dev.herdr.android.ui.theme.HerdrTheme
 import java.time.Duration
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -26,7 +28,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import uniffi.herdr_mobile.AgentAttention
@@ -39,12 +40,20 @@ import uniffi.herdr_mobile.TermState
 // still deliver late input (a keyboard commits a composing word when it
 // notices the change); that goes nowhere, so it cannot take the size of a
 // terminal that is only being watched (terminal-input spec, typing leads).
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class TerminalSwitchTest {
     private val a = AgentKey("workstation", "t1")
     private val b = AgentKey("workstation", "t2")
-    private val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+    private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+    private val activity = controller.get()
+
+    /** Ends the screen, so its composition does not run on into later tests. */
+    @After
+    fun closeScreen() {
+        controller.pause().stop().destroy()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 

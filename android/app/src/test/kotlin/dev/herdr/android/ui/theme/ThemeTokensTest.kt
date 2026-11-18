@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import dev.herdr.android.testing.HerdrTestRunner
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -20,7 +21,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import java.io.File
@@ -29,7 +29,7 @@ import java.io.File
 // value the theme carries is compared with the file, and every token in the
 // sections the theme mirrors must have a Kotlin counterpart, so neither side can
 // drift alone. Runs on Robolectric for its real org.json.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class ThemeTokensTest {
     private val tokens: JSONObject by lazy {
         val path = System.getProperty("herdr.designTokens")
@@ -158,8 +158,11 @@ class ThemeTokensTest {
     /** What [HerdrTheme] gives its content, driven by the app's [ContrastSetting]. */
     private fun themedColours(setting: ContrastSetting, dark: Boolean): HerdrColors {
         var seen: HerdrColors? = null
-        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
-        activity.setContent { HerdrTheme(setting, dark = dark) { seen = HerdrTheme.colors } }
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        controller.get().setContent { HerdrTheme(setting, dark = dark) { seen = HerdrTheme.colors } }
+        shadowOf(Looper.getMainLooper()).idle()
+        // Left open, its composition would run on into later tests.
+        controller.pause().stop().destroy()
         shadowOf(Looper.getMainLooper()).idle()
         return seen!!
     }

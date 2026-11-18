@@ -2,10 +2,10 @@ package dev.herdr.android.ui.agents
 
 import androidx.compose.runtime.mutableLongStateOf
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.theme.HerdrTheme
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -19,7 +19,7 @@ import uniffi.herdr_mobile.PlaceNote
 // list, and the states without a render: a start in flight, the notes for a
 // space folder that is not a full path and a home not known yet, and paper.
 // Reference phone 412 x 915 dp at density 2. Goldens: src/test/snapshots/<name>.png.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class NewTerminalScreenshotTest {

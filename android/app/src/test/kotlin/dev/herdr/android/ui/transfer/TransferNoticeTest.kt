@@ -1,16 +1,16 @@
 package dev.herdr.android.ui.transfer
 
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 // The inline notice on Machines after an export or import: what it says, and
 // whether it reads as an error. Pinned here so a wording change is deliberate.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class TransferNoticeTest {
     private val res = RuntimeEnvironment.getApplication().resources
 

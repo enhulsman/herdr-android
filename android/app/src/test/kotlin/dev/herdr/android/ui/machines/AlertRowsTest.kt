@@ -3,11 +3,11 @@ package dev.herdr.android.ui.machines
 import android.content.res.Resources
 import dev.herdr.android.push.AlertSetup
 import dev.herdr.android.push.MachineAlerts
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.AlertsRegistration
 import uniffi.herdr_mobile.AlertsView
@@ -23,7 +23,7 @@ import uniffi.herdr_mobile.PushStatusView
 // machine shows alerts as off, with a way to grant it), "Endpoint changed while
 // away", "Token revoked" ("Alerts failing: 403"), never "delivered"; "Test
 // passes" ("test received", or that none came within 30 s).
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class AlertRowsTest {
     private val res: Resources = RuntimeEnvironment.getApplication().resources
 

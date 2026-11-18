@@ -145,6 +145,11 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
   `{v, type: alert|cleared|canary|test, machine, terminal?, name?, state?, kind?, at}`.
   Never screen text or `msg`. `ece` pads the plaintext to a multiple of 128 bytes, so
   a payload of up to 3967 bytes fits one record and the 4 KiB cap (body 4070 bytes).
+  herdr-push first pads every payload with trailing spaces to 1024 bytes, so the
+  relay cannot tell an alert from a canary by size; the phone ignores a push
+  without `at` or with an `at` no newer than the last from that machine (a relay
+  could deliver a kept push again), and counts silence from `at`, never later
+  than its arrival (issue #22).
 - **Health:** a canary push every 6 hours (the first at once on a fresh install); the phone records the last push of
   any kind per machine and a local periodic check posts a quiet "Alert health"
   notice after 13 hours of silence. The watcher writes `hdroid-push-status`

@@ -139,6 +139,18 @@ pub enum Outcome {
     NotAllowed,
 }
 
+/// Every plaintext is padded to this many bytes, the longest alert included
+/// (names and places are cut at 80 characters), so the relay cannot tell the
+/// kinds apart by size (issue #22). ece's own padding only rounds to 128.
+const PLAIN_LEN: usize = 1024;
+
+/// `json` followed by spaces up to [`PLAIN_LEN`]; JSON allows trailing white space.
+fn padded(mut json: String) -> String {
+    let len = json.len().max(PLAIN_LEN);
+    json.extend(std::iter::repeat_n(' ', len - json.len()));
+    json
+}
+
 /// Encrypts `push` to each phone and POSTs it where allowed, in order.
 pub fn send(
     push: &Push,
@@ -155,7 +167,7 @@ pub fn send(
             if !allow.allows(&endpoint) {
                 return (endpoint, Outcome::NotAllowed);
             }
-            let plain = payload(push, &phone.machine, at_ms).to_string();
+            let plain = padded(payload(push, &phone.machine, at_ms).to_string());
             let outcome = match webpush::encrypt(&phone.subscription, plain.as_bytes()) {
                 Err(e) => Outcome::Failed(e.to_string()),
                 Ok(body) => match post.post(&endpoint, token, body) {
@@ -285,6 +297,42 @@ mod tests {
             plain.len() + 103 < crate::webpush::MAX_BODY / 4,
             "{} bytes",
             plain.len()
+        );
+    }
+
+    // Issue #22: the server that relays the pushes sees their sizes; every
+    // kind, the longest alert included, is the same size, so it cannot tell
+    // an alert from a canary and drop only the alerts.
+    #[test]
+    fn every_push_is_the_same_size() {
+        let longest = Push::Alert {
+            terminal: "t1zz".into(),
+            name: format!("{}…", "\u{1F600}".repeat(79)),
+            place: Some(format!("{}…", "\u{1F600}".repeat(79))),
+            state: Word::Blocked,
+            kind: Some("permission".into()),
+        };
+        let pushes = [
+            longest,
+            blocked(),
+            Push::Cleared {
+                terminal: "t3".into(),
+            },
+            Push::Canary,
+            Push::Test,
+        ];
+        let phones = [phone("https://ntfy.example.org/upA")];
+        let mut rec = Recorder::default();
+        for p in &pushes {
+            send(p, &phones, &allow(), "t", &mut rec, 1_730_650_000_000);
+        }
+        let sizes: Vec<usize> = rec.sent.iter().map(|(_, _, b)| b.len()).collect();
+        assert!(sizes.iter().all(|&n| n == sizes[0]), "{sizes:?}");
+        assert!(sizes[0] <= crate::webpush::MAX_BODY, "{sizes:?}");
+        // The padding is white space after the JSON: the phone reads it as before.
+        assert_eq!(
+            decrypt(&rec.sent[3].2),
+            payload(&Push::Canary, "workstation", 1_730_650_000_000)
         );
     }
 

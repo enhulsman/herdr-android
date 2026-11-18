@@ -40,9 +40,10 @@ class AlertsTest {
         machine: String = "workstation",
         terminal: String = "t3",
         place: String? = null,
+        at: Long = NOW,
     ) =
         """{"v":1,"type":"alert","machine":"$machine","terminal":"$terminal","name":"$name","state":"$state"""" +
-            (kind?.let { ""","kind":"$it"""" } ?: "") + (place?.let { ""","place":"$it"""" } ?: "") + ""","at":5}"""
+            (kind?.let { ""","kind":"$it"""" } ?: "") + (place?.let { ""","place":"$it"""" } ?: "") + ""","at":$at}"""
 
     @Test
     fun blockedPostsNeedsYouWithKindAndMachineAndOpensTheTerminal() {
@@ -121,7 +122,7 @@ class AlertsTest {
     @Test
     fun thePublicVersionDoesNotSayWhere() {
         push(alert("blocked", kind = "permission", place = "website / 2"))
-        push(alert("done", terminal = "t4", place = "website / 2"))
+        push(alert("done", terminal = "t4", place = "website / 2", at = NOW + 1))
         assertEquals(
             listOf("An agent needs you · workstation", "An agent finished · workstation"),
             sink.posted.map { it.publicTitle },
@@ -139,8 +140,8 @@ class AlertsTest {
     @Test
     fun agentAlertsHaveAPublicVersionWithoutTheName() {
         push(alert("blocked", kind = "permission", name = "Pricing page copy"))
-        push(alert("error", name = "Pricing page copy", terminal = "t4"))
-        push(alert("done", name = "Pricing page copy", terminal = "t5"))
+        push(alert("error", name = "Pricing page copy", terminal = "t4", at = NOW + 1))
+        push(alert("done", name = "Pricing page copy", terminal = "t5", at = NOW + 2))
         assertEquals(
             listOf("An agent needs you · workstation", "An agent needs you · workstation", "An agent finished · workstation"),
             sink.posted.map { it.publicTitle },
@@ -163,14 +164,14 @@ class AlertsTest {
     @Test
     fun clearedRemovesThatAgentsNotification() {
         push(alert("blocked"))
-        push("""{"v":1,"type":"cleared","machine":"workstation","terminal":"t3","at":6}""")
+        push("""{"v":1,"type":"cleared","machine":"workstation","terminal":"t3","at":${NOW + 1}}""", now = NOW + 1)
         assertEquals(listOf("agent:workstation/t3"), sink.cancelled.filter { it.startsWith("agent:") })
         assertEquals(1, sink.posted.size)
     }
 
     @Test
     fun aCanaryShowsNothingButCountsAsWord() {
-        push("""{"v":1,"type":"canary","machine":"workstation","at":5}""", now = NOW + 7)
+        push("""{"v":1,"type":"canary","machine":"workstation","at":${NOW + 7}}""", now = NOW + 7)
         assertTrue(sink.posted.isEmpty())
         assertEquals(NOW + 7, store.machine("workstation").lastPushMs)
     }
@@ -178,7 +179,7 @@ class AlertsTest {
     @Test
     fun aTestArrivesAsANotificationAndIsRecorded() {
         store.testAsked("workstation", NOW - 3_000)
-        push("""{"v":1,"type":"test","machine":"workstation","at":5}""")
+        push("""{"v":1,"type":"test","machine":"workstation","at":$NOW}""")
         val note = sink.posted.single()
         assertEquals(AlertChannel.NeedsYou, note.channel)
         assertEquals("test:workstation", note.tag)
@@ -189,8 +190,8 @@ class AlertsTest {
     @Test
     fun aMutedMachineShowsNothingButStillCountsForHealth() {
         store.setMuted("workstation", true)
-        push(alert("blocked"), now = NOW + 1)
-        push("""{"v":1,"type":"test","machine":"workstation","at":5}""", now = NOW + 2)
+        push(alert("blocked", at = NOW + 1), now = NOW + 1)
+        push("""{"v":1,"type":"test","machine":"workstation","at":${NOW + 2}}""", now = NOW + 2)
         assertTrue(sink.posted.isEmpty())
         assertEquals(NOW + 2, store.machine("workstation").lastPushMs)
         assertEquals(NOW + 2, store.machine("workstation").testReceivedMs)
@@ -212,7 +213,7 @@ class AlertsTest {
 
     @Test
     fun anUnknownTypeOnlyCountsAsWord() {
-        push("""{"v":2,"type":"something-new","machine":"workstation","at":5}""")
+        push("""{"v":2,"type":"something-new","machine":"workstation","at":$NOW}""")
         assertTrue(sink.posted.isEmpty())
         assertEquals(NOW, store.machine("workstation").lastPushMs)
     }
@@ -223,9 +224,84 @@ class AlertsTest {
         assertTrue(sink.posted.isEmpty())
     }
 
+    // Issue #22: a push proves only that its sender holds the subscription
+    // keys, so a server that kept an old one could deliver it again. Each
+    // push carries when the desk sent it ("at"): only one newer than the last
+    // from that machine counts, and silence is measured from when it was sent.
+
+    @Test
+    fun aPushDeliveredAgainIsIgnored() {
+        push(alert("blocked"))
+        push(alert("blocked"), now = NOW + HOUR)
+        assertEquals(1, sink.posted.size)
+        assertEquals(NOW, store.machine("workstation").lastPushMs)
+    }
+
+    @Test
+    fun anOldClearDoesNotRemoveANewerAlert() {
+        push("""{"v":1,"type":"cleared","machine":"workstation","terminal":"t3","at":$NOW}""")
+        push(alert("blocked", at = NOW + 5), now = NOW + 5)
+        push("""{"v":1,"type":"cleared","machine":"workstation","terminal":"t3","at":$NOW}""", now = NOW + 9)
+        assertEquals(listOf("agent:workstation/t3"), sink.cancelled.filter { it.startsWith("agent:") })
+    }
+
+    @Test
+    fun anOldCanaryDoesNotHideSilence() {
+        push("""{"v":1,"type":"canary","machine":"workstation","at":$NOW}""")
+        push("""{"v":1,"type":"canary","machine":"workstation","at":$NOW}""", now = NOW + 12 * HOUR)
+        alerts.checkSilence(NOW + 13 * HOUR)
+        assertEquals(1, sink.posted.count { it.channel == AlertChannel.Health })
+    }
+
+    @Test
+    fun anOldTestDoesNotPassANewTest() {
+        push("""{"v":1,"type":"test","machine":"workstation","at":$NOW}""")
+        store.testAsked("workstation", NOW + HOUR)
+        push("""{"v":1,"type":"test","machine":"workstation","at":$NOW}""", now = NOW + HOUR + 1)
+        assertEquals(NOW, store.machine("workstation").testReceivedMs)
+    }
+
+    @Test
+    fun aHeldBackPushCountsFromWhenItWasSent() {
+        push("""{"v":1,"type":"canary","machine":"workstation","at":${NOW - 10 * HOUR}}""")
+        assertEquals(NOW - 10 * HOUR, store.machine("workstation").lastPushMs)
+        alerts.checkSilence(NOW + 3 * HOUR)
+        assertEquals(1, sink.posted.count { it.channel == AlertChannel.Health })
+    }
+
+    @Test
+    fun aDeskClockAheadCountsAsNow() {
+        push("""{"v":1,"type":"canary","machine":"workstation","at":${NOW + 24 * HOUR}}""")
+        assertEquals(NOW, store.machine("workstation").lastPushMs)
+        push(alert("blocked", at = NOW + 24 * HOUR + 1), now = NOW + 1)
+        assertEquals(1, sink.posted.size)
+    }
+
+    @Test
+    fun aPushWithoutItsTimeIsIgnored() {
+        push("""{"v":1,"type":"canary","machine":"workstation"}""")
+        push("""{"v":1,"type":"canary","machine":"workstation","at":"soon"}""")
+        assertNull(store.machine("workstation").lastPushMs)
+        assertTrue(sink.cancelled.isEmpty())
+    }
+
+    @Test
+    fun aPushPaddedWithSpacesReadsAsBefore() {
+        // herdr-push pads every push to one size with spaces after the JSON.
+        push(alert("blocked", kind = "permission") + " ".repeat(900))
+        assertEquals("docs nav needs you", sink.posted.single().title)
+    }
+
+    @Test
+    fun eachMachineKeepsItsOwnOrder() {
+        push(alert("blocked", machine = "workstation", at = NOW + 50))
+        push(alert("blocked", machine = "server", at = NOW))
+        assertEquals(2, sink.posted.size)
+    }
+
     @Test
     fun silenceOfThirteenHoursPostsOneQuietNotice() {
-        push("""{"v":1,"type":"canary","machine":"workstation","at":5}""", now = NOW)
+        push("""{"v":1,"type":"canary","machine":"workstation","at":$NOW}""", now = NOW)
         alerts.checkSilence(NOW + 13 * HOUR - 1)
         assertTrue(sink.posted.isEmpty())
         alerts.checkSilence(NOW + 13 * HOUR)
@@ -242,9 +318,9 @@ class AlertsTest {
 
     @Test
     fun theNextPushClearsTheNoticeAndArmsItAgain() {
-        push("""{"v":1,"type":"canary","machine":"workstation","at":5}""", now = NOW)
+        push("""{"v":1,"type":"canary","machine":"workstation","at":$NOW}""", now = NOW)
         alerts.checkSilence(NOW + 14 * HOUR)
-        push("""{"v":1,"type":"canary","machine":"workstation","at":6}""", now = NOW + 20 * HOUR)
+        push("""{"v":1,"type":"canary","machine":"workstation","at":${NOW + 20 * HOUR}}""", now = NOW + 20 * HOUR)
         assertTrue("health:workstation" in sink.cancelled)
         alerts.checkSilence(NOW + 33 * HOUR)
         assertEquals(2, sink.posted.count { it.channel == AlertChannel.Health })

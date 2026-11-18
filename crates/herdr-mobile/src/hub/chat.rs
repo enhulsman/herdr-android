@@ -350,9 +350,21 @@ fn send_outcome(r: &Result<Value, CallError>) -> Sent {
 }
 
 /// Enter is pressed once more only into what the message was typed into:
-/// the same process and session, and an agent that may take it now.
-fn may_enter_again(sent_to: Option<&send::Target>, seen: &Seen) -> bool {
-    sent_to.is_some_and(|t| send::check_again(t, seen).is_ok())
+/// the same process and session, and an agent that may take it now. It goes
+/// as a `terminal.send` of one space, never as a bare `terminal.keys` Enter:
+/// the core refuses a send to a blocked program at the moment it types, so
+/// the Enter can never answer a dialog that opened after this check, and the
+/// checked status goes as its `if` where the core has one (idle, working).
+/// Not an empty send: Claude Code keeps the message in its box after an
+/// empty paste (checked at the desk, 2026-11-18); a trailing space changes
+/// nothing the agent reads.
+fn enter_again_params(address: &str, sent_to: Option<&send::Target>, seen: &Seen) -> Option<Value> {
+    let guard = send::check_again(sent_to?, seen).ok()?;
+    let mut params = json!({"terminal": address, "text": " "});
+    if let Some(st) = guard {
+        params["if"] = json!(st);
+    }
+    Some(params)
 }
 
 fn refusal(r: Refusal) -> ChatRefusal {
@@ -671,15 +683,14 @@ impl Chat {
             let Ok((t, start, l)) = self.check(&c).await else {
                 return false;
             };
-            if !may_enter_again(self.sent_to.lock().unwrap().as_ref(), &seen(&t, start, &l)) {
+            let Some(params) = enter_again_params(
+                &self.address,
+                self.sent_to.lock().unwrap().as_ref(),
+                &seen(&t, start, &l),
+            ) else {
                 return false;
-            }
-            c.call(
-                "terminal.keys",
-                json!({"terminal": self.address, "keys": ["enter"]}),
-            )
-            .await
-            .is_ok()
+            };
+            send_outcome(&c.call("terminal.send", params).await) == Sent::Typed
         })
     }
 
@@ -1062,32 +1073,45 @@ mod tests {
             lookup: l,
         };
         let claude = Some(Agent::Claude);
-        assert!(may_enter_again(
-            Some(&to),
-            &seen(claude, 7, Some("idle"), &s1)
-        ));
-        assert!(may_enter_again(
-            Some(&to),
-            &seen(claude, 7, Some("working"), &s1)
-        ));
-        assert!(
-            !may_enter_again(None, &seen(claude, 7, Some("idle"), &s1)),
+        let press =
+            |sent_to: Option<&send::Target>, seen: &Seen| enter_again_params("t3", sent_to, seen);
+        assert_eq!(
+            press(Some(&to), &seen(claude, 7, Some("idle"), &s1)),
+            Some(json!({"terminal": "t3", "text": " ", "if": "idle"})),
+            "a send, not a key: the core refuses it if a dialog opened or the status changed"
+        );
+        assert_eq!(
+            press(Some(&to), &seen(claude, 7, Some("working"), &s1)),
+            Some(json!({"terminal": "t3", "text": " ", "if": "working"}))
+        );
+        assert_eq!(
+            press(Some(&to), &seen(claude, 7, Some("done"), &s1)),
+            Some(json!({"terminal": "t3", "text": " "})),
+            "the core has no if for done; it still refuses a dialog"
+        );
+        assert_eq!(
+            press(None, &seen(claude, 7, Some("idle"), &s1)),
+            None,
             "nothing sent"
         );
-        assert!(
-            !may_enter_again(Some(&to), &seen(claude, 7, Some("blocked"), &s1)),
+        assert_eq!(
+            press(Some(&to), &seen(claude, 7, Some("blocked"), &s1)),
+            None,
             "a dialog would take it"
         );
-        assert!(
-            !may_enter_again(Some(&to), &seen(claude, 8, Some("idle"), &s1)),
+        assert_eq!(
+            press(Some(&to), &seen(claude, 8, Some("idle"), &s1)),
+            None,
             "another process"
         );
-        assert!(
-            !may_enter_again(Some(&to), &seen(claude, 7, Some("idle"), &s2)),
+        assert_eq!(
+            press(Some(&to), &seen(claude, 7, Some("idle"), &s2)),
+            None,
             "another session"
         );
-        assert!(
-            !may_enter_again(Some(&to), &seen(None, 7, Some("idle"), &s1)),
+        assert_eq!(
+            press(Some(&to), &seen(None, 7, Some("idle"), &s1)),
+            None,
             "exited into the shell"
         );
     }

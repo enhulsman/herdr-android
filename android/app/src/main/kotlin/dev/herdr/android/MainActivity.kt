@@ -1,5 +1,6 @@
 package dev.herdr.android
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -34,6 +35,9 @@ class MainActivity : ComponentActivity() {
         val transparent = android.graphics.Color.TRANSPARENT
         // Light or dark bar icons follow the system, as the theme does.
         enableEdgeToEdge(SystemBarStyle.auto(transparent, transparent), SystemBarStyle.auto(transparent, transparent))
+        // Recents keeps no picture of a terminal, chat or diff: it would show
+        // what was on screen after the 30-minute key window has closed (issue #22).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(false)
         val app = application as HerdrApp
         // The UnifiedPush way to keep a registration current: ask again on each start; a
         // changed endpoint arrives in HerdrPushService.

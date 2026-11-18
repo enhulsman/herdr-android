@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -746,6 +747,8 @@ private fun androidx.compose.foundation.layout.RowScope.Key(
         // At large font sizes a label shrinks to fit its key rather than being cut ("ctr").
         BasicText(
             label,
+            // The key's spoken name says it; read the label too and TalkBack says "Dash, dash".
+            modifier = if (spoken != null) Modifier.clearAndSetSemantics {} else Modifier,
             style = HerdrType.keysRow.copy(color = if (latched) c.solidFg else c.fg),
             maxLines = 1,
             // No wrapping: a label too wide must count as overflowing its width, which shrinks it.

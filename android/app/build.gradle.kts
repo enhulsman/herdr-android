@@ -121,7 +121,8 @@ androidComponents {
             description = "Builds the Rust core and its Kotlin bindings for ${variant.name}."
             release.set(variant.buildType != "debug" || providers.gradleProperty("herdr.perf").isPresent)
             // Every build draws terminals since M2: libghostty-vt from scripts/build-ghostty.sh.
-            features.set(listOf("vt"))
+            // ssh_run_spike, which can accept any host key, only in the spike app.
+            features.set(if (variant.buildType == "spike") listOf("vt", "spike") else listOf("vt"))
             repoRoot.set(rootProject.layout.projectDirectory.dir(".."))
         }
         variant.sources.jniLibs?.addGeneratedSourceDirectory(buildRust, BuildRust::jniLibs)

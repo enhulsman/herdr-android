@@ -12,6 +12,9 @@ crate-type = ["cdylib", "lib"]
 [features]
 # Links libghostty-vt from build/ghostty/ (scripts/build-ghostty.sh); see build.rs.
 vt = []
+# ssh_run_spike, which can accept any host key: only the spike app (src/spike)
+# and the sshd tests turn it on; the app's debug and release builds lack it.
+spike = []
 
 [dependencies]
 herdr-proto = { path = "../herdr-proto" }
@@ -29,3 +32,7 @@ uniffi.workspace = true
 base64 = "0.22"
 p256 = { version = "0.14.0", default-features = false, features = ["ecdsa", "std", "pkcs8", "pem"] }
 tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+
+[[test]]
+name = "sshd"
+required-features = ["spike"]

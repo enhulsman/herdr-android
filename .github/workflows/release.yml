@@ -99,7 +99,7 @@ jobs:
 
       - name: Rust tests, release-tag tests, cargo-deny
         run: |
-          cargo test --locked --features herdr-mobile/vt
+          cargo test --locked --features herdr-mobile/vt,herdr-mobile/spike
           scripts/test-check-release-tag.sh
           scripts/test-release-sign-gate.sh
           cargo deny --locked check advisories licenses sources

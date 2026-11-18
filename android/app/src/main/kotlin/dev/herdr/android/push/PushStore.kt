@@ -24,7 +24,11 @@ sealed interface AlertSetup {
 /** What the phone recorded about one machine's alerts; times are ms since the epoch. */
 data class MachineAlerts(
     val muted: Boolean = false,
-    /** The last push of any kind from it; never the registration time (issue 21). */
+    /**
+     * When its desk sent the last push of any kind (never later than when it
+     * arrived); never the registration time (issue 21). A push no newer than
+     * this is a repeat and is ignored (issue #22).
+     */
     val lastPushMs: Long? = null,
     /** When it first had the phone's registration: the silence baseline until a push comes. */
     val enrolledMs: Long? = null,

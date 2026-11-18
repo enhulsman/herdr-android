@@ -41,9 +41,13 @@ interface AlertSink {
 /**
  * Turns pushes from herdr-push into notifications, and silence into one
  * "Alert health" notice (alerts spec). A push the connector could not decrypt,
- * or one without a machine, is ignored entirely: it proves nothing about the
- * path. Every other push counts as word from its machine and clears that
- * machine's health notice; a muted machine's pushes post nothing. Notification
+ * or one without a machine or the time its desk sent it ("at"), is ignored
+ * entirely: it proves nothing about the path. So is one no newer than the last
+ * from its machine: decrypting proves only that the sender holds the
+ * subscription keys, so a server that kept a push could deliver it again
+ * (issue #22). Every other push counts as word from its machine, from when it
+ * was sent (never later than now), and clears that machine's health notice; a
+ * muted machine's pushes post nothing. Notification
  * text carries the agent's name, the kind, the desk's "space / tab" and the
  * machine only, never screen text or the program's message (the payload has
  * neither). The name may be a
@@ -60,7 +64,9 @@ class Alerts(
         if (!decrypted) return
         val push = parse(content) ?: return
         val machine = push.machine
-        store.recordPush(machine, nowMs)
+        val last = store.machine(machine).lastPushMs
+        if (last != null && push.at <= last) return
+        store.recordPush(machine, minOf(push.at, nowMs))
         sink.cancel(healthTag(machine))
         val muted = store.machine(machine).muted
         when (push.type) {
@@ -139,6 +145,7 @@ class Alerts(
         val place: String?,
         val state: String?,
         val kind: String?,
+        val at: Long,
     )
 
     private fun parse(content: ByteArray): Push? {
@@ -149,7 +156,8 @@ class Alerts(
         }
         fun text(key: String): String? = json.opt(key) as? String
         val machine = text("machine")?.takeIf { it.isNotEmpty() } ?: return null
-        return Push(text("type") ?: "", machine, text("terminal")?.takeIf { it.isNotEmpty() }, text("name"), text("place"), text("state"), text("kind")?.takeIf { it.isNotEmpty() })
+        val at = (json.opt("at") as? Number)?.toLong() ?: return null
+        return Push(text("type") ?: "", machine, text("terminal")?.takeIf { it.isNotEmpty() }, text("name"), text("place"), text("state"), text("kind")?.takeIf { it.isNotEmpty() }, at)
     }
 
     companion object {

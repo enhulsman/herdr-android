@@ -1,0 +1,22 @@
+name: Idea
+description: Something the app could do, or do better
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Check the [roadmap board](https://github.com/users/enhulsman/projects/4) and the "Not planned" list in the README first; it may be there already.
+
+        This issue is public, so leave out your host names, IP addresses, ports, paths and anything else about your own machines.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The situation, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you'd like the app to handle it, if you have an idea.

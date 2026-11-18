@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in the app doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. This issue is public, so leave out your host names, IP addresses, ports, paths, user names and anything else about your own machines. Made-up names (workstation, website, ~/project) work just as well.
+
+        A security problem? Don't file it here; see [SECURITY.md](https://github.com/enhulsman/herdr-android/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the agents list
+        2. Tap an agent that needs you
+        3. ...
+  - type: input
+    id: app
+    attributes:
+      label: App version
+      description: In Android settings, Apps, herdr; the version is at the bottom.
+    validations:
+      required: true
+  - type: input
+    id: core
+    attributes:
+      label: herdr-core version
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: Pixel 7, Android 16 (GrapheneOS)
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: Check them for host names, paths and terminal contents before you attach them.

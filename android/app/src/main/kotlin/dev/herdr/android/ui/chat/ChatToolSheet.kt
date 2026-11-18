@@ -42,10 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -254,14 +252,13 @@ private fun CallDetail(d: ChatCall, images: ChatImageSource, onImage: (String) -
 @Composable
 private fun Section(label: String, text: String, mono: Boolean, copy: Boolean) {
     val c = HerdrTheme.colors
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) {
             BasicText(label, style = HerdrType.secondary.copy(color = c.muted, fontWeight = FontWeight.Medium), modifier = Modifier.weight(1f))
             if (copy) {
                 CopyIcon(Modifier.clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
-                    clipboard.setText(AnnotatedString(text))
+                    copySensitive(context, text)
                     Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
                 }.padding(8.dp), tint = c.fg, size = 18.dp)
             }

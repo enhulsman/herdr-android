@@ -61,7 +61,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -451,11 +450,10 @@ private fun Copyable(text: String, end: Boolean = false, content: @Composable ()
 
 @Composable
 private fun CopyButton(text: String, padding: Modifier, tint: Color = HerdrTheme.colors.dimText, size: Dp = 16.dp) {
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     CopyIcon(
         Modifier.clip(RoundedCornerShape(HerdrRadius.chip)).clickable {
-            clipboard.setText(AnnotatedString(text))
+            copySensitive(context, text)
             Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
         }.then(padding),
         tint, size,

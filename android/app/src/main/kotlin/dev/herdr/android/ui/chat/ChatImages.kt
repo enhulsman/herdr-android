@@ -61,6 +61,7 @@ import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.theme.HerdrType
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.herdr_mobile.ChatImage
@@ -292,10 +293,25 @@ fun exifTurn(orientation: Int): ExifTurn = when (orientation) {
     else -> ExifTurn(0f, false)
 }
 
+/** The largest picked file read: well above any camera photo (issue #22). */
+private const val MAX_PICK_BYTES = 64 * 1024 * 1024
+
+/** All of [input] when it holds at most [limit] bytes, else null, reading no more than about [limit]. */
+fun readAtMost(input: InputStream, limit: Int): ByteArray? {
+    val out = ByteArrayOutputStream()
+    val buf = ByteArray(8192)
+    while (true) {
+        val n = input.read(buf)
+        if (n < 0) return out.toByteArray()
+        if (out.size() + n > limit) return null
+        out.write(buf, 0, n)
+    }
+}
+
 /** A picked photo as it will be sent: small enough, in a type agents take. */
 fun prepareAttachment(context: Context, uri: Uri, index: Int = 0): Attachment? {
     val type = context.contentResolver.getType(uri) ?: "image/jpeg"
-    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    val bytes = context.contentResolver.openInputStream(uri)?.use { readAtMost(it, MAX_PICK_BYTES) } ?: return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     if (bounds.outWidth <= 0) return null

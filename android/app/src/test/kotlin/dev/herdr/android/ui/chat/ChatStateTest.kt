@@ -160,4 +160,20 @@ class ChatStateTest {
     fun attachedPhotosGetDistinctNames() {
         assertEquals(4, List(4) { photoName(stamp = 4242L, index = it, ext = "jpg") }.toSet().size)
     }
+
+    // Issue #22: a picked file is read only up to a limit, so a huge one (or a
+    // provider that never stops) cannot fill the app's memory.
+    @Test
+    fun aPickedFileIsReadUpToALimit() {
+        val small = ByteArray(10) { it.toByte() }
+        assertTrue(small.contentEquals(readAtMost(java.io.ByteArrayInputStream(small), 10)))
+        assertNull(readAtMost(java.io.ByteArrayInputStream(ByteArray(11)), 10))
+        val endless = object : java.io.InputStream() {
+            var read = 0L
+            override fun read(): Int { read++; return 0 }
+            override fun read(b: ByteArray, off: Int, len: Int): Int { read += len; return len }
+        }
+        assertNull(readAtMost(endless, 1000))
+        assertTrue("read ${endless.read} bytes", endless.read <= 1000 + 8192)
+    }
 }

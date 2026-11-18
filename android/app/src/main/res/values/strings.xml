@@ -254,6 +254,8 @@
     <string name="compose_to">to %1$s</string>
     <string name="compose_hint">Pasted into the terminal. Enter is yours.</string>
     <string name="compose_paste">Paste</string>
+    <!-- A program without bracketed paste (a plain shell) would run each line (issue #22). -->
+    <string name="compose_lines_refused">This program would take each line break as Enter. Paste one line at a time.</string>
     <!-- Alerts (M3): notification channels, as Android settings lists them. -->
     <string name="channel_needs_you">Needs you</string>
     <string name="channel_finished">Finished</string>

@@ -92,7 +92,8 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
     fun type(text: String) = send { armed = typeText(text) }
     fun backspace() = send { armed = backspace() }
     fun tap(key: RowKeyTap) = send { armed = tap(key) }
-    fun paste(text: String) = send { paste(text) }
+    /** False when the core refused it: a line break the program would take as Enter. */
+    fun paste(text: String): Boolean = if (closed) true else view?.paste(text) ?: true
     fun scroll(rows: Int) = send { if (rows != 0) scroll(rows) }
 
     /** Takes over at the phone's size without typing (a tap while watching). */

@@ -353,6 +353,7 @@ impl Hub {
                         }
                     }
                 });
+            let bracketed = Arc::<std::sync::atomic::AtomicBool>::default();
             let cmds = spawned.ok().map(|_| {
                 term::spawn(
                     &self.core,
@@ -361,10 +362,12 @@ impl Hub {
                     (phone_cols, phone_rows),
                     at_phone_size,
                     Arc::new(ListenerSink(tx)),
+                    bracketed.clone(),
                 )
             });
             Arc::new(TerminalView {
                 cmds: Mutex::new(cmds),
+                bracketed,
                 keys: Mutex::new(keys_row::KeysRow::default()),
             })
         }
@@ -463,6 +466,9 @@ pub struct Armed {
 pub struct TerminalView {
     #[cfg(feature = "vt")]
     cmds: Mutex<Option<tokio::sync::mpsc::UnboundedSender<term::Cmd>>>,
+    /// The program asked for bracketed paste, as of its last output.
+    #[cfg(feature = "vt")]
+    bracketed: Arc<std::sync::atomic::AtomicBool>,
     keys: Mutex<keys_row::KeysRow>,
 }
 
@@ -584,12 +590,21 @@ impl TerminalView {
         self.armed_now()
     }
 
-    /// Compose text, as a bracketed paste without Enter.
-    pub fn paste(&self, text: String) {
+    /// Compose text, as a bracketed paste without Enter; false, with nothing
+    /// sent, when it has a line break and the program did not ask for
+    /// bracketed paste: each line would run as if Enter were pressed (issue #22).
+    pub fn paste(&self, text: String) -> bool {
         #[cfg(feature = "vt")]
-        self.send(term::Cmd::Paste(text));
+        {
+            let bracketed = self.bracketed.load(std::sync::atomic::Ordering::Relaxed);
+            if !bracketed && text.contains(['\n', '\r']) {
+                return false;
+            }
+            self.send(term::Cmd::Paste(text));
+        }
         #[cfg(not(feature = "vt"))]
         let _ = text;
+        true
     }
 
     /// Scrolls the view by rows; up is negative.

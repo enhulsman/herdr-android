@@ -1,6 +1,7 @@
 package dev.herdr.android.ui.terminal
 
 import android.view.HapticFeedbackConstants
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -141,6 +142,18 @@ class TerminalScreenState(zoom: Float? = null) {
             else -> Unit
         }
     }
+
+    /**
+     * Pastes the compose text and closes the sheet; false, with the sheet and
+     * its text kept, when [paste] refused it (a line break the program would
+     * take as Enter, issue #22).
+     */
+    fun sendCompose(paste: (String) -> Boolean): Boolean {
+        if (composeText.isNotEmpty() && !paste(composeText)) return false
+        composeOpen = false
+        composeText = ""
+        return true
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -165,6 +178,7 @@ fun TerminalScreen(
     covered: Boolean = false,
 ) {
     val c = HerdrTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
     val phase = session.state?.phase
     LaunchedEffect(phase) { screen.follow(phase) }
     val keysShown = screen.inputOpen || screen.typing
@@ -209,9 +223,9 @@ fun TerminalScreen(
                     screen.composeText = ""
                 },
                 onPaste = {
-                    if (screen.composeText.isNotEmpty()) session.paste(screen.composeText)
-                    screen.composeOpen = false
-                    screen.composeText = ""
+                    if (!screen.sendCompose(session::paste)) {
+                        Toast.makeText(context, R.string.compose_lines_refused, Toast.LENGTH_LONG).show()
+                    }
                 },
                 focus = composeFocus,
             )

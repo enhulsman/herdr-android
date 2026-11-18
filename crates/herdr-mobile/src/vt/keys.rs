@@ -6,8 +6,9 @@
 //! Apache-2.0 (see crates/herdr-proto/LICENSE-herdr-Apache-2.0). Changed: keys
 //! come from a phone keyboard as characters, so a character is mapped to the
 //! US-layout key that types it (its unshifted codepoint and Shift), and the
-//! macOS option-as-alt setting does not apply; the compose paste is always
-//! bracketed (the spec), and markers are removed until none is left.
+//! macOS option-as-alt setting does not apply; the compose paste is bracketed
+//! only when the program asked (a line break is refused otherwise), and
+//! markers are removed until none is left.
 
 use super::{Terminal, ffi};
 use crate::keys_row::{Key, Mods};
@@ -128,19 +129,28 @@ impl Terminal {
     }
 }
 
-/// Text from the compose field as a bracketed paste with no Enter
-/// (terminal-input spec, "A compose key for long text"): always wrapped, even
-/// when the program did not ask for bracketed paste, newlines kept as typed.
-/// Paste markers inside the text are removed until none is left, so removing
-/// one can never join the text around it into another.
-pub fn paste_bytes(text: &str) -> Vec<u8> {
+/// Text from the compose field with no Enter (terminal-input spec, "A compose
+/// key for long text"): a bracketed paste, newlines kept as typed, when the
+/// program asked for one ([`Terminal::bracketed_paste`]). Otherwise the
+/// program would take each line break as Enter, so text with one is refused
+/// (`None`) and a single line goes in as typed (issue #22). Paste markers
+/// inside the text are removed until none is left, so removing one can never
+/// join the text around it into another.
+pub fn paste_bytes(text: &str, bracketed: bool) -> Option<Vec<u8>> {
     const START: &str = "\x1b[200~";
     const END: &str = "\x1b[201~";
+    if !bracketed && text.contains(['\n', '\r']) {
+        return None;
+    }
     let mut clean = text.to_owned();
     while clean.contains(START) || clean.contains(END) {
         clean = clean.replace(START, "").replace(END, "");
     }
-    [START.as_bytes(), clean.as_bytes(), END.as_bytes()].concat()
+    Some(if bracketed {
+        [START.as_bytes(), clean.as_bytes(), END.as_bytes()].concat()
+    } else {
+        clean.into_bytes()
+    })
 }
 
 #[cfg(test)]
@@ -302,21 +312,46 @@ mod tests {
     }
 
     /// The compose key (terminal-input spec, "A compose key for long text"):
-    /// always a bracketed paste, with no Enter and no newline conversion,
-    /// whether or not the program asked for bracketed paste.
+    /// a bracketed paste with no Enter and no newline conversion when the
+    /// program asked for bracketed paste.
     #[test]
     fn compose_text_is_a_bracketed_paste_without_enter() {
         let text = "fix the retry\nthen run the tests";
         let want = b"\x1b[200~fix the retry\nthen run the tests\x1b[201~".as_slice();
-        assert_eq!(paste_bytes(text), want);
-        let mut t = Terminal::new(80, 24).unwrap();
-        t.write(b"\x1b[?2004h");
-        assert_eq!(paste_bytes(text), want, "same with the mode on");
+        assert_eq!(paste_bytes(text, true).as_deref(), Some(want));
         assert_eq!(
-            paste_bytes("one\r\ntwo\n"),
-            b"\x1b[200~one\r\ntwo\n\x1b[201~",
+            paste_bytes("one\r\ntwo\n", true).as_deref(),
+            Some(b"\x1b[200~one\r\ntwo\n\x1b[201~".as_slice()),
             "newlines are kept as typed, nothing is added"
         );
+    }
+
+    /// Issue #22: a program that did not ask for bracketed paste (a plain
+    /// `sh`) would read the paste markers as junk and run each line, so
+    /// text with a line break is refused, and one line goes in as typed.
+    #[test]
+    fn without_bracketed_paste_only_one_line_goes_in() {
+        assert_eq!(paste_bytes("make clean\nrm -rf build", false), None);
+        assert_eq!(paste_bytes("one\rtwo", false), None);
+        assert_eq!(
+            paste_bytes("git status", false).as_deref(),
+            Some(b"git status".as_slice())
+        );
+        assert_eq!(
+            paste_bytes("a\x1b[201~b", false).as_deref(),
+            Some(b"ab".as_slice()),
+            "markers are removed here too"
+        );
+    }
+
+    #[test]
+    fn the_terminal_reports_bracketed_paste() {
+        let mut t = Terminal::new(80, 24).unwrap();
+        assert!(!t.bracketed_paste());
+        t.write(b"\x1b[?2004h");
+        assert!(t.bracketed_paste());
+        t.write(b"\x1b[?2004l");
+        assert!(!t.bracketed_paste());
     }
 
     /// Pasted text can never end the paste early or start a nested one, also
@@ -333,7 +368,7 @@ mod tests {
             ("\x1b[201\x1b[200~~", ""),
             ("plain \x1b[A arrow", "plain \x1b[A arrow"),
         ] {
-            let got = paste_bytes(text);
+            let got = paste_bytes(text, true).unwrap();
             let inner = &got[6..got.len() - 6];
             assert_eq!(inner, body.as_bytes(), "{text:?}");
             for marker in [b"\x1b[200~".as_slice(), b"\x1b[201~"] {

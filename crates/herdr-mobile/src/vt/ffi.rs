@@ -214,6 +214,16 @@ pub const TERMINAL_DATA_SCROLLBAR: c_int = 9;
 pub const TERMINAL_DATA_VIEWPORT_ACTIVE: c_int = 32;
 pub const TERMINAL_DATA_ACTIVE_SCREEN: c_int = 6;
 pub const TERMINAL_DATA_MOUSE_TRACKING: c_int = 11;
+pub const TERMINAL_DATA_MODE: c_int = 37;
+/// `ghostty_mode_new(2004, false)`: DEC private mode 2004, bracketed paste.
+pub const MODE_BRACKETED_PASTE: u16 = 2004;
+
+/// `GhosttyTerminalModeConfig`: the mode to query, and its value.
+#[repr(C)]
+pub struct ModeConfig {
+    pub mode: u16,
+    pub value: bool,
+}
 
 // GhosttyTerminalScreen
 pub const SCREEN_PRIMARY: c_int = 0;

@@ -106,6 +106,31 @@ class TerminalSessionTest {
         )
     }
 
+    // Issue #22: compose text with a line break is refused where the program
+    // did not ask for bracketed paste; the sheet keeps the text to edit.
+    @Test
+    fun aRefusedPasteKeepsTheComposeSheetAndItsText() {
+        val screen = TerminalScreenState().apply { composeOpen = true; composeText = "make clean\nrm -rf build" }
+        view.pasteTaken = false
+        assertFalse(screen.sendCompose(session::paste))
+        assertTrue(screen.composeOpen)
+        assertEquals("make clean\nrm -rf build", screen.composeText)
+        view.pasteTaken = true
+        screen.composeText = "make clean"
+        assertTrue(screen.sendCompose(session::paste))
+        assertFalse(screen.composeOpen)
+        assertEquals("", screen.composeText)
+        assertEquals(listOf("paste make clean\nrm -rf build", "paste make clean"), view.calls)
+    }
+
+    @Test
+    fun anEmptyComposeClosesWithoutAPaste() {
+        val screen = TerminalScreenState().apply { composeOpen = true }
+        assertTrue(screen.sendCompose(session::paste))
+        assertFalse(screen.composeOpen)
+        assertTrue(view.calls.isEmpty())
+    }
+
     @Test
     fun leavingDetachesAndHandsBackTheLastScreen() {
         val frame = frameOf(6, 2, mapOf(0 to cellsOf("last"), 1 to cellsOf("")))
@@ -176,8 +201,11 @@ class FakeTerminalView : TerminalViewInterface, AutoCloseable {
     override fun live() {
         calls += "live"
     }
-    override fun paste(text: String) {
+    /** What the core answers a paste: false refuses it (a line break without bracketed paste). */
+    var pasteTaken = true
+    override fun paste(text: String): Boolean {
         calls += "paste $text"
+        return pasteTaken
     }
     override fun phoneSize(cols: UShort, rows: UShort) {
         calls += "size ${cols}x$rows"

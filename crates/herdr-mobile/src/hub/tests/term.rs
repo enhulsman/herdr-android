@@ -188,7 +188,15 @@ fn open(rig: &Rig) -> Open {
 /// `lead`: open at the phone's size, as the app does since round 2.
 fn open_with(rig: &Rig, lead: bool) -> Open {
     let (tx, rx) = mpsc::unbounded_channel();
-    let cmds = term::spawn(&rig.hub, WS, "t3", PHONE, lead, Arc::new(Sink(tx)));
+    let cmds = term::spawn(
+        &rig.hub,
+        WS,
+        "t3",
+        PHONE,
+        lead,
+        Arc::new(Sink(tx)),
+        Arc::default(),
+    );
     Open {
         screen: Screen {
             seen: rx,
@@ -340,7 +348,7 @@ async fn the_first_key_reattaches_at_the_phones_size_then_types() {
 // Keys-row keys and the compose paste go through the same path.
 #[tokio::test(start_paused = true)]
 async fn keys_row_keys_and_a_paste_reach_the_program_encoded() {
-    let (_rig, mut core, o) = watching("term-keys").await;
+    let (_rig, mut core, mut o) = watching("term-keys").await;
     o.cmds.send(Cmd::Key(Key::Down, Mods::default())).unwrap();
     assert_eq!(core.frame().await.kind, wire::CLOSE);
     core.attach(6, PHONE).await;
@@ -355,11 +363,30 @@ async fn keys_row_keys_and_a_paste_reach_the_program_encoded() {
         ))
         .unwrap();
     assert_eq!(core.frame().await.payload, b"\x03");
+    // The program asks for bracketed paste, as Claude Code and shells do.
+    core.send(6, wire::DATA, b"\x1b[?2004hready").await;
+    o.screen.until_text("ready").await;
     o.cmds.send(Cmd::Paste("fix it\nplease".into())).unwrap();
     assert_eq!(
         core.frame().await.payload,
         b"\x1b[200~fix it\nplease\x1b[201~"
     );
+}
+
+// Issue #22: a program that did not ask for bracketed paste takes each line
+// break as Enter, so compose text with one types nothing; one line goes in.
+#[tokio::test(start_paused = true)]
+async fn without_bracketed_paste_a_paste_with_a_line_break_types_nothing() {
+    let (_rig, mut core, o) = watching("term-plain-paste").await;
+    o.cmds.send(Cmd::Key(Key::Down, Mods::default())).unwrap();
+    assert_eq!(core.frame().await.kind, wire::CLOSE);
+    core.attach(6, PHONE).await;
+    assert_eq!(core.frame().await.payload, b"\x1b[B");
+    o.cmds
+        .send(Cmd::Paste("make clean\nrm -rf build".into()))
+        .unwrap();
+    o.cmds.send(Cmd::Paste("git status".into())).unwrap();
+    assert_eq!(core.frame().await.payload, b"git status");
 }
 
 // "Desk resizes mid-stream" and "Back at the desk": a size event that is not

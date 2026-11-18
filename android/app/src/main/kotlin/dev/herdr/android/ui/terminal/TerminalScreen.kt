@@ -158,6 +158,11 @@ fun TerminalScreen(
     onChat: (() -> Unit)? = null,
     /** Opens the Changes screen; null hides the button. */
     onChanges: (() -> Unit)? = null,
+    /**
+     * The chat covers the terminal: its grid is not drawn, nor followed, so the
+     * agent's output costs no frames there; the rows it missed draw on return.
+     */
+    covered: Boolean = false,
 ) {
     val c = HerdrTheme.colors
     val phase = session.state?.phase
@@ -172,7 +177,7 @@ fun TerminalScreen(
             }
             ui.queue?.let { QueueStripRow(it) { actions.onOpen(it.next) } }
             Box(Modifier.fillMaxWidth().weight(1f)) {
-                TerminalArea(session, screen, actions, input, keysShown, ui.key.machine)
+                TerminalArea(session, screen, actions, input, keysShown, ui.key.machine, covered)
             }
             if (keysShown) {
                 KeysRow(
@@ -350,6 +355,7 @@ private fun TerminalArea(
     input: TerminalInputHandle,
     keysShown: Boolean,
     machine: String,
+    covered: Boolean,
 ) {
     val c = HerdrTheme.colors
     val density = LocalDensity.current
@@ -436,6 +442,8 @@ private fun TerminalArea(
                     }
                 },
         ) {
+            // Covered: no read of the version, so new output does not ask for a frame.
+            if (covered) return@Canvas
             @Suppress("UNUSED_EXPRESSION")
             session.version
             drawRect(if (grid.isEmpty) c.bg else Color(0xFF000000 or grid.defaultBg.toLong()))

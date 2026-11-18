@@ -1,19 +1,19 @@
 package dev.herdr.android.key
 
 import android.security.keystore.KeyProperties
+import dev.herdr.android.testing.HerdrTestRunner
 import java.security.spec.ECGenParameterSpec
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 // The key's properties are the spike's (M0.6) and the spec's: ECDSA P-256,
 // signing only, SHA-256, user authentication (biometric or device credential)
 // valid 30 minutes, StrongBox when the phone has it. The spec object is plain
 // framework code, so Robolectric can build it.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class PhoneKeySpecTest {
     @Test
     fun thePhoneKeyHasTheSpikesProperties() {

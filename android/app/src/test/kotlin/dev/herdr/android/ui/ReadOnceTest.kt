@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.AgentKey
 import dev.herdr.android.ui.agents.AgentsActions
 import dev.herdr.android.ui.agents.AgentsScreen
@@ -38,7 +39,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -51,7 +51,7 @@ import uniffi.herdr_mobile.TermState
 // read after its name) and "A Needs you card is read once". Reads the merged
 // semantics tree, which is what TalkBack is given: on the phone (2026-11-18)
 // TalkBack read "Dash, dash" and "Permission ... Permission".
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class ReadOnceTest {
     private val res = RuntimeEnvironment.getApplication().resources

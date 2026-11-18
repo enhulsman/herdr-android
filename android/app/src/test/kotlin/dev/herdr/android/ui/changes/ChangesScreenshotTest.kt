@@ -2,10 +2,10 @@ package dev.herdr.android.ui.changes
 
 import androidx.compose.foundation.lazy.LazyListState
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.theme.HerdrTheme
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uniffi.herdr_mobile.ChangesDiff
@@ -17,7 +17,7 @@ import uniffi.herdr_mobile.ChangesView
 // The Changes screen with invented repositories, in paper and graphite, held
 // to the signed-off renders 14-23 in design/renders/screens.html (task 4.2).
 // Goldens: src/test/snapshots/changes-<scene>-<theme>.png.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class ChangesScreenshotTest {

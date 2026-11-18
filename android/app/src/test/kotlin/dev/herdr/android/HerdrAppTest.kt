@@ -2,6 +2,7 @@ package dev.herdr.android
 
 import android.app.Activity
 import android.os.Looper
+import dev.herdr.android.testing.HerdrTestRunner
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -9,7 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 
@@ -18,7 +18,7 @@ import org.robolectric.Shadows.shadowOf
 // show as an error, never crash the app. A plain Activity, not MainActivity:
 // MainActivity loads the uniffi bindings inside Robolectric's class loader,
 // which re-registers the callback tables for the whole JVM (see HubHostTest).
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class HerdrAppTest {
     private val app get() = RuntimeEnvironment.getApplication() as HerdrApp
 

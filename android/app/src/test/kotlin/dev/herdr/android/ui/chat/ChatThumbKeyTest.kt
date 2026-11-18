@@ -9,18 +9,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import dev.herdr.android.testing.HerdrTestRunner
+import org.junit.After
 import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.controller.ActivityController
 
 // A thumbnail whose slot is handed another image must show that image, not
 // keep the one it had (seen in the spike, when rows were keyed by position):
 // tapping it opens the new key.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class ChatThumbKeyTest {
+    private val hosts = mutableListOf<ActivityController<ComponentActivity>>()
+
+    /** Ends each test's screen, so its composition does not run on into later tests. */
+    @After
+    fun closeHosts() {
+        for (c in hosts) c.pause().stop().destroy()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
     private fun bitmap() = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).asImageBitmap()
 
     private fun shown(cachedFirst: Boolean): Pair<ImageBitmap?, ImageBitmap> {
@@ -32,7 +43,9 @@ class ChatThumbKeyTest {
         }
         var key by mutableStateOf("a")
         var seen: ImageBitmap? = null
-        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        hosts += controller
+        val activity = controller.get()
         activity.setContent { seen = (rememberLoad(source, key) as? Load.Loaded)?.image }
         shadowOf(Looper.getMainLooper()).idle()
         key = "b"

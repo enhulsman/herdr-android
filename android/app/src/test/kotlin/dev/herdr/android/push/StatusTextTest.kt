@@ -1,12 +1,12 @@
 package dev.herdr.android.push
 
 import android.content.res.Resources
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import uniffi.herdr_mobile.AgentAttention
 import uniffi.herdr_mobile.AgentRow
@@ -20,7 +20,7 @@ import uniffi.herdr_mobile.MachineView
 // line by how many machines are connected, and with none
 // connected the title by precedence: start error, key, retrying, needs the
 // app, no machines. No agent, project, folder or machine names, ever.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class StatusTextTest {
     private val res: Resources = RuntimeEnvironment.getApplication().resources
 

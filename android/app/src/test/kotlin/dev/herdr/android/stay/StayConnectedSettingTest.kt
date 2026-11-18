@@ -2,18 +2,18 @@ package dev.herdr.android.stay
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 // stay-connected spec, "Stay connected is an option, off by default": off on a
 // fresh install and after an update from a version without it (absent = off),
 // kept in its own app-private preferences file, read back after a restart.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class StayConnectedSettingTest {
     private val app = RuntimeEnvironment.getApplication()
 

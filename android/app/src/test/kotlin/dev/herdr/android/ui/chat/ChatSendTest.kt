@@ -1,13 +1,13 @@
 package dev.herdr.android.ui.chat
 
 import androidx.compose.ui.graphics.ImageBitmap
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 import uniffi.herdr_mobile.ChatRefusal
 import uniffi.herdr_mobile.ChatRow
@@ -17,7 +17,7 @@ import uniffi.herdr_mobile.ChatRow
 // message shows at once and its state is followed", "Slash and shell
 // commands are sent as typed", "A draft is kept for each terminal while the
 // app runs").
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChatSendTest {
     private val rows = listOf(ChatRow("10:0", "said", "Done.", "", emptyList(), emptyList()))

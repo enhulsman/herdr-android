@@ -2,6 +2,7 @@ package dev.herdr.android.ui.flows
 
 import androidx.compose.foundation.layout.Box
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.addmachine.AddMachineActions
 import dev.herdr.android.ui.addmachine.AddMachineScreen
 import dev.herdr.android.ui.addmachine.MachineInput
@@ -17,7 +18,6 @@ import dev.herdr.android.ui.phonekey.PhoneKeyScreen
 import dev.herdr.android.ui.theme.HerdrTheme
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -27,7 +27,7 @@ import org.robolectric.annotation.GraphicsMode
 // (empty and with its checks), the changed-key screen and its forget confirm,
 // and the phone key line. Reference phone 412 x 915 dp at density 2, without
 // system bars. Goldens: src/test/snapshots/<name>.png.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class MachineFlowsScreenshotTest {

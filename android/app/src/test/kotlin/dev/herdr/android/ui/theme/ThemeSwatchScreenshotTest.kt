@@ -20,9 +20,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 // the state colours, the ANSI row and the type scale in both bundled fonts.
 // Goldens: src/test/snapshots/ (recordRoborazziDebug, verifyRoborazziDebug).
 // Reference phone from design-tokens.json: 412 dp wide at density 2.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h732dp-xhdpi")
 class ThemeSwatchScreenshotTest {

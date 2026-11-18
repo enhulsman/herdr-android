@@ -11,17 +11,17 @@ import android.graphics.drawable.AdaptiveIconDrawable
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.herdr.android.R
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 // Pins the release icon (design/renders/icons/herdr.svg as an adaptive icon):
 // the full 108 dp layers, then under a circle and a rounded-square mask (the
 // launcher picks one), then the themed monochrome on a dark tile.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "xhdpi")
 class LauncherIconScreenshotTest {

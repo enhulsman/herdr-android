@@ -8,17 +8,17 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 // Spec scenario "Wrapped inline code": inline code that wraps onto the next
 // line got a box over the whole line before it (seen on the phone in the
 // spike); each box covers only the code's own characters on its line.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChatCodeBoxTest {
     private fun layout(src: String, widthPx: Int) = run {

@@ -2,16 +2,16 @@ package dev.herdr.android.ui.chat
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.herdr.android.testing.HerdrTestRunner
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 // spec "The chosen view stays when switching agents": the last chosen view is
 // remembered across agents and app restarts; the terminal is the first view.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 class ChatViewSettingTest {
     private val app = RuntimeEnvironment.getApplication()
 

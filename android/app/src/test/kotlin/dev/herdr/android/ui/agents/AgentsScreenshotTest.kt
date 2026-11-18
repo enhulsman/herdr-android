@@ -2,13 +2,13 @@ package dev.herdr.android.ui.agents
 
 import androidx.compose.runtime.mutableLongStateOf
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.theme.HerdrTheme
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -22,7 +22,7 @@ import uniffi.herdr_mobile.HubSnapshot
 // and both empty states. Reference phone 412 x 915 dp at density 2, without
 // system bars; the spinner is drawn still (its reduced-motion quarter arc,
 // which is also the renders' frame). Goldens: src/test/snapshots/<name>.png.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w412dp-h915dp-xhdpi")
 class AgentsScreenshotTest {

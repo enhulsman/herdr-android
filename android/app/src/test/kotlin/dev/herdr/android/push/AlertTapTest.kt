@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import dev.herdr.android.HerdrApp
 import dev.herdr.android.MainActivity
+import dev.herdr.android.testing.HerdrTestRunner
 import dev.herdr.android.ui.agents.AgentKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,14 +14,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 
 // Codex review, M3: only a tap on the app's own notification may open a
 // terminal. The tap goes to AlertTapActivity, which other apps cannot start
 // (not exported); the exported launcher takes no terminal from an intent.
-@RunWith(RobolectricTestRunner::class)
+@RunWith(HerdrTestRunner::class)
 @Suppress("DEPRECATION") // getActivityInfo(_, Int): Robolectric 4.17 lacks the ComponentInfoFlags overload.
 class AlertTapTest {
     private val app get() = RuntimeEnvironment.getApplication() as HerdrApp

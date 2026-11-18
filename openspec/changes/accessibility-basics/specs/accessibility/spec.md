@@ -17,11 +17,19 @@ to fit its key.
 ### Requirement: Every key has a spoken name
 Each key of the keys row SHALL have a name a screen reader reads. The
 symbol keys SHALL be read as "dash", "slash", "tilde", "backslash" and
-"pipe".
+"pipe". A key with a spoken name SHALL NOT also have its label read.
 
 #### Scenario: A symbol key with TalkBack
 - **WHEN** TalkBack lands on the "~" key
-- **THEN** it reads "Tilde"
+- **THEN** it reads "Tilde", not "Tilde, tilde"
+
+### Requirement: A Needs you card is read once
+A screen reader SHALL hear a Needs you card's kind and request once: as
+the card's state, not again from the ask box under the name.
+
+#### Scenario: A permission card with TalkBack
+- **WHEN** TalkBack lands on the card of an agent waiting for a permission
+- **THEN** it reads "Permission" (and the request, if any) once, with the agent's name, place and age
 
 ### Requirement: A screen reader can read the terminal
 While a screen reader is on, the terminal's accessibility node SHALL carry

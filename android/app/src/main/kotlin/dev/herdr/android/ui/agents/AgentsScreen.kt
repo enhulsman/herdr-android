@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -387,7 +388,8 @@ private fun NeedsYouCard(row: AgentRowUi, clock: State<Long>, onClick: () -> Uni
             row.asOf?.let { Tag(it) }
             Age(row.sinceMs, clock)
         }
-        Ask(row.requestKind, row.request)
+        // The card's state already reads the kind and request; the ask box would say them again.
+        Ask(row.requestKind, row.request, Modifier.clearAndSetSemantics {})
     }
 }
 

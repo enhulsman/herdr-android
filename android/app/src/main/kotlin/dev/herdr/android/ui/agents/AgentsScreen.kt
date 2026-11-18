@@ -1,10 +1,5 @@
 package dev.herdr.android.ui.agents
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -37,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -74,6 +70,7 @@ import dev.herdr.android.ui.theme.HerdrBorder
 import dev.herdr.android.ui.theme.HerdrLayout
 import dev.herdr.android.ui.theme.HerdrRadius
 import dev.herdr.android.ui.theme.HerdrSpacing
+import dev.herdr.android.ui.components.rememberLoop
 import dev.herdr.android.ui.theme.HerdrTheme
 import dev.herdr.android.ui.theme.HerdrType
 import uniffi.herdr_mobile.AgentAttention
@@ -539,28 +536,33 @@ fun Age(sinceMs: Long?, clock: State<Long>) {
     BasicText(text, style = HerdrType.secondary.copy(color = HerdrTheme.colors.dimText), maxLines = 1)
 }
 
+/** Tags the spinner for tests. */
+const val SPINNER_TAG = "spinner"
+
 /** The working spinner (animations.spinner): a 24% ring with a quarter arc, 15 dp, 3.2 on 24, one turn per 900 ms. */
 @Composable
 private fun Spinner(spin: Boolean) {
+    val turn by rememberLoop(spin, periodMs = 900, still = 0f)
+    SpinnerRing { turn }
+}
+
+/**
+ * The spinner's ring, [turn] (0 to 1) of the way round. The turn is drawn, not
+ * a turned layer: a layer's rotation counts as a layout change, and with an
+ * accessibility service on, each one made Compose walk the whole screen.
+ */
+@Composable
+internal fun SpinnerRing(turn: () -> Float) {
     val color = HerdrTheme.colors.working
-    val turn: State<Float>? = if (spin) {
-        rememberInfiniteTransition(label = "spinner").animateFloat(
-            0f,
-            360f,
-            infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
-            label = "turn",
-        )
-    } else {
-        null
-    }
-    Canvas(Modifier.size(15.dp).graphicsLayer { rotationZ = turn?.value ?: 0f }) {
+    // Its own layer, so a step redraws the ring alone, not the row around it.
+    Canvas(Modifier.size(15.dp).graphicsLayer().testTag(SPINNER_TAG)) {
         val u = size.width / 24f
         val stroke = 3.2f * u
         val radius = 9.4f * u
         drawCircle(color.copy(alpha = color.alpha * 0.24f), radius, style = Stroke(stroke))
         drawArc(
             color,
-            startAngle = -90f,
+            startAngle = -90f + turn() * 360f,
             sweepAngle = 90f,
             useCenter = false,
             topLeft = Offset(center.x - radius, center.y - radius),

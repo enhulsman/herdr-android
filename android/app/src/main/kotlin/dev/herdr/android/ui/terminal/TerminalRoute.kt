@@ -31,6 +31,7 @@ import dev.herdr.android.ui.chat.ChatPolling
 import dev.herdr.android.ui.changes.ChangesRoute
 import dev.herdr.android.ui.chat.ChatRoute
 import dev.herdr.android.ui.chat.rememberChatVisit
+import dev.herdr.android.ui.components.undrawnWhen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import uniffi.herdr_mobile.HubSnapshot
@@ -183,7 +184,8 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
             changesOpen = true
         }
         // Under the chat the terminal is left out of accessibility: its keys are covered.
-        Box(if (switch.chat || changesOpen) Modifier.clearAndSetSemantics {} else Modifier) {
+        // Nor is it drawn there: the chat is opaque, and each of its frames would redraw it.
+        Box((if (switch.chat || changesOpen) Modifier.clearAndSetSemantics {} else Modifier).undrawnWhen(switch.chat)) {
             TerminalScreen(
                 ui, session, screen, actions, input,
                 onChat = if (switch.offered) ({
@@ -194,6 +196,7 @@ fun TerminalRoute(app: HerdrApp, home: AgentsHome, key: AgentKey) {
                     switch.toChat()
                 }) else null,
                 onChanges = openChanges,
+                covered = switch.chat,
             )
         }
         if (switch.chat) {

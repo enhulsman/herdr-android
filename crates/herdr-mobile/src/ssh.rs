@@ -15,13 +15,15 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[cfg(feature = "spike")]
+use russh::ChannelMsg;
+use russh::SendError;
 use russh::client::{self, Handle};
 use russh::keys::PublicKeyOrCertificate;
 use russh::keys::agent::AgentIdentity;
 use russh::keys::ssh_encoding::Encode;
 use russh::keys::ssh_key::public::{EcdsaPublicKey, KeyData};
 use russh::keys::ssh_key::{self, HashAlg, PublicKey};
-use russh::{ChannelMsg, SendError};
 
 /// DER prefix of a P-256 SubjectPublicKeyInfo with an uncompressed point:
 /// SEQUENCE { SEQUENCE { id-ecPublicKey, prime256v1 }, BIT STRING (66 bytes) }.
@@ -155,6 +157,8 @@ pub fn authorized_keys_line(spki_der: Vec<u8>, comment: String) -> Result<String
 /// Connects, authenticates with `signer`, runs one command and returns what it
 /// printed (the spike's whole SSH path). `host_key_fingerprint` pins the
 /// machine; `None` accepts any key and reports it, as a first connect would.
+/// Behind the `spike` feature: the app itself never has it (issue #22).
+#[cfg(feature = "spike")]
 #[uniffi::export]
 #[allow(clippy::too_many_arguments)] // the spike's one entry point; M1 replaces it with a session object
 pub fn ssh_run_spike(
@@ -251,8 +255,10 @@ fn key_error(e: impl std::fmt::Display) -> SshError {
 pub(crate) struct Session {
     pub handle: Handle<HostKeyCheck>,
     /// `SHA256:...` of the key the machine presented.
+    #[cfg_attr(not(feature = "spike"), allow(dead_code))]
     pub host_key_fingerprint: String,
     /// How many times the signer was asked to sign.
+    #[cfg_attr(not(feature = "spike"), allow(dead_code))]
     pub signatures: Arc<AtomicU32>,
 }
 
@@ -349,6 +355,7 @@ pub(crate) async fn open_session(
     })
 }
 
+#[cfg(feature = "spike")]
 async fn run(
     host: String,
     port: u16,
@@ -388,6 +395,7 @@ async fn run(
     })
 }
 
+#[cfg(feature = "spike")]
 async fn exec(
     session: &mut Handle<HostKeyCheck>,
     command: &str,

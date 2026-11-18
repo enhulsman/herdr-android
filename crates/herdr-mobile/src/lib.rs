@@ -11,9 +11,11 @@ mod term;
 #[cfg(feature = "vt")]
 mod vt;
 
+#[cfg(feature = "spike")]
+pub use ssh::ssh_run_spike;
 pub use ssh::{
     REMOTE_COMMAND, SignError, SshError, SshRun, SshSigner, authorized_keys_line,
-    ssh_public_key_line, ssh_run_spike,
+    ssh_public_key_line,
 };
 
 pub use hub::push::{AlertsRegistration, AlertsView, PushRegistration, PushStatusView};

@@ -1,0 +1,165 @@
+---
+// The signature: one A1 tag at hero scale, lit like the app icon, hanging on
+// a graphite knob fixed to the page, with the hole's top edge resting on the
+// knob and the phone on the tag's body. Sized by --u (one unit of the tag's
+// 46 x 56 box). Knocked once on load, it swings on the knob and settles; it
+// leans a little toward a mouse pointer. Neither with reduced motion.
+import { TAG, HOLE } from '../lib/tag.js';
+import Phone from './Phone.astro';
+
+// The knob in tag units: the hole (centre 32,13, radius 3.6) rests on it, so
+// the knob's top meets the hole's top edge at y 9.4.
+const KNOB = { cx: 32, cy: 11.8, r: 2.4 };
+---
+<div class="hang" aria-hidden="true" data-hang>
+  <div class="tag" data-tag>
+    <div class="lean">
+    <svg viewBox="9 4 46 56" overflow="visible" focusable="false" data-tag-art>
+      <path data-tag-body fill="url(#litTag)" fill-rule="evenodd" d={`${TAG}${HOLE}`} />
+      <path data-tag-rim clip-path="url(#tagClip)" fill="none" stroke="url(#litRim)" stroke-width=".55" d={TAG} />
+      <path clip-path="url(#holeClip)" fill="none" stroke="url(#holeWall)" stroke-width=".9" d={HOLE} />
+      <circle data-hole cx="32" cy="13" r="3.6" fill="none" />
+    </svg>
+    <div class="on-tag"><Phone /></div>
+    </div>
+  </div>
+  <svg class="knob" viewBox="9 4 46 56" overflow="visible" focusable="false">
+    <defs>
+      <radialGradient id="knobFace" cx={KNOB.cx - .5} cy={KNOB.cy - 1.3} r="3.4" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#62655e" />
+        <stop offset=".5" stop-color="#2e302c" />
+        <stop offset="1" stop-color="#121311" />
+      </radialGradient>
+      <linearGradient id="knobEdge" x1="0" y1={KNOB.cy - KNOB.r} x2="0" y2={KNOB.cy + KNOB.r} gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#8a8d85" />
+        <stop offset=".45" stop-color="#474a44" />
+        <stop offset="1" stop-color="#0b0c0a" />
+      </linearGradient>
+    </defs>
+    <circle data-knob cx={KNOB.cx} cy={KNOB.cy} r={KNOB.r} fill="url(#knobFace)" stroke="url(#knobEdge)" stroke-width=".32" />
+    <ellipse cx={KNOB.cx - .55} cy={KNOB.cy - 1.25} rx=".95" ry=".42" fill="#fff" fill-opacity=".22" />
+  </svg>
+</div>
+
+<script>
+  // Lean toward a fine pointer, up to 1.5 degrees; off for touch and for reduced motion.
+  const hang = document.querySelector<HTMLElement>('[data-hang]');
+  if (hang && matchMedia('(pointer: fine)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let raf = 0;
+    addEventListener('pointermove', (e) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const r = hang.getBoundingClientRect();
+        const dx = (e.clientX - (r.left + r.width / 2)) / innerWidth;
+        hang.style.setProperty('--sway', (-dx * 3).toFixed(2) + 'deg');
+      });
+    });
+  }
+</script>
+
+<style>
+  .hang {
+    /* how far below the rule above it the tag's box starts */
+    --tag-top: 64px;
+    /* the knob's centre: 7.8 of the tag's 56 units down, mid-width */
+    --pivot: 50% 13.93%;
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    /* the whole tag in view: its right edge on the 1280px frame, never past the gutter */
+    left: min(calc(50% + 640px - 46 * var(--u) - 24px), calc(100% - 46 * var(--u) - 24px));
+    width: calc(46 * var(--u));
+    height: calc(56 * var(--u));
+  }
+  .tag {
+    position: absolute;
+    left: 0;
+    top: var(--tag-top);
+    width: 100%;
+    height: calc(56 * var(--u));
+    transform-origin: var(--pivot);
+    animation: swing var(--duration-swing) linear .3s both;
+  }
+  /* the pointer lean, on the same pivot; the phone turns with the tag it stands on */
+  .lean {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-origin: var(--pivot);
+    transform: rotate(var(--sway, 0deg));
+    transition: transform var(--duration-slow) var(--ease-sway);
+  }
+  .tag svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    filter: var(--shadow-xl);
+  }
+  /* the knob is fixed to the page: it never turns with the tag */
+  .knob {
+    position: absolute;
+    z-index: 3;
+    left: 0;
+    top: var(--tag-top);
+    width: 100%;
+    height: calc(56 * var(--u));
+    pointer-events: none;
+    /* the same light: its shadow falls down and to the right, onto the tag and through the hole */
+    filter:
+      drop-shadow(calc(.28 * var(--u)) calc(.45 * var(--u)) calc(.32 * var(--u)) rgba(46, 32, 4, .42))
+      drop-shadow(calc(.08 * var(--u)) calc(.12 * var(--u)) calc(.06 * var(--u)) rgba(28, 30, 27, .35));
+  }
+  .on-tag {
+    position: absolute;
+    z-index: 2;
+    /* the phone's centre on the logo's prompt, 13 units in */
+    left: calc(13 * var(--u) - 150px * var(--phone-zoom));
+    top: calc(17 * var(--u));
+  }
+  /* the phone made physical: a metal edge, one side key, a shadow cast on the tag */
+  .on-tag :global(.phone) {
+    position: relative;
+    zoom: var(--phone-zoom);
+    box-shadow: inset 0 0 0 1.5px #474a44, inset 0 2px 1px rgba(255, 255, 255, .18), var(--shadow-lg);
+  }
+  .on-tag :global(.phone)::after {
+    content: "";
+    position: absolute;
+    right: -3px;
+    top: 150px;
+    width: 3px;
+    height: 70px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(90deg, #2b2d29, #4a4d47);
+  }
+  /* knocked once: a 9 degree swing that loses about a third each way, like a pendulum
+     (each stretch eases out of one turn and into the next). var() does not resolve
+     inside keyframes, so the curves are written out: --ease-knock, then --ease-swing. */
+  @keyframes swing {
+    0% { transform: rotate(0deg); animation-timing-function: cubic-bezier(.2, .6, .35, 1); }
+    7% { transform: rotate(-9deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    20% { transform: rotate(6.4deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    33% { transform: rotate(-4.4deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    46% { transform: rotate(3deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    59% { transform: rotate(-1.9deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    72% { transform: rotate(1.1deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    85% { transform: rotate(-.5deg); animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+    100% { transform: rotate(0deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tag { animation: none; }
+    .lean { transition: none; }
+  }
+
+  /* under 860px the tag drops below the copy and hangs just under the copy's last rule */
+  @media (max-width: 860px) {
+    .hang {
+      --tag-top: 40px;
+      position: relative;
+      left: auto;
+      margin: 0 auto;
+      height: calc(56 * var(--u) + 40px);
+    }
+    .on-tag { left: calc(8 * var(--u)); top: calc(16 * var(--u)); }
+  }
+</style>

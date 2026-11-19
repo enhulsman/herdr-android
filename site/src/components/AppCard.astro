@@ -1,0 +1,42 @@
+---
+// The closing block: the lit app icon, the name, one line, and the install links.
+import AppIcon from './AppIcon.astro';
+import { RELEASES } from '../lib/site.js';
+---
+<div class="appcard" data-app-card>
+  <AppIcon class="appicon" />
+  <div class="name"><p class="title">kudde</p><p>For Android 12 and up. Free and open source.</p></div>
+  <div class="go actions">
+    <a class="btn ink" href="/install">Install with Obtainium</a>
+    <a class="textlink" href={RELEASES}>or download the signed APK</a>
+  </div>
+</div>
+
+<style>
+  .appcard {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-5) 28px;
+    align-items: center;
+    max-width: 520px;
+  }
+  .appcard :global(.appicon) {
+    width: 132px;
+    height: 132px;
+    border-radius: var(--radius-icon);
+    box-shadow: inset 0 0 0 1px #ffffff14, var(--shadow-md);
+  }
+  .name p { margin: var(--space-2) 0 0; color: var(--color-muted); }
+  .name .title {
+    margin: 0;
+    color: var(--color-ink);
+    font: var(--weight-bold) 40px/1 var(--font-display);
+    letter-spacing: var(--tracking-brand);
+  }
+  .go { grid-column: 1 / -1; }
+  @media (max-width: 860px) {
+    .appcard { gap: var(--space-4) var(--space-5); }
+    .appcard :global(.appicon) { width: 96px; height: 96px; border-radius: 22px; }
+    .name .title { font-size: 32px; }
+  }
+</style>

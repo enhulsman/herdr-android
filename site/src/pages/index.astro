@@ -1,0 +1,181 @@
+---
+import Base from '../layouts/Base.astro';
+import HangingTag from '../components/HangingTag.astro';
+import StepMarker from '../components/StepMarker.astro';
+import AppCard from '../components/AppCard.astro';
+import AppIcon from '../components/AppIcon.astro';
+import { RELEASES } from '../lib/site.js';
+
+const features = [
+  {
+    title: 'Every agent in one list',
+    body: 'Every agent on every machine, with the ones waiting for an answer at the top, then finished, working and idle. Each goes by its session’s name and shows where it sits at the desk. You can start a new terminal or agent from the phone too.',
+  },
+  {
+    title: 'A live terminal, or a chat',
+    body: 'Open an agent’s terminal as the desk draws it, with colours, zoom and scrollback, and type with the phone keyboard and two rows of terminal keys. Or switch Claude Code or Codex to a chat of its conversation and answer from a message box.',
+  },
+  {
+    title: 'Changes',
+    body: 'See the files not committed yet in an agent’s repository, with lines added and removed and each file’s diff wrapped to the screen. It only reads: nothing is staged, committed or discarded from the phone.',
+  },
+  {
+    title: 'Alerts',
+    body: 'With the app closed, an encrypted alert tells you when an agent needs you, with sound, or has finished, silently. Tap it to open that agent’s terminal.',
+  },
+];
+---
+<Base
+  title="kudde: keep in touch with your herd"
+  description="kudde puts the coding agents on your own machines in your pocket: an Android app for herdr-core, over SSH, with encrypted alerts through your own ntfy server."
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="copy">
+        <h1 class="display">Keep in touch with your herd.</h1>
+        <p class="lede">kudde puts the coding agents on your own machines in your pocket. See what each one is doing, open its terminal, and answer it from anywhere.</p>
+        <div class="actions">
+          <a class="btn ink" href="/install">Install with Obtainium</a>
+          <a class="textlink" href={RELEASES}>GitHub release</a>
+        </div>
+        <p class="meta"><AppIcon class="chip" /><span>Android 12+ · open source · no Google, no account</span></p>
+      </div>
+    </div>
+    <div class="hero-art">
+      <HangingTag />
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="what">
+    <div class="wrap">
+      <h2 class="section-title" id="what">What kudde does.</h2>
+      <p class="intro">kudde connects to <span class="nb">herdr-core</span> on your own machines over SSH. Alerts go through your own ntfy server, and no Google service is involved.</p>
+      <ul class="rules features">
+        {features.map((f) => (
+          <li><h3>{f.title}</h3><p>{f.body}</p></li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="steps">
+    <div class="wrap split">
+      <div>
+        <h2 class="section-title steps-title" id="steps">Three steps to your herd.</h2>
+        <p class="intro">Install the app, add a machine, and turn on alerts. The Install and Setup pages go through each step.</p>
+        <div class="actions guide-link"><a class="btn line" href="/setup">Read the setup guide</a></div>
+      </div>
+      <ol class="steps">
+        <li>
+          <StepMarker n={1} current />
+          <div><h3>Install kudde</h3><p>Add the GitHub release to Obtainium, or install the APK with adb. You can check the signature first.</p></div>
+        </li>
+        <li>
+          <StepMarker n={2} />
+          <div><h3>Add a machine</h3><p>kudde makes a key in your phone’s secure hardware. Place it in <code>authorized_keys</code> on the machine and compare the host key.</p></div>
+        </li>
+        <li>
+          <StepMarker n={3} />
+          <div><h3>Turn on alerts</h3><p>Point <code>kudde-push</code> at your own ntfy server and send a test alert. It arrives encrypted, end to end.</p></div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="close" aria-labelledby="close">
+    <div class="wrap">
+      <h2 id="close">Your herd, in your pocket.</h2>
+      <AppCard />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    min-height: max(860px, calc(100vh - 82px));
+  }
+  .hero .wrap {
+    position: relative;
+    z-index: 2;
+    padding-top: 88px;
+    padding-bottom: var(--space-24);
+    /* let the pointer reach past the copy box */
+    pointer-events: none;
+  }
+  .copy { max-width: 600px; pointer-events: auto; }
+  h1 { max-width: 8.5ch; }
+  .lede { font-size: var(--text-lg); line-height: 1.5; max-width: 27em; margin: var(--space-8) 0 0; }
+  .actions { margin-top: 36px; }
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 28px 0 0;
+    font: var(--weight-medium) var(--text-sm) / 1.4 var(--font-mono);
+    color: var(--color-muted);
+  }
+  .meta :global(.chip) {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    flex: none;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .features { margin-top: var(--space-14); }
+
+  .steps-title { font-size: var(--text-5xl); }
+  .guide-link { margin-top: var(--space-8); }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: var(--space-5);
+    padding: 22px 0;
+    border-bottom: var(--rule-thin) solid var(--color-rule);
+  }
+  .steps li:first-child { padding-top: 0; }
+  .steps h3 {
+    margin: 0;
+    font: var(--weight-bold) var(--text-xl) / var(--leading-snug) var(--font-display);
+    letter-spacing: -.015em;
+  }
+  .steps p { margin: 6px 0 0; color: var(--color-muted); }
+
+  .close { position: relative; padding: var(--space-30) 0 var(--space-30); border-top: var(--rule-thick) solid var(--color-ink); }
+  .close .wrap { display: grid; grid-template-columns: 1fr auto; gap: var(--space-16); align-items: end; }
+  .close h2 {
+    font: var(--weight-extrabold) var(--text-closing) / .95 var(--font-display);
+    letter-spacing: var(--tracking-display);
+    margin: 0;
+    max-width: 9ch;
+    align-self: start;
+  }
+
+  @media (max-width: 1280px) {
+    .copy { max-width: 520px; }
+  }
+  @media (max-width: 1100px) {
+    .copy { max-width: 420px; }
+  }
+  @media (max-width: 860px) {
+    .hero { min-height: 0; }
+    .hero .wrap { padding-top: var(--space-10); padding-bottom: 0; }
+    .copy { max-width: none; }
+    .lede { font-size: var(--text-base); margin-top: var(--space-5); }
+    .meta { align-items: flex-start; }
+    .hero-art {
+      position: relative;
+      height: calc(56 * var(--u) + 40px + 150px);
+      border-top: var(--rule-thick) solid var(--color-ink);
+      margin-top: var(--space-10);
+    }
+    .features { margin-top: var(--space-10); }
+    .steps-title { font-size: var(--text-3xl); }
+    .close { padding: var(--space-18) 0; }
+    .close .wrap { grid-template-columns: 1fr; gap: var(--space-6); }
+    .close h2 { font-size: 48px; }
+  }
+</style>

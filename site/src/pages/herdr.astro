@@ -1,0 +1,74 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHead from '../components/PageHead.astro';
+import { REPO, HERDR_CORE, nb } from '../lib/site.js';
+
+const pieces = [
+  ['The desk’s layout', 'Each agent shows where it sits at the desk, by space and tab. A terminal or agent started from the phone opens in one of the desk’s spaces and shows up on the desk as a new tab.'],
+  ['Sharing a terminal', 'Typing on the phone sizes the terminal to the phone. The desk takes its size back on its next input, as herdr itself does.'],
+  ['Alerts that follow the desk', 'kudde-push alerts for the agents in the desk’s panes. Sub-agents and terminals outside a pane stay quiet.'],
+  ['The look of the app', 'kudde’s screens follow the herdr desk app’s design: its graphite and paper colours, Geist and JetBrains Mono, and its status language.'],
+];
+---
+<Base
+  title="kudde and herdr"
+  description="kudde is an independent Android app built on herdr-core. It is not made by the herdr project. What it uses from herdr, and which versions it supports."
+>
+  <PageHead title="kudde and herdr.">
+    kudde is an independent app built on herdr-core. It is not made by the herdr project.
+  </PageHead>
+
+  <section class="section guide" aria-labelledby="core">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="core">Built on <span class="nb">herdr-core</span></h2></div>
+      <div class="prose">
+        <p>kudde connects to <a class="nb" href={HERDR_CORE}>herdr-core</a> on your own machines over SSH, and everything it shows comes from there: the agents, their terminals, and where each sits at the desk. Install <span class="nb">herdr-core</span> as the user your agents run under, on a Linux or WSL machine.</p>
+        <p>The <code>herdr</code> terminal tool is a different program; kudde does not need it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="versions">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="versions">Which versions</h2></div>
+      <div class="prose">
+        <p>kudde needs <span class="nb">herdr-core</span> 0.1.15 or newer. Each release of the app is tested against <span class="nb">herdr-core</span> 0.1.15 and the newest <span class="nb">herdr-core</span> of the day, and has been used daily with every version from 0.1.15 to 0.1.21.</p>
+        <p>A newer <span class="nb">herdr-core</span> connects too. An older one is refused, with a message to update to 0.1.15 or newer.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="pieces">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="pieces">What it takes from herdr</h2></div>
+      <ul class="rules">
+        {pieces.map(([t, b]) => <li><h3 set:html={nb(t)} /><p set:html={nb(b)} /></li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="name">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="name">The name</h2></div>
+      <div class="prose">
+        <p>Before 1.0 the app was called herdr for Android. It grew past a phone port of the herdr desk app, and the herdr name belongs to the herdr project. So at 1.0 it became kudde, Dutch for herd: one group of agents working as a whole, and still a nod to where it came from.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="problems">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="problems">Where problems go</h2></div>
+      <div class="prose">
+        <p>Problems with kudde or kudde-push go to <a href={`${REPO}/issues`}>kudde’s issues on GitHub</a>. Problems in <span class="nb">herdr-core</span> or herdr belong to the herdr project.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section next" aria-labelledby="next">
+    <div class="wrap">
+      <h2 class="section-title" id="next">Ready to try it?</h2>
+      <a class="btn ink" href="/install">Get kudde</a>
+    </div>
+  </section>
+</Base>

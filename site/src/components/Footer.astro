@@ -1,0 +1,55 @@
+---
+// The 2px ink rule, the independence line, the licence, and the page links
+// (the header hides them on a phone).
+import { NAV, REPO } from '../lib/site.js';
+---
+<footer class="site-footer">
+  <div class="wrap">
+    <nav aria-label="Pages">
+      <ul>
+        <li><a href="/">Home</a></li>
+        {NAV.map(({ href, label }) => <li><a href={href}>{label}</a></li>)}
+      </ul>
+    </nav>
+    <div class="lines">
+      <p>Independent app, built on <span class="nb">herdr-core</span>. Not made by the herdr project.</p>
+      <p>Apache-2.0 · <a href={REPO}>Source on GitHub</a></p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    position: relative;
+    z-index: 2;
+    background: var(--color-paper);
+    border-top: var(--rule-thick) solid var(--color-ink);
+    padding: var(--space-6) 0 var(--space-10);
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-6);
+    list-style: none;
+    margin: 0 0 var(--space-3);
+    padding: 0;
+  }
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    text-underline-offset: 3px;
+  }
+  ul a { text-decoration: none; color: var(--color-ink); font-weight: var(--weight-medium); }
+  ul a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--color-tag-deep); }
+  .lines {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0 var(--space-6);
+  }
+  p { margin: 0; }
+</style>

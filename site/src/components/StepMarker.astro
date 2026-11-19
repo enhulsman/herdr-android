@@ -1,0 +1,30 @@
+---
+// A 40px A1 outline tag with the step number; the current step is filled
+// with tag yellow. The Setup page moves `data-current` to the step in view.
+import { TAG, HOLE } from '../lib/tag.js';
+interface Props { n: number; current?: boolean }
+const { n, current = false } = Astro.props;
+---
+<svg class="step-marker" viewBox="6 2 52 60" width="40" height="40" aria-hidden="true" focusable="false"
+  data-step-marker data-current={current ? '' : undefined}>
+  <path data-marker-shape d={TAG} stroke-width="2.6" stroke-linejoin="round" />
+  <path data-marker-hole d={HOLE} stroke-width="2" />
+  <text x="32" y="53" text-anchor="middle">{n}</text>
+</svg>
+
+<style>
+  .step-marker { display: block; flex: none; overflow: visible; }
+  [data-marker-shape] { fill: none; stroke: var(--color-ink); transition: fill var(--duration-normal) var(--ease-default); }
+  [data-marker-hole] { fill: none; stroke: var(--color-ink); }
+  [data-current] [data-marker-shape] { fill: var(--color-tag); }
+  [data-current] [data-marker-hole] { fill: var(--color-paper); }
+  text {
+    fill: var(--color-ink);
+    font-family: var(--font-display);
+    font-weight: var(--weight-extrabold);
+    font-size: 24px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-marker-shape] { transition: none; }
+  }
+</style>

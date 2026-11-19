@@ -1,0 +1,111 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHead from '../components/PageHead.astro';
+import { releaseFingerprint } from '../lib/fingerprint.js';
+import { REPO, OBTAINIUM, guide } from '../lib/site.js';
+
+const fingerprint = releaseFingerprint();
+---
+<Base
+  title="Install kudde"
+  description="Install kudde on Android 12 or newer with Obtainium or adb, and check that a release is the one the project signs."
+>
+  <PageHead title="Install kudde.">
+    kudde is not on Google Play. Each release is a signed APK on GitHub, and Obtainium installs it and tells you about updates.
+  </PageHead>
+
+  <section class="section guide" aria-labelledby="need">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="need">What you need</h2></div>
+      <div class="prose">
+        <ul>
+          <li>An Android phone on Android 12 or newer (arm64).</li>
+          <li><p><a class="nb" href="https://github.com/herdrdev/herdr-core">herdr-core</a> 0.1.15 or newer on a Linux or WSL machine, installed as the user your agents run under:</p>
+            <pre><code>curl -fsSL https://releases.herdr.dev/core/install.sh | sh</code></pre>
+            <p>The <code>herdr</code> terminal tool is a different program; kudde does not need it.</p></li>
+          <li>An OpenSSH server on that machine that the phone can reach, for example over Tailscale. Tailscale SSH does not work, as it ignores the phone key: use the machine’s LAN address, or an OpenSSH port Tailscale does not take over.</li>
+          <li>For alerts: an ntfy server, the ntfy app on the phone, and <code>kudde-push</code> on each machine.</li>
+          <li>To install and update: <a href={OBTAINIUM}>Obtainium</a>, or adb on a computer.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="obtainium">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="obtainium">With Obtainium</h2></div>
+      <div class="prose">
+        <h3>Get Obtainium</h3>
+        <p>Obtainium is not on Google Play either. On the phone, open <a href={`${OBTAINIUM}/releases`}>its releases</a>, download <code>app-arm64-v8a-release.apk</code> from the newest release and open it. Android asks to let your browser install apps; allow it.</p>
+        <h3>Add kudde</h3>
+        <ol>
+          <li>In Obtainium, tap Add App and enter <code>{REPO}</code>. The defaults are fine.</li>
+          <li>Tap Install. Android asks to let Obtainium install apps; allow it.</li>
+          <li>Leave background installing off. Obtainium may tell you about an update; you install each one by hand, after <a href="#check">checking it</a>.</li>
+        </ol>
+        <p class="muted">If Obtainium’s checks fail, GitHub is limiting how often it may check without a token. Create a fine-grained personal access token with access to public repositories and nothing else, and add it under Obtainium’s GitHub source settings.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="android">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="android">When Android stands in the way</h2></div>
+      <div class="prose">
+        <h3>Play Protect</h3>
+        <p>Play Protect may show “App scan recommended”. Scanning is fine, as the APK is public, or choose Install without scanning under More details. With Identity Check on, that asks for your fingerprint or face.</p>
+        <h3>Advanced Protection</h3>
+        <p>On Android 16, Advanced Protection allows only apps from Google Play and the stores that came with the phone, so it blocks Obtainium and anything it installs. Turn it off to install, or <a href="#adb">install from a computer with adb</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="adb">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="adb">From a computer with adb</h2></div>
+      <div class="prose">
+        <ol>
+          <li>From the <a href={`${REPO}/releases/latest`}>latest release</a>, download <code>kudde-&lt;version&gt;.apk</code> and <code>SHA256SUMS</code>, and <a href="#check">check them</a>.</li>
+          <li><p>Turn on USB or wireless debugging on the phone, then run:</p>
+            <pre><code>adb install --user 0 kudde-&lt;version&gt;.apk</code></pre>
+            <p><code>--user 0</code> keeps it out of a work profile or Private Space.</p></li>
+        </ol>
+        <p>Updates go the same way, with <code>adb install -r --user 0</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide" aria-labelledby="check">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="check">Checking a release</h2></div>
+      <div class="prose">
+        <p>On the first install, check that the APK is the one this project signs. On a computer, in the folder with the downloads:</p>
+        <pre><code>sha256sum --check --ignore-missing SHA256SUMS
+apksigner verify --print-certs kudde-&lt;version&gt;.apk</code></pre>
+        <p><code>apksigner</code> comes with Android’s build tools. Its “Signer #1 certificate SHA-256 digest” must be:</p>
+        <p class="fingerprint"><span class="sr-only">Release signing certificate SHA-256: </span><code data-fingerprint>{fingerprint}</code></p>
+        <p class="muted">The same value is kept in the repository, in <a href={guide('docs/release-signing-fingerprint.txt')}>docs/release-signing-fingerprint.txt</a>, and the release workflow publishes nothing that does not match it.</p>
+        <p>After the first install, Android itself refuses an update signed with any other key. Before installing an update, open the release on GitHub: its notes name the commit it was built from. Open that commit, and GitHub lists <code>main</code> among the branches that contain it. If it does not, do not install the update, and open an issue.</p>
+        <p class="more"><a href={guide('docs/install.md')}>The full install guide on GitHub</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section next" aria-labelledby="next">
+    <div class="wrap">
+      <h2 class="section-title" id="next">Next, add a machine.</h2>
+      <a class="btn ink" href="/setup">Set up kudde</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .fingerprint code {
+    display: block;
+    padding: var(--space-4) var(--space-5);
+    font-size: 15px;
+    line-height: 1.6;
+    word-break: break-all;
+    letter-spacing: .02em;
+  }
+</style>

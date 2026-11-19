@@ -1,0 +1,76 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHead from '../components/PageHead.astro';
+import { REPO, guide, nb } from '../lib/site.js';
+
+const groups = [
+  {
+    id: 'key',
+    title: 'The phone key',
+    items: [
+      ['Made in secure hardware', 'The SSH key is made in the Android Keystore, in StrongBox where the phone has it. It cannot be exported and never leaves the phone.'],
+      ['Yours to unlock', 'It signs only for 30 minutes after you unlock the phone or use your fingerprint. Alerts never need it.'],
+      ['Only herdr-core', 'The line you place in `authorized_keys` lets the key run only herdr-core: no shell session, no forwarding. herdr-core can still run commands as your user, so treat the key like a shell login.'],
+      ['Host keys checked', 'You confirm each machine’s host key once, and a changed key stops the connection.'],
+    ],
+  },
+  {
+    id: 'alerts',
+    title: 'Alerts',
+    items: [
+      ['What an alert carries', 'The agent’s name, the machine, its state, the kind of request, and the time. Never the screen’s text or the agent’s message.'],
+      ['What ntfy sees', 'Only ciphertext. Each push is encrypted for the phone with web push encryption (RFC 8291) and padded to one size, so its length says nothing either.'],
+      ['A token that only writes', 'kudde-push uses a dedicated ntfy user that may only write to `up*` topics, never read. It sends pushes only to the servers its config allows, and its token nowhere else.'],
+      ['No Google', 'Alerts go through your own ntfy server to the ntfy app on the phone, with UnifiedPush. No Google service is involved.'],
+    ],
+  },
+  {
+    id: 'releases',
+    title: 'Releases',
+    items: [
+      ['Signed in the open', 'Releases are built and signed by GitHub Actions in the public repository. The release workflow publishes nothing unless the APK’s certificate matches the fingerprint kept in the repository.'],
+      ['Checked by you', 'Check the first install against that fingerprint. After that, Android refuses an update signed with any other key. kudde-push is signed too, and `ssh-keygen` checks it.'],
+      ['Installed by hand', 'With background installing off in Obtainium, nothing installs on its own: you install each update after checking it.'],
+    ],
+  },
+];
+---
+<Base
+  title="Security · kudde"
+  description="How kudde keeps its SSH key in your phone's secure hardware, checks host keys, encrypts alerts, signs releases, and how to report a problem."
+>
+  <PageHead title="Your key stays on your phone.">
+    kudde holds an SSH key that opens your machines. This is how it guards that key, what an alert carries, how releases are signed, and how to report a problem.
+  </PageHead>
+
+  {groups.map((g) => (
+    <section class="section guide" aria-labelledby={g.id}>
+      <div class="wrap split">
+        <div><h2 class="section-title" id={g.id}>{g.title}</h2></div>
+        <ul class="rules">
+          {g.items.map(([t, b]) => <li><h3 set:html={nb(t)} /><p set:html={nb(b)} /></li>)}
+        </ul>
+      </div>
+    </section>
+  ))}
+
+  <section class="section guide" aria-labelledby="report">
+    <div class="wrap split">
+      <div><h2 class="section-title" id="report">Reporting a problem</h2></div>
+      <div class="prose">
+        <p>Please don’t open a public issue. Report it privately instead, with <a href={`${REPO}/security/advisories/new`}>report a vulnerability</a> on GitHub. Only the maintainer sees it.</p>
+        <p>Say what you found, which versions of kudde and <span class="nb">herdr-core</span> it affects, and how to reproduce it. Leave out your own host names, IP addresses, ports, paths and keys; a made-up example shows the problem just as well.</p>
+        <p>You’ll get a first reply within a week. Once a fix is out, the advisory is published, with credit to you if you’d like.</p>
+        <p>Only the latest release gets security fixes, so update to it before reporting. Problems in <span class="nb">herdr-core</span>, in herdr or in your ntfy server belong to those projects.</p>
+        <p class="more"><a href={guide('SECURITY.md')}>The security policy on GitHub</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section next" aria-labelledby="next">
+    <div class="wrap">
+      <h2 class="section-title" id="next">Check your first install.</h2>
+      <a class="btn ink" href="/install#check">Checking a release</a>
+    </div>
+  </section>
+</Base>

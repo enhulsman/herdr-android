@@ -37,12 +37,14 @@ macOS (`chat-on-mac`) or on Windows itself; a desk helper program or sidecar
 
 ## Decisions
 
-### D0. The gallery check comes before the spike
-A throwaway public repository tagged `herdr-mod`, holding a mod folder with a
-generated ~1 MB JavaScript file, a `RECIPE.md` and a `preview.png`. It passes
-when herdr.dev lists it and an agent installing it from the gallery copies the
-generated file into `mods/`. If it fails, decision 7 goes to Ezra before any
-spike work. The test repository is deleted afterwards.
+### D0. The gallery question is answered by a survey, not a test listing
+A survey of the gallery (`research/desktop-chat-2026-11-19/gallery-survey.md`)
+found listed mods shipping generated files of 1.6 to 6.2 MB, one with a
+RECIPE that says to rebuild from its source repository, and found entries of
+deleted repositories still listed. So no test entry is published: the first
+listing is the real one, made when the mod is ready. Whether an installing
+agent copies a large generated file without trouble is checked on the desk
+before release (task 6.2), not before the spike.
 
 ### D1. A spike decides the route
 On a throwaway branch `spike/desktop-chat`: build `kudde-chat` to wasm, lower
@@ -54,6 +56,7 @@ from a minimal mod on Windows. Pass criteria, all on the Windows desk:
 - `core.js` is at most 1.5 MB (else `-Oz` and stripping; still over →
   decision 7);
 - the first open of a 2 MB tail spends at most 300 ms on the window's thread
+  (which every mod shares: a stall here stalls other mods too)
   (else cap the desk's first read at 512 KB and measure again; still over →
   decision 7); one tick spends at most 50 ms there;
 - (D6) a fold opens, the second of two thumbnails in a row enlarges, and the
@@ -193,7 +196,7 @@ toggles a focused fold. `scripts/build-desk.sh [mods-dir]` builds
 and, given a folder, copies the mod there. A release builds the mod, attaches
 `core.js` to this repository's release, and copies the folder, `core.js`
 included, to the gallery repository. Its `RECIPE.md` says: `core.js` is
-generated, do not read it, check its sha256 against the matching release
+generated, do not read it (as openGPUI's RECIPE does for its build), check its sha256 against the matching release
 asset here; if the files fail on a newer herdr version, report it with a link
 to this repository's issues (rebuilding is possible with the stated toolchain
 and command, but not expected); the mod runs programs on your machines
@@ -250,7 +253,8 @@ new one; its fixture is recorded on the desk by hand.
 - **Windows process arguments**: tested in the spike and before each
   release; a base64 fallback exists.
 - **A send to a done agent** has no herdr-core guard, as on the phone (#71).
-- **The gallery** may refuse generated files (D0 checks first).
+- **A gallery listing cannot be reliably taken down** (D0): the listing
+  waits until the mod is ready, and its text is shown to Ezra first.
 
 ## Open Questions
 

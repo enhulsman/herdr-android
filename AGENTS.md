@@ -19,7 +19,7 @@ and `design-brief.md` record them.
 ## Work tracking
 
 The roadmap lives in GitHub, in the open: issues are the items, the
-`v1.0.0` and `1.x` milestones group them, and the "herdr-android roadmap"
+`v1.0.0` and `1.x` milestones group them, and the "Kudde roadmap"
 project board shows what is in progress.
 
 - Start a session with `gh issue list --milestone v1.0.0` and the board.
@@ -32,7 +32,7 @@ project board shows what is in progress.
 
 ## Putting a build on a phone
 
-Test rounds use the debug build ("herdr debug", `dev.herdr.android.debug`,
+Test rounds use the debug build ("Kudde debug", `dev.kudde.android.debug`,
 the inverted icon), installed over wireless adb next to the release; a
 release is cut only for a planned batch of fixes.
 
@@ -45,9 +45,9 @@ release is cut only for a planned batch of fixes.
    Space and other users included.
 4. Check, and remove any copy outside the owner profile:
    `adb -s <serial> shell pm list users`, then per user
-   `pm list packages --user <n> | grep herdr`, and
-   `pm uninstall --user <n> dev.herdr.android.debug` where it should not be.
-5. Launch with `adb shell monkey -p dev.herdr.android.debug -c android.intent.category.LAUNCHER 1`,
+   `pm list packages --user <n> | grep kudde`, and
+   `pm uninstall --user <n> dev.kudde.android.debug` where it should not be.
+5. Launch with `adb shell monkey -p dev.kudde.android.debug -c android.intent.category.LAUNCHER 1`,
    never `am start`.
 
 Phone checks an agent runs alone (test phone, fake agent, measuring on the

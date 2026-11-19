@@ -32,7 +32,7 @@ a letter or digit).
 - **THEN** WSL shows "alerts not registered since endpoint change" until the phone next connects and rewrites the entry
 
 ### Requirement: The watcher only uses an existing core
-`herdr-push` SHALL connect only to an existing herdr-core, taking session and
+`kudde-push` SHALL connect only to an existing herdr-core, taking session and
 socket from its config file, SHALL never start a core, and SHALL report "no core"
 or "core has zero terminals" in its log and status document.
 
@@ -41,7 +41,7 @@ or "core has zero terminals" in its log and status document.
 - **THEN** the watcher reports "no core" and does not start a new core
 
 ### Requirement: The watcher follows the shared attention model
-`herdr-push` SHALL alert on entry into needs-you and finished as defined by
+`kudde-push` SHALL alert on entry into needs-you and finished as defined by
 `herdr-proto::attention`, SHALL suppress sub-agents and terminals neither placed
 in a pane nor labelled with a non-empty `herdr.space`, and SHALL alert for
 unplaceable terminals when the layout cannot be read.
@@ -59,11 +59,11 @@ SHALL be treated as placed.
 
 #### Scenario: Desk app closed
 - **WHEN** an agent started from the phone in the space "website" blocks while the desk app is not running
-- **THEN** herdr-push alerts for it after the grace delay
+- **THEN** kudde-push alerts for it after the grace delay
 
 #### Scenario: Parked terminals stay quiet
 - **WHEN** a terminal's `herdr.space` label is empty and the layout does not place it
-- **THEN** herdr-push does not alert for it
+- **THEN** kudde-push does not alert for it
 
 #### Scenario: Layout unreadable
 - **WHEN** the `herdr-app` document cannot be parsed and an agent becomes blocked

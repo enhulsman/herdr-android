@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds libghostty-vt into build/ghostty/<abi>/ (static and shared library plus
-# headers). herdr-mobile links the static one when built with its `vt` feature.
+# headers). kudde-mobile links the static one when built with its `vt` feature.
 #
 # Usage: scripts/build-ghostty.sh <aarch64-linux-android|x86_64-linux-android|x86_64-linux-gnu>
 #   aarch64-linux-android -> arm64-v8a (phones), x86_64-linux-android -> x86_64
@@ -22,7 +22,7 @@ case "$target" in
 esac
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
-cache="${XDG_CACHE_HOME:-$HOME/.cache}/herdr-android"
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/kudde"
 export ANDROID_NDK_HOME="${ANDROID_HOME:?set ANDROID_HOME}/ndk/27.1.12297006"
 [[ -d "$ANDROID_NDK_HOME" ]] || {
   echo "NDK not found: $ANDROID_NDK_HOME" >&2

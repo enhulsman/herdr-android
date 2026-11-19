@@ -1,0 +1,11 @@
+[package]
+name = "kudde-chat"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Agent session logs as the conversation a chat view shows."
+
+[dependencies]
+serde_json = "1"
+base64 = "0.22"

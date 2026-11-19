@@ -43,7 +43,7 @@ gap. herdr-core already exposes everything needed over its JSON-RPC protocol
 New repository `herdr-android` with two deliverables:
 - **The Android app**: Kotlin + Jetpack Compose UI over a Rust core that embeds
   libghostty-vt, the terminal engine the Mac app uses.
-- **`herdr-push`**: a small watcher that runs next to herdr-core on WSL and sends
+- **`kudde-push`**: a small watcher that runs next to herdr-core on WSL and sends
   encrypted UnifiedPush alerts through the self-hosted ntfy.
 
 | Capability | What it covers | Version |
@@ -52,7 +52,7 @@ New repository `herdr-android` with two deliverables:
 | `agent-list` | Agents across machines, the shared attention model, order | v1 |
 | `terminal-view` | Live terminal drawing, watching without resizing, scrollback, zoom, selection | v1 |
 | `terminal-input` | Typing at phone size, keys row, compose key, interrupt | v1 |
-| `alerts` | `herdr-push`, encrypted push, three notification channels, canary, mute | v1 |
+| `alerts` | `kudde-push`, encrypted push, three notification channels, canary, mute | v1 |
 | `release` | CI build, approval-gated signing, GitHub releases, Obtainium, tests | v1 |
 | `appearance` | Themes and light/dark (v1: graphite, paper); wide layout (v1.1) | v1 / v1.1 |
 | `spaces` | Read-only spaces drawer, tab overview, peek | v1.1 |
@@ -60,8 +60,8 @@ New repository `herdr-android` with two deliverables:
 ## Impact
 
 - WSL: one restricted `authorized_keys` line for the phone key (OpenSSH on
-  WSL); `herdr-push` as a systemd user service with explicit core config.
-- VPS: a write-only ntfy access token for `up*` topics, used only by `herdr-push`;
+  WSL); `kudde-push` as a systemd user service with explicit core config.
+- VPS: a write-only ntfy access token for `up*` topics, used only by `kudde-push`;
   anonymous access stays denied. MollySocket's grant is untouched.
 - Phone: Tailscale and the ntfy app (both present), Obtainium.
 - herdr-core pinned to the tested release (0.1.15); CI also tests the latest.

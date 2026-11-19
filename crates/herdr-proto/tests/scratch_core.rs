@@ -4,7 +4,7 @@
 //!
 //! The binary comes from `HERDR_CORE_BIN` (scripts/fetch-herdr-core.sh, pinned
 //! or latest). Without it every test says so and passes, unless
-//! `HERDR_REQUIRE_CORE` is set (CI's core jobs set both).
+//! `KUDDE_REQUIRE_CORE` is set (CI's core jobs set both).
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -59,8 +59,8 @@ impl Core {
     fn new(session: &str) -> Option<Core> {
         let Some(bin) = std::env::var_os("HERDR_CORE_BIN") else {
             assert!(
-                std::env::var_os("HERDR_REQUIRE_CORE").is_none(),
-                "HERDR_REQUIRE_CORE is set but HERDR_CORE_BIN is not"
+                std::env::var_os("KUDDE_REQUIRE_CORE").is_none(),
+                "KUDDE_REQUIRE_CORE is set but HERDR_CORE_BIN is not"
             );
             eprintln!("skipped: HERDR_CORE_BIN is not set (scripts/fetch-herdr-core.sh)");
             return None;
@@ -684,7 +684,7 @@ fn the_desk_keeps_its_size_and_colours_until_the_phone_types() {
 // Real shells with their rc files in the scratch home, never stub scripts in
 // their place: what the phone relies on is how zsh and bash treat aliases and
 // `-c`. zsh is skipped (and says so) where it is not installed, unless
-// HERDR_REQUIRE_ZSH is set (CI installs it).
+// KUDDE_REQUIRE_ZSH is set (CI installs it).
 
 use herdr_proto::start;
 
@@ -696,8 +696,8 @@ fn have(shell: &str) -> bool {
         return true;
     }
     assert!(
-        std::env::var_os("HERDR_REQUIRE_ZSH").is_none() || shell != ZSH,
-        "HERDR_REQUIRE_ZSH is set but {shell} is missing"
+        std::env::var_os("KUDDE_REQUIRE_ZSH").is_none() || shell != ZSH,
+        "KUDDE_REQUIRE_ZSH is set but {shell} is missing"
     );
     eprintln!("skipped for {shell}: not installed");
     false

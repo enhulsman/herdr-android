@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Records the cell-grid goldens for the app's VT (terminal-view spec,
-# "Cell-grid fidelity"): every crates/herdr-mobile/src/vt/goldens/<name>-<cols>x<rows>.vt
+# "Cell-grid fidelity"): every crates/kudde-mobile/src/vt/goldens/<name>-<cols>x<rows>.vt
 # is fed to scripts/grid-golden.c, a C port of herdr-app's VT pipeline linked
 # against the same libghostty-vt build the app uses, and its grid is written
 # next to it as <name>-<cols>x<rows>.grid. The Rust test
@@ -17,7 +17,7 @@ set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 ghostty="$repo/build/ghostty/host"
-goldens="$repo/crates/herdr-mobile/src/vt/goldens"
+goldens="$repo/crates/kudde-mobile/src/vt/goldens"
 [[ -f "$ghostty/libghostty-vt.a" ]] || {
   echo "missing $ghostty/libghostty-vt.a: run scripts/build-ghostty.sh x86_64-linux-gnu" >&2
   exit 1

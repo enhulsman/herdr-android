@@ -4,7 +4,7 @@
 # restriction missing or re-enabled, a wrong command, a second copy of the key,
 # and sshd -T output. With /usr/sbin/sshd and ssh-keygen installed it also runs
 # the live mode against a throwaway sshd; without them those tests say so and
-# pass, unless HERDR_REQUIRE_SSHD is set (CI sets it).
+# pass, unless KUDDE_REQUIRE_SSHD is set (CI sets it).
 #
 # Usage: scripts/test-check-restricted-key.sh
 set -euo pipefail
@@ -15,12 +15,12 @@ trap 'rm -rf "$scratch"' EXIT
 failures=0
 count=0
 
-# The forced command the app puts in the line (crates/herdr-mobile/src/ssh.rs
+# The forced command the app puts in the line (crates/kudde-mobile/src/ssh.rs
 # REMOTE_COMMAND), with its double quotes escaped as in the line.
 command_escaped='sh -c '\''p=$(command -v herdr-core) || p=$HOME/.local/bin/herdr-core; [ -x \"$p\" ] || { echo \"herdr-core is not installed here\" >&2; exit 127; }; exec \"$p\" connect'\'''
 blob=AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBExampleExampleExampleExampleExampleExampleExampleExampleExampleExample
 other_blob=AAAAC3NzaC1lZDI1NTE5AAAAIExampleOtherKeyExampleOtherKeyExampleOther
-good="restrict,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+good="restrict,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
 
 # keys <line>...: writes the lines as an authorized_keys file, mode 600.
 keys() {
@@ -61,27 +61,27 @@ other_keys_comments_and_blank_lines_are_ignored() {
 }
 
 option_names_are_case_insensitive() {
-  keys "RESTRICT,Command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "RESTRICT,Command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect pass '' -- "$file"
 }
 
 extra_restrictions_are_fine() {
-  keys "restrict,from=\"192.0.2.0/24\",no-pty,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,from=\"192.0.2.0/24\",no-pty,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect pass '' -- "$file"
 }
 
 missing_restrict_fails() {
-  keys "command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*restrict' -- "$file"
 }
 
 re_enabled_pty_fails() {
-  keys "restrict,pty,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,pty,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*pty' -- "$file"
 }
 
 re_enabled_pty_in_capitals_fails() {
-  keys "restrict,PTY,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,PTY,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*pty' -- "$file"
 }
 
@@ -90,18 +90,18 @@ re_enabled_forwarding_fails() {
   for option in port-forwarding agent-forwarding X11-forwarding user-rc \
     'permitopen="127.0.0.1:80"' 'permitlisten="8080"' 'environment="A=b"' \
     'tunnel="1"' cert-authority; do
-    keys "restrict,$option,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+    keys "restrict,$option,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
     expect fail "^FAIL.*${option%%=*}" -- "$file"
   done
 }
 
 wrong_command_fails() {
-  keys "restrict,command=\"bash\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,command=\"bash\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*command' -- "$file"
 }
 
 command_with_a_comma_inside_quotes_is_one_option() {
-  keys "restrict,command=\"echo a,pty\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,command=\"echo a,pty\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*command' -- "$file"
   # ...and the pty inside the quotes is not read as an option.
   if grep -q '^FAIL.*not allowed' <<< "$(HOME="$scratch/home" "$check" "$file" 2>&1)"; then
@@ -111,23 +111,23 @@ command_with_a_comma_inside_quotes_is_one_option() {
 }
 
 missing_command_fails() {
-  keys "restrict ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*command' -- "$file"
 }
 
 two_commands_fail() {
-  keys "restrict,command=\"$command_escaped\",command=\"bash\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,command=\"$command_escaped\",command=\"bash\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*command' -- "$file"
 }
 
 no_options_at_all_fails() {
-  keys "ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*restrict' -- "$file"
 }
 
 no_phone_key_line_fails() {
   keys "ssh-ed25519 $other_blob laptop"
-  expect fail '^FAIL.*herdr-android' -- "$file"
+  expect fail '^FAIL.*kudde' -- "$file"
 }
 
 the_same_key_without_restrictions_elsewhere_fails() {
@@ -338,8 +338,8 @@ have_sshd() {
   if [[ -x /usr/sbin/sshd ]] && command -v ssh-keygen > /dev/null; then
     return 0
   fi
-  if [[ -n ${HERDR_REQUIRE_SSHD:-} ]]; then
-    echo "FAIL: HERDR_REQUIRE_SSHD is set but /usr/sbin/sshd is not installed" >&2
+  if [[ -n ${KUDDE_REQUIRE_SSHD:-} ]]; then
+    echo "FAIL: KUDDE_REQUIRE_SSHD is set but /usr/sbin/sshd is not installed" >&2
     failures=$((failures + 1))
   else
     echo "skipped ${FUNCNAME[1]}: /usr/sbin/sshd is not installed" >&2
@@ -358,26 +358,26 @@ live_good_line_passes_every_refusal() {
 
 live_ignores_a_from_limit() {
   have_sshd || return 0
-  keys "restrict,from=\"192.0.2.0/24\",command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,from=\"192.0.2.0/24\",command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect pass '^PASS.*live.*other command' -- --live "$file"
 }
 
 live_re_enabled_pty_is_caught() {
   have_sshd || return 0
-  keys "restrict,pty,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,pty,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*live.*pty' -- --live "$file"
 }
 
 live_re_enabled_forwarding_is_caught() {
   have_sshd || return 0
-  keys "restrict,port-forwarding,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict,port-forwarding,command=\"$command_escaped\" ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*live.*local port forwarding' -- --live "$file"
   expect fail '^FAIL.*live.*remote port forwarding' -- --live "$file"
 }
 
 live_wrong_command_is_caught() {
   have_sshd || return 0
-  keys "restrict ecdsa-sha2-nistp256 $blob herdr-android"
+  keys "restrict ecdsa-sha2-nistp256 $blob kudde"
   expect fail '^FAIL.*live.*other command' -- --live "$file"
 }
 

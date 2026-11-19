@@ -78,11 +78,11 @@ check "the password is long" test "${#password}" -ge 32
 check "generate does not print the password" absent "$password" "$S/out"
 check "bitwarden.txt holds the password" grep -qF -- "$password" "$dir/bitwarden.txt"
 check "bitwarden.txt holds the keystore" grep -qF -- "$(<"$dir/release.p12.b64")" "$dir/bitwarden.txt"
-check "bitwarden.txt holds the herdr-push key" grep -qF -- "$(sed -n 2p "$dir/herdr-push")" "$dir/bitwarden.txt"
+check "bitwarden.txt holds the kudde-push key" grep -qF -- "$(sed -n 2p "$dir/kudde-push")" "$dir/bitwarden.txt"
 
 run upload "$dir"; rc=$?
 check "upload exits 0" test "$rc" -eq 0
-for name in RELEASE_KEYSTORE_B64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD HERDR_PUSH_SIGNING_KEY; do
+for name in RELEASE_KEYSTORE_B64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD KUDDE_PUSH_SIGNING_KEY; do
   check "$name goes to the release environment" grep -qx "secret set $name --env release --repo owner/repo" "$S/fake/calls"
   check "$name is not empty" test -s "$S/fake/secret-$name"
 done
@@ -104,13 +104,13 @@ digest=$("$apksigner" verify --print-certs --min-sdk-version 31 "$S/signed.apk" 
   | sed -n 's/^Signer #[0-9]* certificate SHA-256 digest: //p')
 check "an APK signed with the secrets matches the recorded fingerprint" test "$digest" = "$expected"
 
-# Sign herdr-push as the workflow does, verify with the committed allowed-signers file.
-echo payload > "$S/herdr-push"
-key="$S/push-key"; (umask 077; printf '%s\n' "$(<"$S/fake/secret-HERDR_PUSH_SIGNING_KEY")" > "$key")
-ssh-keygen -q -Y sign -f "$key" -n herdr-push "$S/herdr-push" 2>/dev/null
-check "herdr-push signatures verify against docs/herdr-push-allowed-signers" \
-  ssh-keygen -q -Y verify -f "$S/repo/docs/herdr-push-allowed-signers" -I herdr-push -n herdr-push \
-  -s "$S/herdr-push.sig" < "$S/herdr-push"
+# Sign kudde-push as the workflow does, verify with the committed allowed-signers file.
+echo payload > "$S/kudde-push"
+key="$S/push-key"; (umask 077; printf '%s\n' "$(<"$S/fake/secret-KUDDE_PUSH_SIGNING_KEY")" > "$key")
+ssh-keygen -q -Y sign -f "$key" -n kudde-push "$S/kudde-push" 2>/dev/null
+check "kudde-push signatures verify against docs/kudde-push-allowed-signers" \
+  ssh-keygen -q -Y verify -f "$S/repo/docs/kudde-push-allowed-signers" -I kudde-push -n kudde-push \
+  -s "$S/kudde-push.sig" < "$S/kudde-push"
 check "the M0.4 comment is gone" absent "M0.4: replace" "$S/repo/docs/release-signing-fingerprint.txt"
 check "upload deletes the key folder" test ! -e "$dir"
 check "upload does not print the password" absent "$password" "$S/out"

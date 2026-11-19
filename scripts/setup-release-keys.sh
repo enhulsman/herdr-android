@@ -3,7 +3,7 @@
 # yourself from the repository root:
 #
 #   scripts/setup-release-keys.sh generate
-#       Makes the APK signing keystore (EC P-256) and the herdr-push signing key
+#       Makes the APK signing keystore (EC P-256) and the kudde-push signing key
 #       (ed25519) in a new private folder in your home directory and prints its
 #       path. Uploads nothing. Copy bitwarden.txt from that folder into your
 #       password manager before the next step.
@@ -11,7 +11,7 @@
 #   scripts/setup-release-keys.sh upload <folder>
 #       Creates the `release` environment (deployment branch: main only), stores
 #       the five secrets in it, writes docs/release-signing-fingerprint.txt and
-#       docs/herdr-push-allowed-signers, and shreds the folder.
+#       docs/kudde-push-allowed-signers, and shreds the folder.
 #
 # Both steps refuse to run once a fingerprint is recorded or any of the five
 # secrets exists, so a signing key is never replaced by accident. Secrets never
@@ -24,11 +24,11 @@ set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 fingerprint_file="$repo/docs/release-signing-fingerprint.txt"
-signers_file="$repo/docs/herdr-push-allowed-signers"
+signers_file="$repo/docs/kudde-push-allowed-signers"
 placeholder=PLACEHOLDER-replace-in-M0.4
 key_alias=herdr-release
-secrets=(RELEASE_KEYSTORE_B64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD HERDR_PUSH_SIGNING_KEY)
-files=(release.p12 release.p12.b64 password alias fingerprint herdr-push herdr-push.pub bitwarden.txt)
+secrets=(RELEASE_KEYSTORE_B64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD KUDDE_PUSH_SIGNING_KEY)
+files=(release.p12 release.p12.b64 password alias fingerprint kudde-push kudde-push.pub bitwarden.txt)
 
 die() { echo "setup-release-keys: $*" >&2; exit 1; }
 
@@ -76,7 +76,7 @@ generate() {
     -validity 10000 -dname "CN=herdr-android" -storepass:env KS_PASS -keypass:env KS_PASS 2>/dev/null
   base64 -w0 "$dir/release.p12" > "$dir/release.p12.b64"
   cert_sha256 "$dir" > "$dir/fingerprint"
-  ssh-keygen -q -t ed25519 -N '' -C herdr-push -f "$dir/herdr-push"
+  ssh-keygen -q -t ed25519 -N '' -C kudde-push -f "$dir/kudde-push"
 
   cat > "$dir/bitwarden.txt" <<EOF
 Two items for your password manager. Copy each value exactly.
@@ -89,9 +89,9 @@ Two items for your password manager. Copy each value exactly.
    Keystore, base64 (to restore: base64 -d > release.p12):
 $(<"$dir/release.p12.b64")
 
-2. herdr-push signing key (OpenSSH private key, no passphrase)
-$(<"$dir/herdr-push")
-   Public key: $(<"$dir/herdr-push.pub")
+2. kudde-push signing key (OpenSSH private key, no passphrase)
+$(<"$dir/kudde-push")
+   Public key: $(<"$dir/kudde-push.pub")
 EOF
 
   local windows
@@ -131,10 +131,10 @@ upload() {
   set_secret RELEASE_KEYSTORE_PASSWORD "$dir/password"
   set_secret RELEASE_KEY_ALIAS "$dir/alias"
   set_secret RELEASE_KEY_PASSWORD "$dir/password"
-  set_secret HERDR_PUSH_SIGNING_KEY "$dir/herdr-push"
+  set_secret KUDDE_PUSH_SIGNING_KEY "$dir/kudde-push"
 
   sed -i -e "/^# M0.4: replace/d" -e "s/^$placeholder\$/$(<"$dir/fingerprint")/" "$fingerprint_file"
-  printf 'herdr-push %s\n' "$(cut -d' ' -f1,2 "$dir/herdr-push.pub")" > "$signers_file"
+  printf 'kudde-push %s\n' "$(cut -d' ' -f1,2 "$dir/kudde-push.pub")" > "$signers_file"
   echo "Wrote ${fingerprint_file#"$repo"/} and ${signers_file#"$repo"/}."
 
   for name in "${files[@]}"; do shred -u "$dir/$name"; done

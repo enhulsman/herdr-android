@@ -2,7 +2,7 @@
 # Checks, on the machine, that the phone's key can only start herdr-core.
 #
 # The app gives you one line to add to ~/.ssh/authorized_keys:
-#   restrict,command="sh -c '...exec herdr-core connect'" ecdsa-sha2-nistp256 AAAA... herdr-android
+#   restrict,command="sh -c '...exec herdr-core connect'" ecdsa-sha2-nistp256 AAAA... kudde
 # This script reads that file (it never changes it) and checks every line that
 # carries the phone's key:
 #   - `restrict` is set: no terminal (pty), no port, agent or X11 forwarding,
@@ -37,7 +37,7 @@
 # Usage: scripts/check-restricted-key.sh [--live] [--comment NAME]
 #                                         [--sshd-settings FILE] [AUTHORIZED_KEYS]
 #   AUTHORIZED_KEYS  default ~/.ssh/authorized_keys
-#   --comment NAME   the key's comment, default herdr-android
+#   --comment NAME   the key's comment, default kudde
 # Prints PASS, FAIL or SKIP per check. Exit 0 when nothing failed, 1 when a
 # check failed, 2 on a usage error.
 set -euo pipefail
@@ -48,7 +48,7 @@ usage() {
 }
 
 live=0
-comment=herdr-android
+comment=kudde
 settings=
 file=
 while [[ $# -gt 0 ]]; do
@@ -64,7 +64,7 @@ while [[ $# -gt 0 ]]; do
 done
 file=${file:-$HOME/.ssh/authorized_keys}
 
-# The forced command, as crates/herdr-mobile/src/ssh.rs REMOTE_COMMAND has it
+# The forced command, as crates/kudde-mobile/src/ssh.rs REMOTE_COMMAND has it
 # (the line escapes its double quotes as \"; parsing undoes that).
 expected_command=$(cat <<'EOF'
 sh -c 'p=$(command -v herdr-core) || p=$HOME/.local/bin/herdr-core; [ -x "$p" ] || { echo "herdr-core is not installed here" >&2; exit 127; }; exec "$p" connect'
@@ -390,14 +390,14 @@ live_check() {
     fail "live: needs $sshd_bin, ssh and ssh-keygen"
     return
   fi
-  scratch=$(mktemp -d "${TMPDIR:-/tmp}/herdr-check.XXXXXX")
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/kudde-check.XXXXXX")
   # shellcheck disable=SC2064 # expand now: the paths are local
   trap "[[ -n \$live_pid ]] && kill \$live_pid 2> /dev/null; rm -rf '$scratch'" EXIT
   live_pid=
 
   mkdir -p "$scratch/home/bin"
   ssh-keygen -q -t ed25519 -N '' -f "$scratch/host_key"
-  ssh-keygen -q -t ecdsa -b 256 -N '' -C herdr-check -f "$scratch/client_key"
+  ssh-keygen -q -t ecdsa -b 256 -N '' -C kudde-check -f "$scratch/client_key"
   # Stand-in herdr-core: says what it was asked and whether it got a terminal.
   cat > "$scratch/home/bin/herdr-core" <<'EOF'
 #!/bin/sh

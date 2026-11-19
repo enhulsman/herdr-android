@@ -13,18 +13,18 @@ val appVersion = repoRoot.file("VERSION").asFile.readText().trim()
 val (major, minor, patch) = appVersion.split('.').map(String::toInt)
 
 android {
-    namespace = "dev.herdr.android"
+    namespace = "dev.kudde.android"
     compileSdk = 36
     // Same NDK as scripts/build-rust-android.sh; AGP strips the .so files with it.
     ndkVersion = "27.1.12297006"
 
     defaultConfig {
-        applicationId = "dev.herdr.android"
+        applicationId = "dev.kudde.android"
         minSdk = 31
         targetSdk = 36
         versionName = appVersion
         versionCode = major * 10000 + minor * 100 + patch
-        manifestPlaceholders["appLabel"] = "herdr"
+        manifestPlaceholders["appLabel"] = "Kudde"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
@@ -35,12 +35,12 @@ android {
         // Installs next to the release from Obtainium, signed with the debug key.
         debug {
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["appLabel"] = "herdr debug"
+            manifestPlaceholders["appLabel"] = "Kudde debug"
             // The release icon inverted (src/debug/res), so it never passes for the release.
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_debug"
-            // -Pherdr.perf: the same app, not debuggable and with optimized Rust, for
+            // -Pkudde.perf: the same app, not debuggable and with optimized Rust, for
             // frame-time and open-time checks; installs over the debug app and keeps its data.
-            if (providers.gradleProperty("herdr.perf").isPresent) isDebuggable = false
+            if (providers.gradleProperty("kudde.perf").isPresent) isDebuggable = false
         }
         // The terminal spike (task M0.5, src/spike/): optimized Rust with
         // libghostty-vt linked in, not debuggable so frame times are realistic.
@@ -51,7 +51,7 @@ android {
             isDebuggable = false
             isJniDebuggable = false
             applicationIdSuffix = ".spike"
-            manifestPlaceholders["appLabel"] = "herdr spike"
+            manifestPlaceholders["appLabel"] = "Kudde spike"
             // The system's default icon: the debug icon lives in src/debug/res, which spike lacks.
             manifestPlaceholders["appIcon"] = "@android:drawable/sym_def_app_icon"
             matchingFallbacks += "debug"
@@ -119,7 +119,7 @@ androidComponents {
         val buildRust = tasks.register<BuildRust>("buildRust${variant.name.replaceFirstChar(Char::uppercase)}") {
             group = "build"
             description = "Builds the Rust core and its Kotlin bindings for ${variant.name}."
-            release.set(variant.buildType != "debug" || providers.gradleProperty("herdr.perf").isPresent)
+            release.set(variant.buildType != "debug" || providers.gradleProperty("kudde.perf").isPresent)
             // Every build draws terminals since M2: libghostty-vt from scripts/build-ghostty.sh.
             // ssh_run_spike, which can accept any host key, only in the spike app.
             features.set(if (variant.buildType == "spike") listOf("vt", "spike") else listOf("vt"))
@@ -163,11 +163,11 @@ dependencies {
 // bindings (CoreBridgeTest), so the bridge is checked without a device.
 val buildRustHost = tasks.register<Exec>("buildRustHost") {
     group = "build"
-    description = "Builds libherdr_mobile.so for the host JVM's unit tests."
+    description = "Builds libkudde_mobile.so for the host JVM's unit tests."
     workingDir(repoRoot)
     // The same target directory as the jna.library.path below, whatever the environment says.
     environment("CARGO_TARGET_DIR", repoRoot.dir("target").asFile.path)
-    commandLine("cargo", "build", "-p", "herdr-mobile", "--locked")
+    commandLine("cargo", "build", "-p", "kudde-mobile", "--locked")
 }
 
 val robolectricJars = tasks.register<Sync>("robolectricJars") {
@@ -184,11 +184,11 @@ roborazzi {
 tasks.withType<Test>().configureEach {
     dependsOn(buildRustHost)
     systemProperty("jna.library.path", repoRoot.dir("target/debug").asFile.path)
-    systemProperty("herdr.version", appVersion)
+    systemProperty("kudde.version", appVersion)
     // ThemeTokensTest compares the Kotlin theme with the signed-off tokens.
     val designTokens = repoRoot.file("design-tokens.json")
     inputs.file(designTokens).withPropertyName("designTokens").withPathSensitivity(PathSensitivity.NONE)
-    systemProperty("herdr.designTokens", designTokens.asFile.path)
+    systemProperty("kudde.designTokens", designTokens.asFile.path)
     dependsOn(robolectricJars)
     systemProperty("robolectric.offline", "true")
     systemProperty("robolectric.dependency.dir", robolectricJars.get().destinationDir.path)

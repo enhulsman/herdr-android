@@ -7,7 +7,7 @@ body:
       value: |
         Thanks for reporting. This issue is public, so leave out your host names, IP addresses, ports, paths, user names and anything else about your own machines. Made-up names (workstation, website, ~/project) work just as well.
 
-        A security problem? Don't file it here; see [SECURITY.md](https://github.com/enhulsman/herdr-android/blob/main/SECURITY.md).
+        A security problem? Don't file it here; see [SECURITY.md](https://github.com/enhulsman/kudde/blob/main/SECURITY.md).
   - type: textarea
     id: what
     attributes:
@@ -27,7 +27,7 @@ body:
     id: app
     attributes:
       label: App version
-      description: In Android settings, Apps, herdr; the version is at the bottom.
+      description: In Android settings, Apps, Kudde; the version is at the bottom.
     validations:
       required: true
   - type: input

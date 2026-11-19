@@ -84,7 +84,7 @@
     <string name="machines_import">Import machine list</string>
     <string name="machines_import_detail">Adds machines you don\'t have yet</string>
     <!-- The file name the export's file picker suggests. -->
-    <string name="machines_export_file_name" translatable="false">herdr-machines.json</string>
+    <string name="machines_export_file_name" translatable="false">kudde-machines.json</string>
     <!-- Remove machine: the card's last row and its confirm (drawn like render 8's dialog). %1$s is the machine's name. -->
     <string name="machines_remove">Remove machine</string>
     <string name="remove_title">Remove %1$s?</string>
@@ -137,7 +137,7 @@
     <string name="status_app_too_old_detail">Update the app to connect.</string>
     <!-- decisions.md 2026-11-01: GrapheneOS's per-app Network permission. -->
     <string name="status_network_off">Network permission is off</string>
-    <string name="status_network_off_detail">Allow Network for herdr in Android settings.</string>
+    <string name="status_network_off_detail">Allow Network for Kudde in Android settings.</string>
 
     <!-- What a machine card offers when it waits for the person. -->
     <string name="action_unlock">Unlock</string>
@@ -303,10 +303,10 @@
     <string name="alerts_allow">Allow</string>
     <!-- Never "delivered": ntfy accepting a push is all the watcher knows (alerts spec). -->
     <string name="alerts_accepted">Last accepted by ntfy %1$s</string>
-    <!-- %1$s the HTTP status or the error herdr-push reported ("403", "timed out"). -->
+    <!-- %1$s the HTTP status or the error kudde-push reported ("403", "timed out"). -->
     <string name="alerts_failing">Alerts failing: %1$s</string>
     <string name="alerts_no_push_yet">Registered, no push yet</string>
-    <string name="alerts_no_watcher">No answer from herdr-push</string>
+    <string name="alerts_no_watcher">No answer from kudde-push</string>
     <string name="alerts_registered">Registered</string>
     <string name="alerts_not_yet">Registers at the next connection</string>
     <string name="alerts_endpoint_changed">Not registered since endpoint change</string>
@@ -320,5 +320,5 @@
     <string name="alerts_test_idle">Checks the whole path to this phone</string>
     <string name="alerts_test_waiting">Waiting for the test alert</string>
     <string name="alerts_test_received">Test received %1$s</string>
-    <string name="alerts_test_missed">No test alert within 30 s · is herdr-push running there?</string>
+    <string name="alerts_test_missed">No test alert within 30 s · is kudde-push running there?</string>
 </resources>

@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: One attention model, shared with the watcher
-The app and `herdr-push` SHALL use one implementation of the desktop's attention
+The app and `kudde-push` SHALL use one implementation of the desktop's attention
 model (`herdr-proto::attention`, ported from herdr-app `model.rs`), tested
 against this table:
 

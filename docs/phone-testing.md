@@ -46,7 +46,7 @@ the person unplugs it; Wi-Fi only, so a lower bound.
 working|blocked|idle|error` changes what it reports. Working then idle makes it
 "done" on the phone until opened there. Typing into it from the phone is
 harmless: it echoes. `stop` removes it. On a desk with a Herdr app
-layout herdr-push sends no alert for it (it alerts only for terminals in a
+layout kudde-push sends no alert for it (it alerts only for terminals in a
 Herdr app pane), so check alerts there with a real agent's quiet "Finished"
 alert, for example the checking agent's own turn ending. On a machine with no
 Herdr app layout, `set blocked` gives a "Needs you" alert after the grace delay.

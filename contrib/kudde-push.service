@@ -1,0 +1,19 @@
+# systemd user unit for kudde-push (docs/kudde-push.md).
+# Install: cp kudde-push.service ~/.config/systemd/user/ && systemctl --user enable --now kudde-push
+[Unit]
+Description=kudde-push: phone alerts for herdr agents
+
+[Service]
+ExecStart=%h/.local/bin/kudde-push
+# A missing core or a config mistake is logged and retried, never fatal.
+Restart=always
+RestartSec=60
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=default.target

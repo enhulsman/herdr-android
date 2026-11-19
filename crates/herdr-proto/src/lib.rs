@@ -1,4 +1,4 @@
-//! Protocol code shared by herdr-mobile and herdr-push (design.md, "Shared crate").
+//! Protocol code shared by kudde-mobile and kudde-push (design.md, "Shared crate").
 //!
 //! Parts are adapted from herdr (herdr-app `src/hc.rs` and `src/model.rs`),
 //! licensed under the Apache License 2.0; see `LICENSE-herdr-Apache-2.0` in

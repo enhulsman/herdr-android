@@ -105,7 +105,7 @@ jobs:
           EXPECTED: ${{ steps.fingerprint.outputs.expected }}
         run: |
           tools="$ANDROID_HOME/build-tools/$BUILD_TOOLS"
-          apk="release/herdr-android-${TAG#v}.apk"
+          apk="release/kudde-${TAG#v}.apk"
           umask 077
           mkdir release
           keystore="$RUNNER_TEMP/release.jks"
@@ -113,7 +113,7 @@ jobs:
           base64 --decode <<<"$RELEASE_KEYSTORE_B64" > "$keystore"
           "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$RELEASE_KEY_ALIAS" \
             --ks-pass env:RELEASE_KEYSTORE_PASSWORD --key-pass env:RELEASE_KEY_PASSWORD \
-            --out "$apk" unsigned/herdr-android-unsigned.apk
+            --out "$apk" unsigned/kudde-unsigned.apk
           certs=$("$tools/apksigner" verify --print-certs --min-sdk-version 31 "$apk")
           digests=$(sed -n 's/^Signer #[0-9]* certificate SHA-256 digest: //p' <<<"$certs")
           echo "Signing certificate SHA-256: $digests"
@@ -122,24 +122,24 @@ jobs:
             exit 1
           fi
 
-      - name: Sign herdr-push for each architecture (detached, namespace herdr-push)
+      - name: Sign kudde-push for each architecture (detached, namespace kudde-push)
         env:
-          HERDR_PUSH_SIGNING_KEY: ${{ secrets.HERDR_PUSH_SIGNING_KEY }}
+          KUDDE_PUSH_SIGNING_KEY: ${{ secrets.HERDR_PUSH_SIGNING_KEY }}
         run: |
           umask 077
-          key="$RUNNER_TEMP/herdr-push-signing"
+          key="$RUNNER_TEMP/kudde-push-signing"
           trap 'rm -f "$key"' EXIT
-          printf '%s\n' "$HERDR_PUSH_SIGNING_KEY" > "$key"
+          printf '%s\n' "$KUDDE_PUSH_SIGNING_KEY" > "$key"
           for arch in x86_64 aarch64; do
-            cp "unsigned/herdr-push-$arch" "release/herdr-push-$arch"
-            ssh-keygen -Y sign -f "$key" -n herdr-push "release/herdr-push-$arch"
+            cp "unsigned/kudde-push-$arch" "release/kudde-push-$arch"
+            ssh-keygen -Y sign -f "$key" -n kudde-push "release/kudde-push-$arch"
           done
 
       - name: Publish the release
         working-directory: release
         run: |
-          files=("herdr-android-${TAG#v}.apk"
-            herdr-push-x86_64 herdr-push-x86_64.sig herdr-push-aarch64 herdr-push-aarch64.sig)
+          files=("kudde-${TAG#v}.apk"
+            kudde-push-x86_64 kudde-push-x86_64.sig kudde-push-aarch64 kudde-push-aarch64.sig)
           sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \

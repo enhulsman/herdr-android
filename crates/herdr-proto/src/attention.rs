@@ -1,4 +1,4 @@
-//! The attention model shared by the app and herdr-push (agent-list spec,
+//! The attention model shared by the app and kudde-push (agent-list spec,
 //! "One attention model, shared with the watcher").
 //!
 //! Adapted from herdr-app `src/model.rs` (`Model::set_word`, `alert`, `status`,

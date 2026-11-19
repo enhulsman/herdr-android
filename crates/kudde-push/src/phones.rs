@@ -1,4 +1,4 @@
-//! The phones registered in a core's `hdroid-push` document (design.md §5,
+//! The phones registered in a core's `kudde-push` document (design.md §5,
 //! "Registration"): `{phones: [{endpoint, p256dh, auth, machine, test?}]}`.
 //!
 //! `machine` is the phone's own name for this machine, echoed in every push so
@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::webpush::Subscription;
 
-pub const DOC: &str = "hdroid-push";
+pub const DOC: &str = "kudde-push";
 
 #[derive(Clone, Debug)]
 pub struct Phone {
@@ -114,6 +114,6 @@ mod tests {
         assert!(phones(&Value::Null).1.is_empty());
         let (got, notes) = phones(&json!("junk"));
         assert!(got.is_empty());
-        assert_eq!(notes, vec!["hdroid-push unreadable"]);
+        assert_eq!(notes, vec!["kudde-push unreadable"]);
     }
 }

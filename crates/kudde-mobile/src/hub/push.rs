@@ -3,15 +3,15 @@
 //! is", "A test alert proves the path").
 //!
 //! The phone writes its push endpoint and keys, with its own name for the
-//! machine, into the machine's `hdroid-push` document, replacing the entry it
+//! machine, into the machine's `kudde-push` document, replacing the entry it
 //! wrote before; kudde-push reads them there. kudde-push answers in
-//! `hdroid-push-status`, which the phone reads back for the machine card. Only
+//! `kudde-push-status`, which the phone reads back for the machine card. Only
 //! a phone with a registration (or one to take back) talks to these documents.
 
 use serde_json::{Value, json};
 
-pub const DOC: &str = "hdroid-push";
-pub const STATUS_DOC: &str = "hdroid-push-status";
+pub const DOC: &str = "kudde-push";
+pub const STATUS_DOC: &str = "kudde-push-status";
 
 /// What the UnifiedPush distributor gave this phone.
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
@@ -33,7 +33,7 @@ pub enum AlertsRegistration {
     EndpointChanged,
 }
 
-/// What kudde-push last wrote in `hdroid-push-status`, as of the last connection.
+/// What kudde-push last wrote in `kudde-push-status`, as of the last connection.
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
 pub struct PushStatusView {
     /// kudde-push's version, if it ever wrote a status.
@@ -54,7 +54,7 @@ pub struct AlertsView {
     pub status: Option<PushStatusView>,
 }
 
-/// The `hdroid-push` value to write, or None when it already says the same.
+/// The `kudde-push` value to write, or None when it already says the same.
 ///
 /// The phone's entries are the one for its current endpoint and the one it
 /// wrote before (`previous`); both are replaced by one entry for `me`, or
@@ -114,7 +114,7 @@ fn with_phones(doc: &Value, phones: Vec<Value>) -> Value {
     out
 }
 
-/// Reads `hdroid-push-status` for this phone's endpoint. Null (never written)
+/// Reads `kudde-push-status` for this phone's endpoint. Null (never written)
 /// is None; fields that are missing or of the wrong type are left empty.
 pub fn status_view(doc: &Value, endpoint: Option<&str>) -> Option<PushStatusView> {
     if doc.is_null() {

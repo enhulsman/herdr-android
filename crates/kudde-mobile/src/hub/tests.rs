@@ -1390,7 +1390,7 @@ async fn each_broken_list_is_kept_under_its_own_name() {
     assert_eq!(read("machines.json.broken-2"), "second");
 }
 
-// ---- alerts: this phone's entry in hdroid-push (task M3.4) ----
+// ---- alerts: this phone's entry in kudde-push (task M3.4) ----
 
 const UP_NEW: &str = "https://ntfy.example.org/upNEW?up=1";
 const UP_OLD: &str = "https://ntfy.example.org/upOLD?up=1";
@@ -1428,18 +1428,18 @@ impl Core {
     async fn registers(&mut self, have: Value, want: Value, status: Value) {
         self.doc_call(
             "doc.get",
-            "hdroid-push",
+            "kudde-push",
             json!({"value": have, "version": 4}),
         )
         .await;
         let set = self
-            .doc_call("doc.set", "hdroid-push", json!({"version": 5}))
+            .doc_call("doc.set", "kudde-push", json!({"version": 5}))
             .await;
         assert_eq!(set["params"]["value"], want);
         assert_eq!(set["params"]["version"], 4);
         self.doc_call(
             "doc.get",
-            "hdroid-push-status",
+            "kudde-push-status",
             json!({"value": status, "version": 2}),
         )
         .await;
@@ -1549,12 +1549,12 @@ async fn a_test_request_writes_a_new_test_value() {
     rig.hub.send_test(WS).unwrap();
     core.doc_call(
         "doc.get",
-        "hdroid-push",
+        "kudde-push",
         json!({"value": doc, "version": 5}),
     )
     .await;
     let set = core
-        .doc_call("doc.set", "hdroid-push", json!({"version": 6}))
+        .doc_call("doc.set", "kudde-push", json!({"version": 6}))
         .await;
     let test = &set["params"]["value"]["phones"][0]["test"];
     assert!(test.as_str().is_some_and(|t| !t.is_empty()), "{set}");
@@ -1584,12 +1584,12 @@ async fn a_document_event_refreshes_the_status() {
         1,
         "doc",
         "",
-        json!({"name": "hdroid-push-status", "version": 3}),
+        json!({"name": "kudde-push-status", "version": 3}),
     )
     .await;
     core.doc_call(
         "doc.get",
-        "hdroid-push-status",
+        "kudde-push-status",
         json!({"value": status_doc(403), "version": 3}),
     )
     .await;
@@ -1619,12 +1619,12 @@ async fn turning_alerts_off_takes_the_entry_back() {
     assert_eq!(alerts(&rig.hub.snapshot()), None);
     core.doc_call(
         "doc.get",
-        "hdroid-push",
+        "kudde-push",
         json!({"value": doc, "version": 5}),
     )
     .await;
     let set = core
-        .doc_call("doc.set", "hdroid-push", json!({"version": 6}))
+        .doc_call("doc.set", "kudde-push", json!({"version": 6}))
         .await;
     assert_eq!(set["params"]["value"], json!({"phones": []}));
 }
@@ -1632,7 +1632,7 @@ async fn turning_alerts_off_takes_the_entry_back() {
 const UP_THIRD: &str = "https://ntfy.example.org/upTHIRD?up=1";
 
 impl Core {
-    /// Serves `hdroid-push` from `doc` (and a fixed status) until the app has
+    /// Serves `kudde-push` from `doc` (and a fixed status) until the app has
     /// been quiet for a second; returns the document as the app left it.
     async fn serve_push_docs(&mut self, mut doc: Value, mut version: u64) -> Value {
         while let Ok(req) = tokio::time::timeout(Duration::from_secs(1), self.request()).await {
@@ -1641,14 +1641,14 @@ impl Core {
                 .unwrap_or_default()
                 .to_owned();
             let result = match (req["method"].as_str().unwrap(), name.as_str()) {
-                ("doc.get", "hdroid-push") => json!({"value": doc, "version": version}),
-                ("doc.set", "hdroid-push") => {
+                ("doc.get", "kudde-push") => json!({"value": doc, "version": version}),
+                ("doc.set", "kudde-push") => {
                     assert_eq!(req["params"]["version"], version, "{req}");
                     doc = req["params"]["value"].clone();
                     version += 1;
                     json!({"version": version})
                 }
-                ("doc.get", "hdroid-push-status") => {
+                ("doc.get", "kudde-push-status") => {
                     json!({"value": status_doc(200), "version": 2})
                 }
                 _ => panic!("unexpected {req}"),
@@ -1683,7 +1683,7 @@ async fn a_second_endpoint_change_mid_write_leaves_only_the_latest() {
     rig.hub.set_push(Some(registration(UP_NEW)));
     core.doc_call(
         "doc.get",
-        "hdroid-push",
+        "kudde-push",
         json!({"value": old, "version": 5}),
     )
     .await;

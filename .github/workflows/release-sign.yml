@@ -124,7 +124,7 @@ jobs:
 
       - name: Sign kudde-push for each architecture (detached, namespace kudde-push)
         env:
-          KUDDE_PUSH_SIGNING_KEY: ${{ secrets.HERDR_PUSH_SIGNING_KEY }}
+          KUDDE_PUSH_SIGNING_KEY: ${{ secrets.KUDDE_PUSH_SIGNING_KEY }}
         run: |
           umask 077
           key="$RUNNER_TEMP/kudde-push-signing"

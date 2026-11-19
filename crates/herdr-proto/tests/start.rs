@@ -279,7 +279,7 @@ fn the_check_is_exactly_the_designed_line_with_words_inline() {
     );
     assert_eq!(
         argv[2],
-        r#"printf 'herdr-home:%s\n' "$HOME"; case $(uname -s) in Darwin) f=-lic;; *) f=-ic;; esac; exec "${SHELL:-sh}" $f 'for c in claude codex; do command -v "$c" >/dev/null 2>&1 && echo "herdr-has:$c"; done; echo herdr-done'"#
+        r#"printf 'kudde-home:%s\n' "$HOME"; case $(uname -s) in Darwin) f=-lic;; *) f=-ic;; esac; exec "${SHELL:-sh}" $f 'for c in claude codex; do command -v "$c" >/dev/null 2>&1 && echo "kudde-has:$c"; done; echo kudde-done'"#
     );
 }
 
@@ -287,7 +287,7 @@ const WORDS: &[&str] = &["claude", "codex", "pi"];
 
 #[test]
 fn a_clean_answer_gives_home_and_the_found_agents_in_table_order() {
-    let out = "herdr-home:/home/me\nherdr-has:codex\nherdr-has:claude\nherdr-done\n";
+    let out = "kudde-home:/home/me\nkudde-has:codex\nkudde-has:claude\nkudde-done\n";
     assert_eq!(
         parse_check(out, Some(0), WORDS),
         Check {
@@ -299,7 +299,7 @@ fn a_clean_answer_gives_home_and_the_found_agents_in_table_order() {
 
 #[test]
 fn prompt_noise_and_glued_escapes_do_not_hide_markers() {
-    let out = "herdr-home:/home/me with space\n\x1b]0;zsh\x07Welcome!\n\x1b[?2004hherdr-has:claude\n\x1b]7;file://x\x07herdr-done\x1b[?2004l";
+    let out = "kudde-home:/home/me with space\n\x1b]0;zsh\x07Welcome!\n\x1b[?2004hkudde-has:claude\n\x1b]7;file://x\x07kudde-done\x1b[?2004l";
     assert_eq!(
         parse_check(out, Some(0), WORDS),
         Check {
@@ -312,7 +312,7 @@ fn prompt_noise_and_glued_escapes_do_not_hide_markers() {
 #[test]
 fn zero_agents_is_a_success() {
     assert_eq!(
-        parse_check("herdr-home:/home/me\nherdr-done\n", Some(0), WORDS),
+        parse_check("kudde-home:/home/me\nkudde-done\n", Some(0), WORDS),
         Check {
             home: Some(HOME.into()),
             found: Some(vec![])
@@ -323,7 +323,7 @@ fn zero_agents_is_a_success() {
 #[test]
 fn a_failed_inner_shell_still_gives_home() {
     // fish: the loop is not its syntax; the outer sh printed home first.
-    let out = "herdr-home:/home/me\nfish: Unsupported use of 'do'.\n";
+    let out = "kudde-home:/home/me\nfish: Unsupported use of 'do'.\n";
     assert_eq!(
         parse_check(out, Some(127), WORDS),
         Check {
@@ -342,14 +342,14 @@ fn a_failed_inner_shell_still_gives_home() {
 
 #[test]
 fn a_timeout_or_a_signal_is_a_failure() {
-    let out = "herdr-home:/home/me\nherdr-has:claude\nherdr-done\n";
+    let out = "kudde-home:/home/me\nkudde-has:claude\nkudde-done\n";
     assert_eq!(parse_check(out, None, WORDS).found, None);
     assert_eq!(parse_check(out, Some(1), WORDS).found, None);
 }
 
 #[test]
 fn unknown_words_and_empty_home_are_ignored() {
-    let out = "herdr-home:\nherdr-has:rm\nherdr-has:pi\nherdr-done";
+    let out = "kudde-home:\nkudde-has:rm\nkudde-has:pi\nkudde-done";
     assert_eq!(
         parse_check(out, Some(0), WORDS),
         Check {

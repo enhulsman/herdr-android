@@ -21,7 +21,7 @@ the time. Never screen text or the agent's message. ntfy only sees ciphertext.
   broken alert path (after 13 hours of silence it shows "Alert health"). With
   Battery Saver on, Android holds back that check until Battery Saver is off
   again.
-- It writes what ntfy last answered into the `hdroid-push-status` document on
+- It writes what ntfy last answered into the `kudde-push-status` document on
   the core; the app shows "Last accepted by ntfy hh:mm" or "Alerts failing".
 - It only connects to an existing core and never starts one. With no core it
   logs "no core" and tries again every 30 s. The phone's first connection
@@ -131,7 +131,7 @@ The log names each push with the ntfy host and what ntfy answered, for
 example `alert t3 blocked to ntfy.example.org: Answered(200)`. A 403 means the
 token was refused (revoked, or no write access to `up*`).
 
-The phone writes `hdroid-push` on the core (its endpoint and keys); the
+The phone writes `kudde-push` on the core (its endpoint and keys); the
 watcher only sends to endpoints on a host in `allow`, and sends the token
 nowhere else. An entry on another host is ignored and noted in
-`hdroid-push-status`.
+`kudde-push-status`.

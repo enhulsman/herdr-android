@@ -14,17 +14,17 @@ setup.
 
 ### Requirement: The phone registers itself in a core document
 The app SHALL write its endpoint, keys and its own name for the machine into the
-`hdroid-push` document on each connected machine and SHALL update them when the
+`kudde-push` document on each connected machine and SHALL update them when the
 endpoint changes. The watcher SHALL echo that name as `machine` in each push. Client document
 names SHALL satisfy herdr-core's name rule (1-32 of `a-z 0-9 - _ .`, starting with
 a letter or digit).
 
 #### Scenario: First registration
 - **WHEN** the app registers while connected to WSL
-- **THEN** WSL's `hdroid-push` holds the current endpoint, keys and the phone's name for WSL
+- **THEN** WSL's `kudde-push` holds the current endpoint, keys and the phone's name for WSL
 
 #### Scenario: Names pass the core's rule
-- **WHEN** the tests write `hdroid-push` and `hdroid-push-status` to a scratch core
+- **WHEN** the tests write `kudde-push` and `kudde-push-status` to a scratch core
 - **THEN** both `doc.set` calls succeed
 
 #### Scenario: Endpoint changed while away
@@ -91,7 +91,7 @@ its allowlist, over https, without following redirects, with a 10 s timeout and 
 - **THEN** its body is ciphertext that decrypts with the phone's keys to the listed fields only
 
 #### Scenario: Foreign endpoint
-- **WHEN** `hdroid-push` contains an endpoint on another host
+- **WHEN** `kudde-push` contains an endpoint on another host
 - **THEN** that host receives neither the POST nor the token, and the status document reports the ignored entry
 
 ### Requirement: Three notification channels
@@ -132,7 +132,7 @@ cleared by the next push from that machine.
 - **THEN** the "Alert health" notice appears after 13 hours
 
 ### Requirement: Delivery status is shown as what it is
-The watcher SHALL write `hdroid-push-status` with its version, the time and HTTP
+The watcher SHALL write `kudde-push-status` with its version, the time and HTTP
 status of its last push accepted or refused by ntfy, per-endpoint status and notes,
 on change or every 30 minutes. The app SHALL show "Last accepted by ntfy hh:mm" or
 "Alerts failing: <status>" per machine and SHALL NOT call an accepted push delivered.
@@ -143,7 +143,7 @@ on change or every 30 minutes. The app SHALL show "Last accepted by ntfy hh:mm" 
 
 ### Requirement: A test alert proves the path
 The app SHALL offer "Send test alert" per machine: it writes a request into
-`hdroid-push`, the watcher sends a `test` push through the real path, and the app
+`kudde-push`, the watcher sends a `test` push through the real path, and the app
 reports whether it arrived within 30 s.
 
 #### Scenario: Test passes

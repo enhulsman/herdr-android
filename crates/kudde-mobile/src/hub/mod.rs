@@ -299,7 +299,7 @@ struct Live {
     task: Option<AbortHandle>,
     /// When the task's backoff ends, ms since the epoch; only while waiting.
     next_retry_ms: Option<u64>,
-    /// What kudde-push wrote in `hdroid-push-status`, as of the last read.
+    /// What kudde-push wrote in `kudde-push-status`, as of the last read.
     push_status: Option<push::PushStatusView>,
     /// The spaces and folders a new terminal can go to (this connection's).
     places: start::Places,
@@ -355,7 +355,7 @@ pub(crate) struct HubCore {
     snapshots: watch::Sender<HubSnapshot>,
     /// Each machine's live connection, for terminal views to attach through.
     conns: Mutex<HashMap<String, watch::Sender<Option<Conn>>>>,
-    /// One `hdroid-push` sync at a time per machine: a later one must not be
+    /// One `kudde-push` sync at a time per machine: a later one must not be
     /// overtaken by an earlier one still writing an older registration.
     push_syncs: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
 }
@@ -920,7 +920,7 @@ impl HubCore {
             .map(|_| conn)
     }
 
-    /// Whether this phone has anything to say in the machine's `hdroid-push`.
+    /// Whether this phone has anything to say in the machine's `kudde-push`.
     fn push_relevant(&self, name: &str) -> bool {
         let st = self.state.lock().unwrap();
         st.push.is_some() || st.list.get(name).is_some_and(|m| m.push_endpoint.is_some())
@@ -1299,7 +1299,7 @@ async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> 
     }
 }
 
-/// Writes this phone's entry into the machine's `hdroid-push` (or takes it
+/// Writes this phone's entry into the machine's `kudde-push` (or takes it
 /// back), with a test request when `test` is set, then reads the status. A
 /// failure only notes it: the next connection tries again.
 async fn sync_push(
@@ -1341,7 +1341,7 @@ enum Written {
     Stop,
 }
 
-/// One pass of [`sync_push`]: reads `hdroid-push` and writes this phone's entry.
+/// One pass of [`sync_push`]: reads `kudde-push` and writes this phone's entry.
 async fn write_push_entry(
     hub: &Arc<HubCore>,
     name: &str,
@@ -1417,7 +1417,7 @@ async fn write_push_entry(
     })
 }
 
-/// Reads `hdroid-push-status` for the machine card.
+/// Reads `kudde-push-status` for the machine card.
 async fn read_push_status(hub: Arc<HubCore>, name: String, epoch: u64, client: Client) {
     let got = match client
         .call("doc.get", json!({"name": push::STATUS_DOC}))

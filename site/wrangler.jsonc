@@ -1,0 +1,14 @@
+// Cloudflare Workers, static assets only: no Worker script runs. `npm run build`
+// writes dist/, and `wrangler deploy` uploads it and serves it on kudde.dev.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "kudde-site",
+  "compatibility_date": "2026-11-11",
+  "assets": {
+    "directory": "./dist",
+    // an unknown path gets dist/404.html with status 404
+    "not_found_handling": "404-page"
+  },
+  // a Custom Domain: Cloudflare creates the DNS record and certificate on deploy
+  "routes": [{ "pattern": "kudde.dev", "custom_domain": true }]
+}

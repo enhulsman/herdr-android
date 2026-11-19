@@ -21,6 +21,7 @@
     "astro": "7.4.7"
   },
   "devDependencies": {
-    "playwright": "1.55.1"
+    "playwright": "1.55.1",
+    "wrangler": "4.158.0"
   }
 }

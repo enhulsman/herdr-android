@@ -3,7 +3,7 @@
 // button, closed by the 2px ink rule the hero tag hangs from.
 import Mark from './Mark.astro';
 import { NAV, REPO } from '../lib/site.js';
-const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/(index)?$/, '') || '/';
 ---
 <header class="site-header">
   <div class="wrap">

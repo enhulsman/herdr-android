@@ -1,0 +1,36 @@
+/* The Kudde agent list, rebuilt from the app's tokens (412 x 912 dp screen drawn at 0.68). */
+.phone{width:300px;height:640px;border-radius:44px;background:#1c1e1b;padding:10px;box-shadow:0 30px 60px -30px rgba(28,30,27,.45)}
+.screen{width:280px;height:620px;border-radius:35px;overflow:hidden;background:#101114;position:relative}
+.app{width:412px;height:912px;transform:scale(.6796);transform-origin:0 0;background:#101114;color:#eeeeef;font:400 16px/1.25 "Geist",system-ui,sans-serif;position:relative}
+.app .status{height:36px;display:flex;align-items:center;justify-content:space-between;padding:6px 24px 0;font-size:13.5px;font-weight:500;color:#d2d4d9}
+.app .status i{width:11px;height:11px;border-radius:50%;background:#000;position:absolute;left:50%;top:13px;margin-left:-5.5px}
+.app .status svg{width:44px;height:12px}
+.app .bar{height:60px;display:flex;align-items:center;padding:0 20px 0 17px;gap:26px}
+.app .bar h2{font:600 22px/1 "Geist",sans-serif;letter-spacing:-.01em;flex:1;margin:0;color:#eeeeef}
+.app .bar svg{width:22px;height:22px;stroke:#aeaeb0;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.app .sec{height:40px;display:flex;align-items:center;gap:8px;padding:6px 17px 0;font-size:13px;font-weight:500}
+.app .sec em{font-style:normal;color:#696a6d;font-weight:400}
+.app .sec.needs{color:#f0705f}.app .sec.done{color:#76a8ff}.app .sec.working{color:#e5c07b}.app .sec.idle{color:#696a6d}
+.app .row{height:64px;display:flex;align-items:center;padding:0 20px 0 17px}
+.app .agent{width:20px;height:20px;flex:none;margin-right:14px}
+.app .txt{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.app .txt b{font-weight:400;font-size:16px}
+.app .txt span,.app time{font-size:13px;color:#696a6d}
+.app .row.idle b{color:#98999b}
+.app time{margin-right:14px}
+.app .st{width:18px;height:18px;display:grid;place-items:center;flex:none}
+.app .st.dot::after{content:"";width:9px;height:9px;border-radius:50%;background:#76a8ff}
+.app .st.ring::after{content:"";width:9px;height:9px;border-radius:50%;border:1.8px solid #696a6d}
+.app .st.spin::after{content:"";width:15px;height:15px;border-radius:50%;border:3.2px solid #e5c07b3d;border-top-color:#e5c07b;transform:rotate(100deg);animation:kspin .9s linear infinite}
+.app .card{margin:2px 8px 6px;background:#25272b;border:1px solid #ffffff18;border-radius:14px;padding:12px 14px 13px 13px;position:relative;overflow:hidden}
+.app .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#f0705f}
+.app .card .row{height:auto;padding:0 0 12px 0}.app .card .row time{margin-right:0}
+.app .ask{background:#131518;border-radius:9px;padding:9px 11px}
+.app .ask b{display:block;font-size:12px;font-weight:600;color:#f0705f;margin-bottom:3px}
+.app .ask code{font:400 13px/1.45 "JetBrains Mono",monospace;color:#d2d4d9;font-variant-ligatures:none}
+.app .other{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 17px;font-size:13px;color:#696a6d;font-weight:500}
+.app .other span em{font-style:normal;font-weight:400;margin-left:6px}
+.app .other svg{width:14px;height:14px;stroke:#696a6d;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.app .gesture{position:absolute;left:50%;bottom:10px;width:112px;height:4px;margin-left:-56px;border-radius:2px;background:#eeeeef66}
+@keyframes kspin{to{transform:rotate(460deg)}}
+@media (prefers-reduced-motion: reduce){.app .st.spin::after{animation:none}}

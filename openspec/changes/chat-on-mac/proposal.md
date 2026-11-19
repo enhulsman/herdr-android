@@ -4,8 +4,18 @@
 
 **Decisions** (Ezra, 2026-11-19): agents on a Mac are part of v1, as this
 change, split from `desktop-chat` after the council review; the gallery
-release of the desk chat waits for it. No open questions; one fact must be
+release of the desk chat waits for it. One fact must be
 checked first (below).
+
+**Open for you (from the R1 review):**
+- **Pick: approve this notice (R1-E).** "kudde's chat can read agents on Linux
+  and macOS. This agent runs on Windows itself; agents in WSL work."
+  For other unsupported systems: "kudde's chat can read agents on Linux and
+  macOS. This machine is not supported." Approve these texts?
+
+Sends to Mac agents now check open files twice with `lsof`, so a reply may
+be noticeably slower; task 1.2 measures the added time. Confidence: moderate
+on the extra work, low on the delay until measured.
 
 **What changes for you:** agents running on a Mac get the chat: in the herdr
 desktop app, from any computer, and on the phone, if the phone can reach the
@@ -44,7 +54,7 @@ gallery's audience runs agents on a Mac.
   a Mac.
 - `desktop-chat`: Mac agents are supported. Its delta is drafted against
   the pending desktop requirements and integrated after desktop-chat tasks
-  2.8 and sections 3–4 pass, before the joint gallery release; archival is
+  3.6 and sections 4–5 pass, before the joint gallery release; archival is
   not a prerequisite.
 
 ## Impact

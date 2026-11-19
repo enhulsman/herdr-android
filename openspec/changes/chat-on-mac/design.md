@@ -37,10 +37,11 @@ and session against fresh facts. Claude Code uses its session file and `ps`
 lock files and their times through `lsof`. Unreadable or ambiguous results
 refuse before typing. A send may therefore pay the cost of `lsof` twice.
 
-**Owner pick R1-A (proposed):** refuse and keep the draft when session identity
-cannot be established, rather than waiting and retrying automatically, as
-in desktop-chat D4. Keep the same target through uploads and any guarded
-second Enter; do not substitute the latest poll's target.
+Refuse and preserve the draft as `openspec/specs/chat-view/spec.md`,
+requirement "Sending goes only to the agent whose log is shown", already
+requires. Keep the original target through uploads and a guarded second
+Enter; do not substitute the latest poll's target. The same requirement
+already keeps unsure sends pending without restoring the draft.
 
 ### D4. The phone asks the system
 The phone runs `uname -s` once per machine (cached on success only); a
@@ -48,17 +49,21 @@ machine that is neither Linux nor Darwin shows no switch. Today no such
 check exists, so the existing spec sentence was not tested.
 
 ### D5. Integration before the joint gallery release
-Task 3.1 depends on desktop-chat task 2.8 and sections 3–4 (including 3.8 and 4.10) passing,
+Task 3.1 depends on desktop-chat task 3.6 and sections 4–5 passing,
 not on archival. Its desktop delta is drafted now against the pending base:
 apply desktop-chat's requirements first, then this change's modifications.
-Both changes validate and complete review before desktop-chat section 6;
+Both changes validate and complete review before desktop-chat section 7;
 archive desktop-chat then chat-on-mac after the joint release. This keeps
 Mac agents in v1 without a completion cycle.
 
-**Owner pick R1-E (proposed):** after Mac integration, the unsupported Windows
-notice says "kudde's chat can read agents on Linux and macOS. This agent runs
-on Windows itself; agents in WSL work." Alternative: retain the Linux-only
-notice. The supported-machine wording then agrees with the implemented set.
+**Text approval R1-E (pending):** after Mac integration, use "kudde's chat
+can read agents on Linux and macOS. This agent runs on Windows itself;
+agents in WSL work." Pick: approve that text, which names both supported
+systems. This is wording approval, not a choice to keep an inaccurate notice.
+Before editing the Mac override, recopy desktop-chat's final requirement so
+pane wording approved there cannot be overwritten by this older draft.
+For a different unsupported system use "kudde's chat can read agents on
+Linux and macOS. This machine is not supported." Show both texts for approval.
 
 ## Testing
 

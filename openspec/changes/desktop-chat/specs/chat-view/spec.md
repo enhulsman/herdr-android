@@ -4,15 +4,17 @@
 Before creating pending state or classifying a message, the app SHALL remove control characters other than
 newline and tab, and SHALL turn a Windows line ending into a plain line
 break. Everything else SHALL be sent as typed, `/` and `!` commands
-included. The resulting canonical text SHALL be used for pending bubbles,
+included. The resulting cleaned text (canonical text) SHALL be used for pending bubbles,
 slash/bang classification, log and queue confirmation, input-box matching
 and transport formatting. Image-path prefixes and transport quoting SHALL
-be added afterwards without changing pending's text. The original draft and
+be added afterwards without changing pending's text. The core's `sent()`
+SHALL receive the canonical text. A space after a final `@` word SHALL be
+added only for transport and ignored when matching. The original draft and
 attachments SHALL be retained separately for definitive refusal restoration.
 
-**Owner pick R1-B (proposed):** if canonical text is blank and there are no
+If canonical text is blank and there are no
 attachments, the app SHALL leave the original draft in the box and create
-no pending bubble or terminal send; alternative: show a new refusal.
+no pending bubble or terminal send.
 Attachment-only messages SHALL retain their current behaviour.
 
 #### Scenario: A pasted Ctrl+C
@@ -47,3 +49,7 @@ Attachment-only messages SHALL retain their current behaviour.
 #### Scenario: Original draft on refusal
 - **WHEN** a normalized message is definitively refused while newer text is in the box
 - **THEN** the original draft and attachments return with the newer draft, rather than replacing it with the canonical text
+
+#### Scenario: A final file word with an image prefix
+- **WHEN** a message ending in an `@` word is sent with an image
+- **THEN** the core classifies and tracks the canonical text, while transport adds image paths and the trailing space without changing confirmation

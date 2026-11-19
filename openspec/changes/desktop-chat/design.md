@@ -44,59 +44,81 @@ RECIPE that says to rebuild from its source repository, and found entries of
 deleted repositories still listed. So no test entry is published: the first
 listing is the real one, made when the mod is ready. Whether an installing
 agent copies a large generated file without trouble is checked on the desk
-before release (task 6.2), not before the spike.
+before release (task 7.2), not before the spike.
 
 ### D1. A spike decides the route
-Tasks 2.1 and 2.2 may run first as isolated preparation: move only the core
-and clock adapter, preserving every assertion and keeping `Held` and its
-tests mobile-only. No send, pending, markdown or release work starts until
-the spike passes. On a throwaway branch `spike/desktop-chat`, build a
-throwaway wasm32 `cdylib` harness that calls the actual moved `ChatCore`,
-with alloc/free and representative raw-script, read, older-page and JSON
-view exports as in D10. It does not wait for production task 3.3. A parser-only
-harness cannot pass. Build that harness to wasm, lower
-the features stable Rust's wasm32 std uses (sign-ext, nontrapping-fptoint,
-bulk-memory, multivalue) with `wasm-opt`, convert with `wasm2js`, and load it
-from a minimal mod on Windows. Pass criteria, all on the Windows desk:
-- a real Claude Code session from WSL shows, with one picture, and a new
-  reply appears without a click;
-- `core.js` is at most 1.5 MB (else `-Oz` and stripping; still over →
-  decision 7);
-- the first open of a 2 MB tail spends at most 300 ms on the window's thread
-  (which every mod shares: a stall here stalls other mods too)
-  (else cap the desk's first read at 512 KB and measure again; still over →
-  decision 7); every synchronous slice spends at most 50 ms there after
-  opening. Measure maximum incremental reads (7,864,320 bytes), long retained
-  histories, older-page reparsing, changed and unchanged views, JSON encoding
-  and decoding, and multiple active panes, not just one quiet tick. Record
-  worst observed times and input sizes, including a maximum-size single
-  record. D5's bounded work must be in the harness before accepting timings;
-- (D6) a fold opens, the second of two thumbnails in a row enlarges, and the
-  chat stays at the bottom over 20 growing updates;
-- (D7) a written PNG shows within one render and survives a reload of the
-  mod; writing under `data/.kudde-images/` does not reload mods;
-- (D4) a hostile message round-trips through the mod's real `hc()` and
-  `exec` (CRLF, quotes, trailing backslash, `%`, emoji, leading `-`,
-  30 KB, shell substitutions, backticks, delimiters and trailing newlines).
-  Compare the exact received text against D3's canonical text, not its screen
-  rendering; normalized-empty input must dispatch nothing. Exercise both the
-  direct call and fixed-script path; `hc` is on the agent machine's PATH; whether `hc send` drops a
-  second Enter as the phone's path did;
-- whether a hidden pane gets a signal (`on_size_change`, render calls).
-Round latency (hc plus the remote command) is recorded but is not a pass
-criterion. The exact `wasm-opt` flags go in the spike notes and in CI. A
-failure is written down with its cause and goes to Ezra. Core performance or
-size failures use decision 7; UI or image failures need a targeted design
-choice, since changing the parser route does not establish that they work.
+The isolated core move and its commit (tasks 1.1–1.3) come first. Preserve
+all assertions and keep `Held` and its tests mobile-only. The measurement
+harness in 2.2 requires that move; it does not require the production bridge.
+
+**Owner pick R1-F (proposed):** keep the send, pending, markdown and phone
+release work after the spike (section 3). Alternative: allow the pure send
+and splitter moves alongside it. Pick: keep spike-first now that it measures
+rather than builds. Confidence: moderate.
+
+On a throwaway branch `spike/desktop-chat`, build a small wasm32 `cdylib`
+harness around the actual moved `ChatCore`, with alloc/free, raw-script,
+read, older-page and JSON/view calls as in D10. A parser-only timing is not
+enough. Lower stable Rust's wasm32 features (sign-ext, nontrapping-fptoint,
+bulk-memory and multivalue) with `wasm-opt`, convert with
+`wasm2js`, and run in a minimal mod on the Windows desk. Record the flags.
+Measure the existing core without first building resumable parsing, paged
+views or a shared queue. The harness is not production bounding work.
+
+Record time per MB and worst single-call time for parsing, retained-history
+reparsing, changed and unchanged views, JSON encoding/decoding, a 2 MB first
+open, the full 7,864,320-byte incremental read, older pages, maximum-size
+single records and multiple panes. Record sizes and total window-thread time
+as well as the longest step; exclude remote waiting time. Derive candidate
+first-read, incremental-read, older-page and retained-history budgets from
+these measurements, including a real 512 KB first-read configuration.
+Re-run with those budgets where the existing core permits it. No invented
+budget or unfinished parser counts as a passing result.
+
+The performance target is at most 300 ms total window-thread work for first
+open, and at most 50 ms for any single synchronous step. One record larger
+than the measured byte budget is the sole exception: its step may take up
+to 300 ms, including on later reads. D5's approach remains an owner choice,
+waiting for these measurements. The first stand-in timings were about 6–8 s
+for a 2 MB first open and over 1 s per update; these do not establish that
+QuickJS in the mod meets the target. No pass is assumed. Confidence: low on
+feasibility until measured in the actual mod.
+
+Also check:
+- a real Claude Code session from WSL shows with a picture and updates
+  without a click; `core.js` is at most 1.5 MB after `-Oz` and stripping;
+- a fold opens, the second thumbnail enlarges, and the chat stays at the
+  bottom through 20 growing updates (D6);
+- a cached PNG shows within one render, survives mod reload, and writing
+  under `data/.kudde-images/` does not reload mods (D7);
+- hostile messages round-trip through both real `hc()` and fixed-script
+  `exec`: CRLF, quotes, trailing backslash, `%`, emoji, leading `-`, 30 KB,
+  shell substitutions, backticks, delimiters and trailing newlines. Compare
+  exact received text after control stripping; blank input dispatches nothing;
+- what each route actually returns for success, `status_mismatch`, `blocked`,
+  `finished`, `not_found`, `unavailable` and timeout: values, exit status,
+  stdout, stderr and thrown/rejected errors. Note which failures prove no
+  input, including whether `unavailable` can occur after typing. Missing
+  evidence is recorded as unknown, never replaced with an invented shape;
+- `hc` on the agent machine's PATH, whether a second Enter is dropped,
+  round latency, and whether a hidden pane gets a signal.
+
+Findings go to the owner before dependent work. Decision 7 still applies to
+failed spikes: size/speed evidence informs the parser/program choice; a UI
+or image failure also needs an owner decision about its specific repair,
+because changing parser routes alone does not fix it. Do not route a failure
+to decision 7 merely because production bounding was not built in the harness.
 
 ### D2. The chat core moves into `kudde-chat`, times in milliseconds
 `chat_core.rs` and its tests move to `kudde-chat/src/core.rs`
 (`kudde_chat::core`), with the moved types made `pub`. Every `Instant`
 becomes a `u64` of milliseconds on a clock the caller supplies, and every
 difference uses `saturating_sub` (`chat_core.rs:199, 308, 374` today), so a
-clock that goes back (the desk's `Date.now()`) never panics or wraps; a test
+clock that goes back never panics or wraps; a test
 drives a backwards clock. `Held<T>` stays in `kudde-mobile` (phone only).
 The phone passes milliseconds since a fixed `Instant` taken at hub start.
+The desk must supply a clock that never goes backwards; clamping subtraction
+alone prevents underflow but does not keep its three timers advancing.
 The move changes no behaviour: the moved tests pass apart from the clock
 type, and the hub's tests pass untouched.
 
@@ -116,10 +138,13 @@ After D2, the pure parts of sending move into `kudde_chat::send`:
   accepts from typing; it would arrive as a key (interrupt, escape).
   Everything typeable, `/` and `!` included, still goes as typed.
 
-Canonicalization happens once, before pending creation or `/` and `!`
+Canonicalization (removing controls to get the text that will be sent)
+happens once, before pending creation or `/` and `!`
 classification. Pending bubbles, log/queue matching and input-box matching
 use that canonical text; transport-only quoting or image-path prefixes are
-added afterwards and never change pending's text. Keep the original draft
+added afterwards and never change pending's text. The core's `sent()` receives
+that same cleaned text; the space after a final `@` word is added only for
+transport and ignored in matching. Keep the original draft
 and attachments separately for a definitive refusal, using the phone's
 existing merge with anything typed meanwhile.
 
@@ -141,8 +166,7 @@ The phone calls these through uniffi; `ChatPending.kt` keeps only drawing.
 The code-block splitter moves from `ChatScreen.kt` into
 `kudde_chat::markdown` with its tests, and Kotlin calls it. D2, D3 and the
 splitter ship as one phone release, its notes naming the control-character
-change, before production desk tasks depend on them; the D1 harness is the explicit
-preparation exception.
+change, before production desk tasks depend on them; the measurement harness can use the isolated core move before that release.
 
 ### D4. The desk calls `hc` and the same scripts as the phone
 Terminal facts come from `hc get <terminal> --json` through the mod's
@@ -159,49 +183,54 @@ again. Missing, unreadable or ambiguous facts refuse before dispatch, never
 reuse the periodic lookup. These checks narrow but do not remove the gap
 before typing; herdr-core's status guard is not an atomic session guard.
 
-**Owner pick R1-A (proposed):** if a fresh check cannot establish the same
-session, type nothing and keep the draft; a changed session uses the existing
-"This is a different session now" refusal. Alternative: wait and retry the
-lookup automatically before sending.
+Refusal on uncertain identity and keeping an unsure send pending are already
+settled by `openspec/specs/chat-view/spec.md`, requirement "Sending goes only
+to the agent whose log is shown". They are not owner questions.
 
-The desk adapter returns `Typed`, `Unsure` or `Refused` to the shared core.
-`Typed` requires a recognized successful send acknowledgement. `Refused`
-requires evidence no terminal input occurred: a local pre-dispatch failure
-or a recognized herdr-core rejection that guarantees nothing was typed.
-Exit status, stderr or a rejected promise alone are not that evidence. After
-dispatch, timeout, disconnect, malformed response or an unrecognized failure
-means `Unsure`, through both direct `hc()` and fallback `exec`. Never retry
-through the other route after an uncertain dispatch.
+The desk adapter returns `Typed`, `Unsure` or `Refused` using the results
+recorded in spike task 2.6. `Typed` needs the recorded success result, not
+merely exit zero. Local failures before dispatch are `Refused`. Identifiable
+`status_mismatch`, `blocked`, `finished` and `not_found` rejections that
+herdr-core returns before typing are `Refused`, restoring the draft as on
+the phone. `unavailable` is `Refused` only when the recorded result proves
+rejection before any input; otherwise it is `Unsure`. Timeout, disconnect,
+malformed output and unidentified failures after dispatch are `Unsure`.
+Exit status, stderr or a rejected promise alone cannot prove nothing was
+typed. Apply this mapping to the route selected by the spike, never retry a
+send through the other route. Unsure never restores the draft or triggers
+another send or second Enter.
 
-**Owner pick R1-C (proposed):** an uncertain send stays pending, never restores
-the draft or retries automatically (including a second Enter); a definitive
-refusal restores the original draft. Alternative: offer a manual retry with
-a duplicate-delivery warning. This preserves the phone's certainty mapping.
+**Owner pick R1-G (conditional, waiting for spike results):** if either route
+cannot distinguish guard refusals, require structured errors before shipping
+desk replies. Alternative: accept that those sends look unsure and the draft
+does not return. Pick: preserve phone behaviour; no external work is authorized
+here. Confidence: moderate. Record the gap and return it to the owner before
+building the adapter; do not invent error shapes or silently change refusals.
+
 If the spike finds Windows argument passing unsafe, the text goes base64 as
 an argument to a fixed script on the agent machine that decodes `"$1"`,
 re-checks and runs `hc send` there; the text is never part of the script.
 Whether the desk needs the Enter-again rule follows the spike's finding.
 
 ### D5. When the desk reads
-**Owner pick R1-D (proposed):** catch-up and older messages may appear across
-several bounded slices while the window stays responsive. Alternative:
-pause the pane immediately when a backlog exceeds one slice.
+**Owner pick R1-D (open, waiting for spike speed measurements):** keep at
+most N MB of history in desk memory, with older messages reloaded on scroll;
+choose N and read/page sizes from the measured costs. A single giant record
+may take up to 300 ms. Alternatives: build an incremental parser so even
+large records yield, or return to decision 7's program off the window thread.
+Pick: try capped retention first if measurements support it. Confidence: low
+until measured. This changes which history stays in memory, not which
+messages can be read; pictures remain supported.
 
-The desk supplies explicit first-read, incremental-read and older-read byte
-budgets; a 512 KB first-read fallback must be an actual configuration, not
-just a smaller fixture. Phone defaults remain 2,000,000 bytes for first and
-older reads and 7,864,320 bytes for incremental reads. Before each synchronous
-call, bound input bytes, records processed, rows cloned and bytes serialized;
-record the tested limits in the spike notes. Reads preserve byte offsets and
-incomplete records across slices, including records larger than a slice.
-Parsing, older-history reparsing and view/JSON generation must be resumable
-or paged, yielding to the event loop between bounded slices. Retained history
-must never cause a full unbounded reparse, clone or serialization in one call.
-A cheap revision query must not construct a view. Multiple panes share one
-window work queue; yielding must allow other panes and input to run. If this
-cannot satisfy D1's limits, the spike fails before dependent work starts.
-The ten-tick pause below is a runtime backstop, not a time limit capable of
-interrupting a synchronous call.
+The product limits are 300 ms total window-thread work on first open,
+50 ms per synchronous step, with only a single over-budget record allowed
+up to 300 ms. Keep desk read and retention budgets configurable and phone
+defaults unchanged. Backlog and older messages can appear over several steps,
+without lost or duplicated rows, yielding to input and other panes between
+steps. Checking an unchanged chat should cost almost nothing. Build and test
+the chosen bounding once in production (tasks 4.2–4.4), not in the spike.
+The spike records a failure or unresolved feasibility if its measurements
+cannot support the limits; it does not have to implement the alternatives.
 
 One async loop per pane does all its work, so a read never overlaps another;
 each round carries a generation and a stale reply is dropped. The pane reads:
@@ -216,9 +245,12 @@ A hidden pane keeps this schedule, which still costs one remote round trip
 every 5 s; if the spike finds a hidden signal, a hidden pane probes every
 15 s instead. Round latency only slows reading: after three rounds over
 1.5 s, at most one read every 3 s, until a round is fast again. Time spent on
-the window's thread is the only thing that may stop a pane: ten ticks in a
-row over 50 ms show "The chat is paused: it was slowing the window" with
-"Open terminal".
+the window's thread is the only thing that may stop a pane: ten reads in a
+row whose longest synchronous step exceeds 50 ms show
+"The chat is paused: it was slowing the window" with
+"Open terminal". Total time across responsive steps does not count as
+one long step. The single-large-record exception still counts toward this
+backstop.
 
 ### D6. Rows, clicks and scrolling
 The chat column is gpui-kit's `list`, which measures each row. Handlers
@@ -230,7 +262,7 @@ position getter: the pane tracks "at the bottom" from wheel and scrollbar
 events and its own `scroll_to_bottom` calls. If the spike's probes fail, the
 fallback is a scroll column of the last 200 rows with a "Show earlier
 messages" row, and the spec's scroll scenarios are reworded from what the
-spike found before task 4 starts.
+spike found before task 5 starts.
 
 ### D7. Pictures go through a cache file
 A base64 variant of `image::FILE_SCRIPT` caps the raw file at 6,000,000 bytes
@@ -274,11 +306,12 @@ the bridge loads a fresh one and rebuilds every chat it held from a fresh
 lookup, re-reading their rows.
 
 ### D11. Where the mod lives, how it is built and shipped
-The integration milestone is desktop-chat task 2.8 and sections 3–4 (including 3.8 and 4.10)
+The integration milestone is desktop-chat task 3.6 and sections 4–5
 complete, with tests passing; archival is not a prerequisite for Mac work.
 `chat-on-mac` writes its desktop delta against this change's requirements
 before joint release. Apply the base desktop requirements, then the Mac
-modifications; finish both validations and reviews, then section 6, then
+modifications; finish chat-on-mac tasks 3.1–3.3 and both reviews/validations,
+then section 7, then
 archive desktop-chat followed by chat-on-mac. Decisions 1–8 stand.
 
 `desk/kudde/` holds `mod.json`, `main.js` and the handwritten modules, with
@@ -302,9 +335,12 @@ The mod reads the machine's state from `machines()` first: while `loading`
 it waits; `unavailable` shows "Can't reach <machine>; retrying". On a
 `ready` machine it runs `uname -s` once and caches only a success. `Linux`
 is supported. `Darwin` shows "kudde's chat can't read agents on a Mac yet."
-until `chat-on-mac` lands. Anything else, or a ready machine where `sh`
-cannot start, shows "kudde's chat can read agents on Linux. This agent runs
-on Windows itself; agents in WSL work." Each has "Open terminal".
+until `chat-on-mac` lands. A confirmed Windows machine shows
+"kudde's chat can read agents on Linux.
+This agent runs on Windows itself; agents in WSL work." For another unsupported
+system, or if `sh` cannot start and Windows is not established, show "kudde's
+chat can read agents on Linux. This machine is not supported." Each has
+"Open terminal".
 
 ### D13. Drift and updates
 Gallery copies never update themselves. The core counts records and blocks
@@ -351,4 +387,4 @@ new one; its fixture is recorded on the desk by hand.
 ## Open Questions
 
 - The key that opens the chat: one free in the default `keys.json` on all
-  three platforms (task 4.1); proposed to Ezra with the pane's texts.
+  three platforms (task 5.1); proposed to Ezra with the pane's texts.

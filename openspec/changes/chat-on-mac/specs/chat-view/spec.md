@@ -97,30 +97,56 @@ about a second after it ends.
 - **WHEN** two Claude Code agents run in the same folder on a Mac
 - **THEN** each terminal's chat shows its own conversation
 
-## ADDED Requirements
+### Requirement: Sending goes only to the agent whose log is shown
+The message box SHALL send with `terminal.send` through the API, only when
+the terminal's foreground is the agent process whose log is shown and its
+status is idle, done or working. The app SHALL record the process, its start
+time and the session at the first check, check again before uploading
+photos and right before typing, and refuse when any of them differs. It
+SHALL pass `terminal.send`'s `if` guard with the status seen at the check
+when that is idle or working; for done no guard exists, a known window. A
+refusal SHALL keep the draft and say why ("The agent is waiting for you in
+the terminal", "The agent has exited", "This is a different session now"),
+with a button to the terminal where it applies. A send whose outcome is not
+known (no reply in time, or the connection lost while waiting) is not a
+refusal: it may be typed, so its bubble SHALL stay and be followed as sent,
+and the draft SHALL NOT come back.
 
-### Requirement: Mac send checks read the current session
-Before dispatch, both first and final send checks on macOS SHALL compare the
-immutable displayed target against fresh process and session facts. Claude
-Code SHALL use the session file and `ps`, or the open-file fallback if the
-facts-first check requires it. Codex SHALL reread open rollout and lock files
-and their times with `lsof` at each check, independently of periodic lookup.
-Unreadable or ambiguous facts SHALL refuse before typing. Uploads and a
-second Enter SHALL keep the original target, never the latest poll's target.
+Both first and final checks SHALL use fresh session facts, never the latest
+periodic lookup. Claude Code SHALL use its session file and process facts;
+on macOS, if its recorded start cannot be compared, the uniquely open
+`.jsonl` file SHALL identify it instead, with multiple files meaning Missed.
+Codex SHALL reread open rollout and lock files and their times at each check
+(`/proc` on Linux, `lsof` on macOS). Unreadable or ambiguous facts SHALL refuse
+before typing. Uploads and a guarded second Enter SHALL retain the original
+target rather than the latest poll's target.
 
-**Owner pick R1-A (proposed):** refuse and preserve the draft on failed
-identity checks; alternative: wait and retry lookup automatically.
+#### Scenario: No reply to the send
+- **WHEN** the connection drops while the message is being sent
+- **THEN** the bubble stays, turns into the row if the message arrives, and reads "Not in the conversation yet" after 30 s if it does not; the draft stays empty
 
-#### Scenario: Codex changes thread on a Mac
+#### Scenario: Blocked on a permission prompt
+- **WHEN** Ezra taps send while the agent is blocked
+- **THEN** nothing is typed, the draft stays, and the chat says "The agent is waiting for you in the terminal" with a button to it
+
+#### Scenario: The agent restarted during a photo upload
+- **WHEN** the agent process changes while a photo uploads
+- **THEN** nothing is typed and the chat says "This is a different session now"
+
+#### Scenario: An exited agent
+- **WHEN** the agent exited and the shell is in front
+- **THEN** no text reaches the shell
+
+#### Scenario: Codex changes thread with the same process
 - **GIVEN** Codex retains its pid and process start
 - **WHEN** `/new` or `/resume` changes thread before the first check or between first and final checks
 - **THEN** fresh open-file facts refuse the send, type nothing and preserve the draft
 
-#### Scenario: Open files unreadable or ambiguous on a Mac
+#### Scenario: Open files unreadable or ambiguous
 - **WHEN** either send check cannot read open files or identify one current thread
 - **THEN** it refuses without cached lookup fallback and preserves the draft
 
-#### Scenario: Claude changes session on a Mac
+#### Scenario: Claude changes session
 - **WHEN** Claude's fresh session facts differ from the displayed target
 - **THEN** the send is refused before typing
 

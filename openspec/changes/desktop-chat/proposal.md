@@ -2,7 +2,7 @@
 
 ## Plain summary
 
-**Decisions** (Ezra, 2026-11-19: all settled, after the council review):
+**Decisions** (Ezra, 2026-11-19: decisions 1–8 stand, after the council review):
 1. **Opening a chat on the desk.** A pane beside the agent's terminal,
    opened with a key and from the command list (`kudde.chat`) while the
    agent's terminal is focused. The pane stays with that terminal and closes
@@ -41,6 +41,24 @@
    reader support in the pane (gpui-kit exposes no semantics yet), and the
    ideas in the research brief.
 
+**Open for you (from the R1 review):**
+- **Pick: keep blank input in the box (R1-B).** If removing stray control
+  characters leaves no text or pictures, send nothing, without a new error?
+- **Pick: cap history held in desk memory (R1-D), waiting for spike speed
+  measurements.** Reload older messages on scroll, allowing one giant record
+  up to 300 ms, or fund an incremental parser, or revisit a separate program?
+  The memory cap is not chosen yet and the limits are not proven.
+- **Pick: keep the phone's send and formatting moves after the spike (R1-F).**
+  Keep that order, or allow those pure refactors alongside the measurement?
+- **Pick: preserve the phone's refusals (R1-G), if the spike finds missing
+  error details.** Require structured errors before desk replies ship, or
+  accept unsure sends whose drafts do not return? Decide after the probe.
+
+Unclear identity already keeps the draft, and an unsure send already stays
+pending: those are settled phone rules, not new choices. Decision 7 still
+applies to failed spikes. UI or image failures also need a decision on their
+specific repair; changing parser routes alone does not fix them.
+
 **What changes for you:** in the herdr app, on Windows, Linux or a Mac, a
 key opens an agent's conversation beside its terminal. It reads as on the
 phone: your messages as bubbles, the agent's answers formatted, tool calls
@@ -64,10 +82,11 @@ shows real pictures, which no chat mod there does today.
 
 ## What Changes
 
-- A spike comes first (only isolated core/clock tasks 2.1–2.2 may prepare
-  it) and decides the route (decision 7): the mod on
+- A spike comes first (the isolated core move and commit, tasks 1.1–1.3, come
+  before it) and decides the route (decision 7): the mod on
   Windows shows a real Claude Code session from WSL, with a picture,
-  updating without a click, inside fixed time limits on the window's thread.
+  updating without a click, measuring whether it can meet the window-thread limits; the spike does not
+  have to build a new parser, paged views or a work queue.
 - `ChatCore` moves from `kudde-mobile` into `kudde-chat`, with times as
   milliseconds; then the send and pending decisions (`chat.rs`,
   `ChatPending.kt`) and the code-block splitter (`ChatScreen.kt`) move there
@@ -112,10 +131,13 @@ shows real pictures, which no chat mod there does today.
   gallery copy.
 - herdr-core and herdr app APIs used: `exec(..., {on})`, `hc get`,
   `hc send --if`, `agents()`, `machines()`, `image()`, `fs/promises` and
-  `Buffer` under the app's folder, `fetch` for the version check. No new
-  herdr-core feature is needed; a 1.x issue asks for an `--if done` guard.
+  `Buffer` under the app's folder, `fetch` for the version check. The send-result probe must establish whether existing error details suffice
+  before building the adapter; a missing distinction returns to the owner.
+  A 1.x issue asks for an `--if done` guard.
 - Desk cost: one `hc` call plus one remote command per read; about every
   second while an agent works or just finished, every 5 seconds otherwise
   while the pane exists.
-- Estimate: 1 spike session, then 10-14 sessions; `chat-on-mac` 2-3 more.
-  Confidence: low.
+- Estimate: 1–2 measurement sessions and owner review, then provisionally
+  10–14 sessions; `chat-on-mac` 2–3 more. Added work for retention limits,
+  incremental parsing or structured errors remains unestimated until the
+  spike and owner choices. Confidence: low.

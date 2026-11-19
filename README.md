@@ -7,6 +7,16 @@ draws it, and lets you type into it. With the app closed, an encrypted alert
 tells you when an agent needs you or has finished. Alerts go through your own
 ntfy server; no Google service is involved.
 
+<p align="center">
+  <img src="docs/screenshots/agents.png" width="260" alt="The agent list on two machines: one agent needs you, two are done, two are working, one is idle">
+  <img src="docs/screenshots/chat.png" width="260" alt="An agent as a chat: a screenshot and a question, the agent's tool calls folded into one line, and its formatted answer">
+  <img src="docs/screenshots/terminal.png" width="260" alt="An agent's live terminal on the phone: Claude Code asks a question with three options, terminal keys below">
+</p>
+<p align="center">
+  <img src="docs/screenshots/alert.png" width="480" alt="An alert: Plain output flag needs you, with where it sits at the desk and on which machine">
+</p>
+<p align="center"><sub>Agents on a desktop ("workstation") and a Raspberry Pi in one list, one as a chat, one as its live terminal, and the alert it sent.</sub></p>
+
 **Status:** early, pre-1.0, used daily by its author. Expect rough edges and
 changes between releases.
 

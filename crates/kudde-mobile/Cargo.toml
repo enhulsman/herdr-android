@@ -22,7 +22,7 @@ kudde-chat = { path = "../kudde-chat" }
 kudde-changes = { path = "../kudde-changes" }
 base64 = "0.22"
 p256 = { version = "0.14.0", default-features = false, features = ["ecdsa", "std"] }
-russh = { version = "0.65.0", default-features = false, features = ["ring"] }
+russh = { version = "0.65.2", default-features = false, features = ["ring"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }

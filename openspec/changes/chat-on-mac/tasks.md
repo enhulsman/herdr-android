@@ -1,0 +1,17 @@
+## 1. Facts first
+
+- [ ] 1.1 Find how the phone reaches a Mac's herdr-core; if it cannot, drop the phone scenarios from the delta and note it in `decisions.md`
+- [ ] 1.2 On the MacBook: what Claude Code writes in `~/.claude/sessions/<pid>.json` (`procStart` included), what `ps -o comm=` and `etime` print, and what Codex holds open; write it down; revise the spec per design D2 if needed
+
+## 2. Scripts and decision
+
+- [ ] 2.1 Golden test: the Linux branch of every script is byte-identical
+- [ ] 2.2 Tests first with fake tools, covering every chat-view scenario in the delta
+- [ ] 2.3 The Darwin branch in the lookup, tail and image scripts; new `Probe` fields; `decide` and `claude()` follow 1.2
+- [ ] 2.4 The phone's `uname -s` check, cached on success
+
+## 3. Desk and phone
+
+- [ ] 3.1 Once `desktop-chat` is archived: a delta to `desktop-chat` making Mac agents supported, and the "not on a Mac yet" message removed
+- [ ] 3.2 Try on the MacBook: local agents in the desk chat, Mac agents from Windows, two agents in one folder, and the phone's switch if 1.1 found a route
+- [ ] 3.3 `openspec validate chat-on-mac --strict`

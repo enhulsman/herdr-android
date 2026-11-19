@@ -902,57 +902,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "herdr-changes"
-version = "0.5.0"
-dependencies = [
- "base64 0.22.1",
- "serde_json",
-]
-
-[[package]]
-name = "herdr-chat"
-version = "0.5.0"
-dependencies = [
- "base64 0.22.1",
- "serde_json",
-]
-
-[[package]]
-name = "herdr-mobile"
-version = "0.5.0"
-dependencies = [
- "base64 0.22.1",
- "herdr-changes",
- "herdr-chat",
- "herdr-proto",
- "p256",
- "russh",
- "serde",
- "serde_json",
- "tokio",
- "uniffi",
-]
-
-[[package]]
 name = "herdr-proto"
 version = "0.5.0"
 dependencies = [
  "base64 0.22.1",
  "serde_json",
  "tokio",
-]
-
-[[package]]
-name = "herdr-push"
-version = "0.5.0"
-dependencies = [
- "base64 0.22.1",
- "ece",
- "herdr-proto",
- "serde_json",
- "sha2 0.10.9",
- "tokio",
- "ureq",
 ]
 
 [[package]]
@@ -1112,6 +1067,51 @@ checksum = "01737161ba802849cfd486b5bd209d38ba4943494c249a8126005170c7621edd"
 dependencies = [
  "crypto-common 0.2.2",
  "rand_core",
+]
+
+[[package]]
+name = "kudde-changes"
+version = "0.5.0"
+dependencies = [
+ "base64 0.22.1",
+ "serde_json",
+]
+
+[[package]]
+name = "kudde-chat"
+version = "0.5.0"
+dependencies = [
+ "base64 0.22.1",
+ "serde_json",
+]
+
+[[package]]
+name = "kudde-mobile"
+version = "0.5.0"
+dependencies = [
+ "base64 0.22.1",
+ "herdr-proto",
+ "kudde-changes",
+ "kudde-chat",
+ "p256",
+ "russh",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uniffi",
+]
+
+[[package]]
+name = "kudde-push"
+version = "0.5.0"
+dependencies = [
+ "base64 0.22.1",
+ "ece",
+ "herdr-proto",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+ "ureq",
 ]
 
 [[package]]

@@ -290,7 +290,7 @@ fn every_method_the_app_calls_is_checked_at_connect() {
 // ---- USES is complete (start-agents design D8) ----
 
 /// Every method the phone's code calls (`call("...")` outside tests in
-/// herdr-mobile and herdr-proto) is in `USES`, so an older core that lacks one
+/// kudde-mobile and herdr-proto) is in `USES`, so an older core that lacks one
 /// is caught at connect instead of failing a tap later.
 #[test]
 fn uses_lists_every_method_the_phone_calls() {
@@ -319,7 +319,7 @@ fn uses_lists_every_method_the_phone_calls() {
         .unwrap();
     let mut found = std::collections::BTreeSet::new();
     scan(&crates.join("herdr-proto/src"), &mut found);
-    scan(&crates.join("herdr-mobile/src"), &mut found);
+    scan(&crates.join("kudde-mobile/src"), &mut found);
     // Sent through `call` too today; listed by hand in case that changes.
     found.extend(["terminal.attach", "events.subscribe"].map(String::from));
     assert!(

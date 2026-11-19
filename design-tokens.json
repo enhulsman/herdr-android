@@ -6,7 +6,7 @@
     "platform": "Android, Jetpack Compose; sizes in dp/sp (1 CSS px in the renders = 1 dp)",
     "source": "herdr-app settings.rs presets (graphite, paper) run through resolve(); defaults/mods/agents/main.js for the agent list. Values are copied, not invented.",
     "groundTruth": "design/renders/screens.html and design/checkpoints/*.png, signed off by Ezra 2026-11-01",
-    "project": "herdr-android",
+    "project": "kudde",
     "updated": "2026-11-01",
     "aesthetic": "herdr-app design system (graphite/paper), phone layout",
     "extends": "herdr-app settings.rs presets"

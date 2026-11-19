@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds libherdr_mobile.so for the app (arm64-v8a for phones, x86_64 for the
+# Builds libkudde_mobile.so for the app (arm64-v8a for phones, x86_64 for the
 # emulator) into android/app/src/main/jniLibs/<abi>/, and generates its Kotlin
 # bindings with the workspace uniffi-bindgen (library mode) into
 # android/app/build/generated/uniffi/kotlin.
@@ -39,10 +39,10 @@ export CARGO_TARGET_DIR="$repo/target"
 rm -rf android/app/src/main/jniLibs
 cargo ndk -t arm64-v8a -t x86_64 -P "$API_LEVEL" \
   -o android/app/src/main/jniLibs \
-  build -p herdr-mobile --locked "${cargo_args[@]}"
+  build -p kudde-mobile --locked "${cargo_args[@]}"
 
 out=android/app/build/generated/uniffi/kotlin
 rm -rf "$out"
 cargo run -p uniffi-bindgen --locked -- generate \
-  --library "target/aarch64-linux-android/$profile/libherdr_mobile.so" \
+  --library "target/aarch64-linux-android/$profile/libkudde_mobile.so" \
   --language kotlin --no-format --config scripts/uniffi-kotlin.toml --out-dir "$out"

@@ -78,18 +78,18 @@ jobs:
           scripts/build-ghostty.sh x86_64-linux-gnu
 
       - run: cargo fmt --all --check
-      - run: cargo clippy --locked --all-targets --features herdr-mobile/vt,herdr-mobile/spike -- -D warnings
-      # The SSH tests (crates/herdr-mobile/tests/sshd.rs) start a throwaway sshd.
+      - run: cargo clippy --locked --all-targets --features kudde-mobile/vt,kudde-mobile/spike -- -D warnings
+      # The SSH tests (crates/kudde-mobile/tests/sshd.rs) start a throwaway sshd.
       - run: sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
-      - run: cargo test --locked --features herdr-mobile/vt,herdr-mobile/spike
+      - run: cargo test --locked --features kudde-mobile/vt,kudde-mobile/spike
         env:
-          HERDR_REQUIRE_SSHD: "1"
+          KUDDE_REQUIRE_SSHD: "1"
       - run: scripts/test-check-release-tag.sh
       - run: scripts/test-release-sign-gate.sh
       - run: scripts/test-fetch-herdr-core.sh
       - run: scripts/test-check-restricted-key.sh
         env:
-          HERDR_REQUIRE_SSHD: "1"
+          KUDDE_REQUIRE_SSHD: "1"
 
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
@@ -147,7 +147,7 @@ jobs:
 
   # The one check the main ruleset requires: green when every job above passed
   # or was skipped for a docs-only change, red when any failed or was cancelled.
-  # The release builds herdr-push for aarch64 on an arm runner: prove it builds.
+  # The release builds kudde-push for aarch64 on an arm runner: prove it builds.
   push-aarch64:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -164,8 +164,8 @@ jobs:
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
           rustup default "$RUST_TOOLCHAIN"
 
-      - name: herdr-push for Linux aarch64
-        run: cargo build -p herdr-push --release --locked --target aarch64-unknown-linux-gnu
+      - name: kudde-push for Linux aarch64
+        run: cargo build -p kudde-push --release --locked --target aarch64-unknown-linux-gnu
 
   ci-ok:
     if: always()

@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "herdr-android"
+rootProject.name = "kudde"
 include(":app")

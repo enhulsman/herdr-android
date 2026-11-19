@@ -3,7 +3,7 @@
  * herdr-app's VT pipeline reads it (src/vt.rs: `Vt::frame` and `read_cell`).
  * scripts/record-grid-goldens.sh compiles it against build/ghostty/host and
  * writes the goldens the app's grid reader is tested against
- * (crates/herdr-mobile/src/vt/goldens/).
+ * (crates/kudde-mobile/src/vt/goldens/).
  *
  * Ported from herdr-app `src/vt.rs`, Apache-2.0 (see
  * crates/herdr-proto/LICENSE-herdr-Apache-2.0). Changed: C over the library's

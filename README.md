@@ -1,11 +1,14 @@
-# herdr for Android
+# Kudde
 
-See and answer your [herdr](https://github.com/herdrdev/herdr) agents from your
-phone. The app connects to herdr-core on your own machines over SSH, lists every
-agent with the ones that need you first, shows each terminal live as the desk
-draws it, and lets you type into it. With the app closed, an encrypted alert
-tells you when an agent needs you or has finished. Alerts go through your own
-ntfy server; no Google service is involved.
+Your coding agents, on your phone. Kudde (Dutch for "herd") connects to
+herdr-core on your own machines over SSH, lists every agent with the ones that
+need you first, shows each as a live terminal or a chat, and lets you answer.
+With the app closed, an encrypted alert tells you when an agent needs you or
+has finished. Alerts go through your own ntfy server; no Google service is
+involved.
+
+Kudde is an independent app built on [herdr-core](https://github.com/herdrdev/herdr-core).
+It is not made by the herdr project.
 
 <p align="center">
   <img src="docs/screenshots/agents.png" width="260" alt="The agent list on two machines: one agent needs you, two are done, two are working, one is idle">
@@ -17,8 +20,8 @@ ntfy server; no Google service is involved.
 </p>
 <p align="center"><sub>Agents on a desktop ("workstation") and a Raspberry Pi in one list, one as a chat, one as its live terminal, and the alert it sent.</sub></p>
 
-**Status:** early, pre-1.0, used daily by its author. Expect rough edges and
-changes between releases.
+**Status:** 1.0. Complete for what it sets out to do, used daily by its
+author, tested on a few phones, built on herdr-core 0.1.x.
 
 ## What works today
 
@@ -57,7 +60,7 @@ changes between releases.
   kept awake by other apps anyway: on a phone that would otherwise sleep, or
   with busier agents, it can be more. While the app is open the connection is
   there either way
-  ([measurements](https://github.com/enhulsman/herdr-android/issues/16)). On
+  ([measurements](https://github.com/enhulsman/kudde/issues/16)). On
   GrapheneOS, the counts show on the lock screen only if it shows silent
   notifications.
 - **Security:** the SSH key is made in the phone's secure hardware and never
@@ -69,7 +72,7 @@ changes between releases.
 
 - An Android phone on Android 12 or newer (arm64).
 - herdr-core 0.1.15 or newer
-  ([herdrdev/herdr-core](https://github.com/herdrdev/herdr-core)) on a Linux
+  ([herdrdev/kudde-core](https://github.com/herdrdev/kudde-core)) on a Linux
   or WSL machine. Install it as the user your agents run under:
   `curl -fsSL https://releases.herdr.dev/core/install.sh | sh`. The `herdr`
   terminal tool is a different program; the app does not need it.
@@ -81,7 +84,7 @@ changes between releases.
   Tailscale). Tailscale SSH does not work: it ignores the phone key. If the
   machine runs Tailscale SSH, use its LAN address, or an OpenSSH port
   Tailscale does not take over.
-- For alerts: an ntfy server, the ntfy app on the phone, and `herdr-push` on
+- For alerts: an ntfy server, the ntfy app on the phone, and `kudde-push` on
   each machine.
 - To install and update: [Obtainium](https://github.com/ImranR98/Obtainium),
   or adb on a computer.
@@ -102,8 +105,8 @@ changes between releases.
    shell session, no forwarding. herdr-core can still run commands as that
    user, so treat the key like a shell login. The first connection starts
    herdr-core, so the card may show "Unreachable" once before it connects.
-3. **Turn on alerts:** install `herdr-push` on the machine and turn alerts on in
-   the app; see [docs/herdr-push.md](docs/herdr-push.md).
+3. **Turn on alerts:** install `kudde-push` on the machine and turn alerts on in
+   the app; see [docs/kudde-push.md](docs/kudde-push.md).
 
 "Finished" alerts are silent by default. To hear them, open Android settings,
 go to the app's notifications, open "Finished", and set it to alerting.
@@ -114,7 +117,7 @@ Version 1.0 completes the loop: a view of an agent's git changes, plus the
 work that lets someone else set the app up without help.
 
 What is planned and what is being worked on now are tracked in the open:
-the [v1.0.0 milestone](https://github.com/enhulsman/herdr-android/milestone/1)
+the [v1.0.0 milestone](https://github.com/enhulsman/kudde/milestone/1)
 and the [roadmap board](https://github.com/users/enhulsman/projects/4). Ideas
 and bug reports are welcome as issues.
 
@@ -125,8 +128,8 @@ browser, custom theme files, pasting images into the terminal.
 
 - `android/`: the app (Kotlin and Jetpack Compose).
 - `crates/`: the Rust core the app uses (SSH, the herdr-core protocol, the
-  terminal engine) and `herdr-push`.
-- `docs/`: guides for installing, releases and `herdr-push`, phone
+  terminal engine) and `kudde-push`.
+- `docs/`: guides for installing, releases and `kudde-push`, phone
   checklists, release notes.
 - `openspec/`: the specification, and `decisions.md` the decisions behind it.
 - `design/`: the signed-off screen renders.

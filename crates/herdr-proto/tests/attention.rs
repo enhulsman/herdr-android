@@ -1,4 +1,4 @@
-//! The attention model shared by the app and herdr-push (agent-list spec, task M1.1).
+//! The attention model shared by the app and kudde-push (agent-list spec, task M1.1).
 
 use herdr_proto::attention::{Attention, Tracker, folder_name};
 use serde_json::{Value, json};

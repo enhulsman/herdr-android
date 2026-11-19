@@ -1,6 +1,6 @@
 # Releasing
 
-How the maintainer makes a release. To install the app or `herdr-push`, see
+How the maintainer makes a release. To install the app or `kudde-push`, see
 [install.md](install.md).
 The rules behind this are in `openspec/changes/android-client-v1/specs/release/spec.md`.
 
@@ -13,7 +13,7 @@ The rules behind this are in `openspec/changes/android-client-v1/specs/release/s
 3. The `Release` workflow (`release.yml`) fails unless the tag's commit is on
    `main`, `VERSION` matches the tag, and the versionCode
    (`major*10000 + minor*100 + patch`) is above every earlier release tag. It runs
-   all tests and `cargo-deny`, builds the unsigned arm64-v8a APK and `herdr-push`,
+   all tests and `cargo-deny`, builds the unsigned arm64-v8a APK and `kudde-push`,
    and uploads them with their SHA-256 sums.
 4. When it succeeds, `Sign and publish` (`release-sign.yml`) runs in the `release`
    environment. It always runs as the file is on `main`, so a tag cannot change
@@ -22,7 +22,7 @@ The rules behind this are in `openspec/changes/android-client-v1/specs/release/s
    `main`, `VERSION` matches, and the versionCode is above every published
    release; then it verifies the sums, signs, checks the certificate against
    `docs/release-signing-fingerprint.txt`, and publishes the release with the
-   APK, `herdr-push-x86_64` and `herdr-push-aarch64` with a `.sig` each, and
+   APK, `kudde-push-x86_64` and `kudde-push-aarch64` with a `.sig` each, and
    `SHA256SUMS`.
 
 A tag cannot be moved or deleted, so a failed release is fixed with the next
@@ -39,7 +39,7 @@ this; the script's header says how.
   read the keys.
 - Its secrets (never repository secrets): `RELEASE_KEYSTORE_B64` (the keystore,
   base64), `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`,
-  and `HERDR_PUSH_SIGNING_KEY` (an unencrypted OpenSSH private key).
+  and `KUDDE_PUSH_SIGNING_KEY` (an unencrypted OpenSSH private key).
 - Keystore and both keys backed up in the password manager.
 - The certificate's SHA-256 replaces the placeholder in
   `docs/release-signing-fingerprint.txt`. Until then every release stops before

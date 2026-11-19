@@ -12,7 +12,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 
 ## M0. Release loop and early spikes
 
-- [x] M0.1 Gradle project (Kotlin, Compose, minSdk 31), Cargo workspace (`herdr-proto`, `herdr-mobile`, `herdr-push`), uniffi bridge returning a version string
+- [x] M0.1 Gradle project (Kotlin, Compose, minSdk 31), Cargo workspace (`herdr-proto`, `kudde-mobile`, `kudde-push`), uniffi bridge returning a version string
 - [x] M0.2 libghostty-vt build: Zig 0.16.0 pinned by checksum, Ghostty `1e5cdb8`, Android targets; bindings regenerated from its headers
 - [x] M0.3 Workflow per the release spec: build job (main-ancestry check, tests, cargo-deny, sums), sign job without checkout in environment `release`; lockfiles and Gradle verification
 - [x] M0.4 `release` environment (deployment policy: branch `main` only, see the release spec), signing key as its secret and in Bitwarden; certificate fingerprint committed
@@ -40,7 +40,7 @@ starts only after the previous phone check passed. Version 1 = M0-M3.
 ## M3. Alerts
 
 - [x] M3.1 Tests: RFC 8291 vectors, transition rules with grace delay, persistence across restart, `missed` diff, allowlist and token scope, payload fields, doc names against a scratch core
-- [x] M3.2 `herdr-push`: existing-core connection, rules, canary, cleared, test alert, status document; systemd unit and install notes
+- [x] M3.2 `kudde-push`: existing-core connection, rules, canary, cleared, test alert, status document; systemd unit and install notes
 - [x] M3.3 ntfy write-only `up*` token on the VPS (done in Spike C, 2026-11-01; in the homelab docs)
 - [x] M3.4 App: UnifiedPush registration, `hdroid-push` writes, three channels, cleared handling, silence check, status display, mute, permission flow
 - [x] M3.5 Phone check: app closed, agent blocks on WSL, alert opens it; answered at the desk clears it; test alert; WSL off overnight gives one quiet notice

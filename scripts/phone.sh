@@ -19,11 +19,11 @@
 # Which phone: PHONE_SERIAL, else the "Test phone adb serial:" line in
 # local/setup.md. It never falls back to "the only device": that could be a
 # daily phone. The PIN: PHONE_PIN, else the "Test phone PIN:" line there.
-# HERDR_LOCAL_SETUP points at another setup file (the tests use it).
+# KUDDE_LOCAL_SETUP points at another setup file (the tests use it).
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
-setup=${HERDR_LOCAL_SETUP:-$repo/local/setup.md}
-app=dev.herdr.android.debug
+setup=${KUDDE_LOCAL_SETUP:-$repo/local/setup.md}
+app=dev.kudde.android.debug
 
 from_setup() { # the value after "<label>:" in the setup file
   [ -f "$setup" ] || return 0

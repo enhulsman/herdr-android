@@ -49,7 +49,7 @@ after its folder.
 
 #### Scenario: Zero spaces
 - **WHEN** the machine's layout lists zero spaces and the person starts a terminal in `/home/me/src/api` from the phone
-- **THEN** the desk shows a new space "api" holding it, and herdr-push alerts for it as for any placed terminal
+- **THEN** the desk shows a new space "api" holding it, and kudde-push alerts for it as for any placed terminal
 
 ### Requirement: Start errors are shown
 When the core refuses a start, the sheet SHALL stay open and show the reason;
@@ -124,5 +124,5 @@ no `sh` SHALL get "Terminal" only.
 
 #### Scenario: Alerts while the desk app is closed
 - **WHEN** an agent started from the phone in the space "website" blocks while the desk app is not running
-- **THEN** herdr-push alerts for it after the grace delay, per the V1 alerts rule as amended by this change
+- **THEN** kudde-push alerts for it after the grace delay, per the V1 alerts rule as amended by this change
 

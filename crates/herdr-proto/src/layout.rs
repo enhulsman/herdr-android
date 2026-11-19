@@ -4,7 +4,7 @@
 //! (`content: {terminal}` or a mod pane) or a container with `children`. It is
 //! read leniently: unknown node types are walked for children, a tab whose root
 //! is not a node is skipped. Addresses are machine-local; a qualified one
-//! (`ws/t7`) names the same terminal as `t7`. Moved here from herdr-push so
+//! (`ws/t7`) names the same terminal as `t7`. Moved here from kudde-push so
 //! the phone reads the same document (start-agents design D3).
 
 use std::collections::BTreeSet;

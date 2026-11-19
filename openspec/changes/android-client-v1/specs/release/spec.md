@@ -15,7 +15,7 @@ its commit is on `main`.
 
 #### Scenario: Release tag
 - **WHEN** Ezra pushes tag v0.2.0
-- **THEN** the signed APK and `herdr-push` are attached to release v0.2.0, and
+- **THEN** the signed APK and `kudde-push` are attached to release v0.2.0, and
   Obtainium shows the update without installing it
 
 #### Scenario: Workflow on another branch
@@ -35,7 +35,7 @@ check through the GitHub API that the tag points at the built commit, that commi
 on `main`, `VERSION` there matches the tag, and the `versionCode` is above every
 published release; signing jobs SHALL run one at a time. It SHALL then download the
 artifacts, verify their sums, sign the APK with a pinned `apksigner` and
-`herdr-push` with a detached signature, and publish.
+`kudde-push` with a detached signature, and publish.
 
 #### Scenario: Tag off main
 - **WHEN** a tag points at a commit not on `main`
@@ -61,7 +61,7 @@ licenses, sources) before any artifact is uploaded.
 ### Requirement: Obtainium installs and updates the app
 Each release SHALL attach one arm64-v8a APK whose `versionCode` is
 `major*10000 + minor*100 + patch`, tested to exceed the previous release's, plus a
-`herdr-push` binary for each of Linux x86_64 and aarch64, each with its sum and
+`kudde-push` binary for each of Linux x86_64 and aarch64, each with its sum and
 signature. The signing
 certificate fingerprint SHALL be recorded in the repository.
 

@@ -1,0 +1,15 @@
+# Response headers for Workers static assets (kudde.dev). The site loads
+# nothing from anyone else: no inline scripts or styles, no third parties.
+# data: is for the paper grain, an SVG drawn in the stylesheet.
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
+
+# Astro's build output has a content hash in every file name: cache it for a year.
+/_astro/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

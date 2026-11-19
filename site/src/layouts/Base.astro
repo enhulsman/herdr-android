@@ -14,7 +14,9 @@ import Footer from '../components/Footer.astro';
 
 interface Props { title: string; description: string }
 const { title, description } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+// install.html is served at /install: name the page by that path
+const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '/') || '/';
+const canonical = new URL(path, Astro.site);
 ---
 <!doctype html>
 <html lang="en">

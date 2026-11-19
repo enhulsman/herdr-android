@@ -13,7 +13,12 @@ body {
   color: var(--color-ink);
   font: var(--weight-normal) var(--text-base) / var(--leading-normal) var(--font-body);
   -webkit-font-smoothing: antialiased;
+  /* the footer ends the page, also on a short one */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
+main { flex: 1 0 auto; }
 
 a { color: inherit; }
 
@@ -223,3 +228,13 @@ pre code { background: none; padding: 0; white-space: pre; }
 }
 .prose li > p { margin-bottom: var(--space-2); }
 .prose li > pre { margin-bottom: var(--space-2); }
+
+/* SVG colours from the tokens, as classes: no style attributes, so the
+   Content-Security-Policy needs no 'unsafe-inline' for styles */
+.svg-defs { position: absolute; }
+.stop-lit-top { stop-color: var(--color-tag-lit-top); }
+.stop-lit-mid { stop-color: var(--color-tag-lit-mid); }
+.stop-lit-bottom { stop-color: var(--color-tag-lit-bottom); }
+.stop-hole-shadow { stop-color: var(--color-tag-hole-shadow); }
+.mark-tag { fill: var(--color-tag); }
+.mark-prompt { stroke: var(--color-ink); }

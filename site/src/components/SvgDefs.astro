@@ -3,20 +3,20 @@
 // the hole's wall and the app icon's ground. Included once, by the layout.
 import { TAG, HOLE } from '../lib/tag.js';
 ---
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
   <defs>
     <linearGradient id="litTag" x1="0" y1="4" x2="0" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0" style="stop-color:var(--color-tag-lit-top)" />
-      <stop offset=".45" style="stop-color:var(--color-tag-lit-mid)" />
-      <stop offset="1" style="stop-color:var(--color-tag-lit-bottom)" />
+      <stop offset="0" class="stop-lit-top" />
+      <stop offset=".45" class="stop-lit-mid" />
+      <stop offset="1" class="stop-lit-bottom" />
     </linearGradient>
     <linearGradient id="litRim" x1="0" y1="4" x2="0" y2="34" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff" stop-opacity=".75" />
       <stop offset="1" stop-color="#fff" stop-opacity="0" />
     </linearGradient>
     <linearGradient id="holeWall" x1="0" y1="9.4" x2="0" y2="16.6" gradientUnits="userSpaceOnUse">
-      <stop offset="0" style="stop-color:var(--color-tag-hole-shadow)" stop-opacity=".75" />
-      <stop offset=".5" style="stop-color:var(--color-tag-hole-shadow)" stop-opacity=".1" />
+      <stop offset="0" class="stop-hole-shadow" stop-opacity=".75" />
+      <stop offset=".5" class="stop-hole-shadow" stop-opacity=".1" />
       <stop offset="1" stop-color="#fff3c4" stop-opacity=".9" />
     </linearGradient>
     <clipPath id="tagClip"><path d={TAG} /></clipPath>

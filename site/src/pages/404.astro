@@ -1,0 +1,23 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base
+  title="Page not found · kudde"
+  description="This page is not on kudde.dev."
+>
+  <div class="page-head">
+    <div class="wrap">
+      <h1 class="display">This page isn’t here.</h1>
+      <p class="lede">The link may be old, or the address may have a typo. Everything on the site is a step from the home page.</p>
+      <div class="actions">
+        <a class="btn ink" href="/">Go to the home page</a>
+        <a class="textlink" href="/install">Install kudde</a>
+      </div>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .page-head { padding-bottom: var(--space-30); }
+  .actions { margin-top: var(--space-10); }
+</style>

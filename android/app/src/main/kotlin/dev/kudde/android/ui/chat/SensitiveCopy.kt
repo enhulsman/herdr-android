@@ -12,7 +12,7 @@ import android.os.PersistableBundle
  * preview (issue #22). The flag's key is the same string before 13.
  */
 fun copySensitive(context: Context, text: String) {
-    val clip = ClipData.newPlainText("Kudde", text)
+    val clip = ClipData.newPlainText("kudde", text)
     clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(clip)
 }

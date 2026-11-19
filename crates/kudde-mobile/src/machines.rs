@@ -271,7 +271,7 @@ impl MachineList {
         let export: Export =
             serde_json::from_str(text).map_err(|e| ListError::Unreadable(e.to_string()))?;
         if export.kind != EXPORT_KIND && export.kind != OLD_EXPORT_KIND {
-            return Err(ListError::Unreadable("not a Kudde export".into()));
+            return Err(ListError::Unreadable("not a kudde export".into()));
         }
         if export.version != FORMAT {
             return Err(ListError::Unreadable(format!(
@@ -448,7 +448,7 @@ mod tests {
         assert!(list.get("workstation").is_some());
     }
 
-    // The app was called herdr for Android before 1.0: Kudde writes its own
+    // The app was called herdr for Android before 1.0: kudde writes its own
     // kind and still reads a list exported by the old app.
     #[test]
     fn an_export_from_the_old_herdr_app_imports() {

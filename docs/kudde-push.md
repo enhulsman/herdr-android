@@ -107,7 +107,7 @@ path from the machine to the phone.
 ## Coming from herdr-push
 
 Before 1.0 the app was called herdr for Android and this program `herdr-push`.
-Kudde is a new app to Android, so its alerts are turned on afresh. On each
+kudde is a new app to Android, so its alerts are turned on afresh. On each
 machine, swap the program and keep its settings:
 
 ```
@@ -118,7 +118,7 @@ mv ~/.local/state/herdr-push ~/.local/state/kudde-push
 ```
 
 If your config sets `token_file` to a path under `herdr-push`, change it. Then
-follow steps 1, 2 and 5 above, and turn alerts on in Kudde (step 7).
+follow steps 1, 2 and 5 above, and turn alerts on in kudde (step 7).
 
 ## Checking it
 

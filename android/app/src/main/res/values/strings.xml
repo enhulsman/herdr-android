@@ -137,7 +137,7 @@
     <string name="status_app_too_old_detail">Update the app to connect.</string>
     <!-- decisions.md 2026-11-01: GrapheneOS's per-app Network permission. -->
     <string name="status_network_off">Network permission is off</string>
-    <string name="status_network_off_detail">Allow Network for Kudde in Android settings.</string>
+    <string name="status_network_off_detail">Allow Network for kudde in Android settings.</string>
 
     <!-- What a machine card offers when it waits for the person. -->
     <string name="action_unlock">Unlock</string>

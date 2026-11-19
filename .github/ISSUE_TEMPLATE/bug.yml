@@ -27,7 +27,7 @@ body:
     id: app
     attributes:
       label: App version
-      description: In Android settings, Apps, Kudde; the version is at the bottom.
+      description: In Android settings, Apps, kudde; the version is at the bottom.
     validations:
       required: true
   - type: input

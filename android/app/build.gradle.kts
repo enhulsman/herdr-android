@@ -24,7 +24,7 @@ android {
         targetSdk = 36
         versionName = appVersion
         versionCode = major * 10000 + minor * 100 + patch
-        manifestPlaceholders["appLabel"] = "Kudde"
+        manifestPlaceholders["appLabel"] = "kudde"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
@@ -35,7 +35,7 @@ android {
         // Installs next to the release from Obtainium, signed with the debug key.
         debug {
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["appLabel"] = "Kudde debug"
+            manifestPlaceholders["appLabel"] = "kudde debug"
             // The release icon inverted (src/debug/res), so it never passes for the release.
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_debug"
             // -Pkudde.perf: the same app, not debuggable and with optimized Rust, for
@@ -51,7 +51,7 @@ android {
             isDebuggable = false
             isJniDebuggable = false
             applicationIdSuffix = ".spike"
-            manifestPlaceholders["appLabel"] = "Kudde spike"
+            manifestPlaceholders["appLabel"] = "kudde spike"
             // The system's default icon: the debug icon lives in src/debug/res, which spike lacks.
             manifestPlaceholders["appIcon"] = "@android:drawable/sym_def_app_icon"
             matchingFallbacks += "debug"

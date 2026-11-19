@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432" role="img" aria-label="Kudde app icon">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432" role="img" aria-label="kudde app icon">
   <title>kudde: app icon, A1 on graphite (108 dp adaptive canvas, mark inside the 66 dp safe zone, raised 2.5 dp; soft light)</title><defs>
 <radialGradient id="bg" cx="54" cy="34" r="78" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2e312c"/><stop offset=".55" stop-color="#1c1e1b"/><stop offset="1" stop-color="#121411"/></radialGradient>
 <radialGradient id="sh" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>

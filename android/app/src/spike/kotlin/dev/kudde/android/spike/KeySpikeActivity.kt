@@ -190,7 +190,7 @@ class KeySpikeActivity : ComponentActivity() {
         val cancel = CancellationSignal()
         cont.invokeOnCancellation { cancel.cancel() }
         BiometricPrompt.Builder(this)
-            .setTitle("Kudde spike")
+            .setTitle("kudde spike")
             .setSubtitle("Unlock the SSH key")
             .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
             .build()

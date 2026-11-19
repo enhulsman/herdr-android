@@ -135,6 +135,17 @@ jobs:
             ssh-keygen -Y sign -f "$key" -n kudde-push "release/kudde-push-$arch"
           done
 
+      - name: Check the signatures against the tagged commit's allowed signers
+        run: |
+          signers="$RUNNER_TEMP/allowed_signers"
+          gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$GITHUB_REPOSITORY/contents/docs/kudde-push-allowed-signers?ref=$SHA" > "$signers"
+          for arch in x86_64 aarch64; do
+            ssh-keygen -Y verify -f "$signers" -I kudde-push -n kudde-push \
+              -s "release/kudde-push-$arch.sig" < "release/kudde-push-$arch" ||
+              { echo "::error::kudde-push-$arch does not verify: is KUDDE_PUSH_SIGNING_KEY the key in docs/kudde-push-allowed-signers?"; exit 1; }
+          done
+
       - name: Publish the release
         working-directory: release
         run: |

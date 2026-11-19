@@ -1,13 +1,13 @@
-# Kudde
+# kudde
 
-Your coding agents, on your phone. Kudde (Dutch for "herd") connects to
+Your coding agents, on your phone. kudde (Dutch for "herd") connects to
 herdr-core on your own machines over SSH, lists every agent with the ones that
 need you first, shows each as a live terminal or a chat, and lets you answer.
 With the app closed, an encrypted alert tells you when an agent needs you or
 has finished. Alerts go through your own ntfy server; no Google service is
 involved.
 
-Kudde is an independent app built on [herdr-core](https://github.com/herdrdev/herdr-core).
+kudde is an independent app built on [herdr-core](https://github.com/herdrdev/herdr-core).
 It is not made by the herdr project.
 
 <p align="center">

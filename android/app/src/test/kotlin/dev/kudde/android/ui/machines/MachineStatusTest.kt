@@ -191,7 +191,7 @@ class MachineStatusTest {
     fun networkOffSaysSoInsteadOfConnectionFailed() {
         val c = card(MachineState.NetworkOff)
         assertEquals("Network permission is off", c.statusText)
-        assertEquals("Allow Network for Kudde in Android settings.", c.detail)
+        assertEquals("Allow Network for kudde in Android settings.", c.detail)
         assertEquals(CardButton.OpenSettings, c.button)
     }
 

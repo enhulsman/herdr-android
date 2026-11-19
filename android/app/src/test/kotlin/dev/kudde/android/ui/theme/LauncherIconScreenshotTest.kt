@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-// Pins Kudde's icons (the ear tag, design/brand/): for the release and the
+// Pins kudde's icons (the ear tag, design/brand/): for the release and the
 // debug launcher icon the full 108 dp layers, then under a circle and a
 // rounded-square mask (the launcher picks one), then the themed monochrome on a
 // dark tile; and the alert icon, white from alpha as the status bar draws it.

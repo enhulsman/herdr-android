@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The debug build's icon: the release icon inverted (the ear tag as a
-     graphite outline on tag yellow), so "Kudde debug" looks finished on the
+     graphite outline on tag yellow), so "kudde debug" looks finished on the
      phone yet never passes for the release. Monochrome: the same outline, for
      themed icons. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">

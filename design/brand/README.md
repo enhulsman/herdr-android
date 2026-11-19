@@ -1,4 +1,4 @@
-# Kudde mark: ear tag A1 (chosen 2026-11-19)
+# kudde mark: ear tag A1 (chosen 2026-11-19)
 
 A livestock ear tag in tag yellow with a shell prompt. The tag is the herd; the
 prompt is the terminal. Drawn by hand: each side of the tag is three tangent

@@ -32,7 +32,7 @@ project board shows what is in progress.
 
 ## Putting a build on a phone
 
-Test rounds use the debug build ("Kudde debug", `dev.kudde.android.debug`,
+Test rounds use the debug build ("kudde debug", `dev.kudde.android.debug`,
 the inverted icon), installed over wireless adb next to the release; a
 release is cut only for a planned batch of fixes.
 

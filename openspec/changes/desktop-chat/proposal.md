@@ -22,14 +22,15 @@
    no WebAssembly).
 5. **Published to the herdr gallery as "kudde"**, from a separate small
    public repository that holds only the built mod; this repository's
-   release builds it and copies it there. A throwaway test entry first
-   checks that the gallery takes a large generated file. The listing text
+   release builds it and copies it there. A survey of the gallery found
+   listed mods with generated files up to 6 MB, and deleted repositories
+   still listed, so no test entry is published first. The listing text
    is shown to Ezra verbatim, and submitting waits for his OK.
 6. **The phone's send logic moves into the shared Rust code**, with the chat
    core and the code-block splitter, and ships as its own phone release
    before the desk depends on it. Otherwise the desk would hold a third copy
    of the logic most phone fixes landed in.
-7. **If the spike or the gallery test fails**, Ezra chooses then between a
+7. **If the spike fails**, Ezra chooses then between a
    JavaScript copy of the parser (nothing installed, two parsers to keep in
    step) and a small kudde program on each agent machine (one parser, but
    something to install; `kudde-push` already has a signed release
@@ -63,10 +64,9 @@ shows real pictures, which no chat mod there does today.
 
 ## What Changes
 
-- A gallery check and a spike come first and decide the route (decision 7):
-  a test entry with a large generated file; then the mod on Windows shows a
-  real Claude Code session from WSL, with a picture, updating without a
-  click, inside fixed time limits on the window's thread.
+- A spike comes first and decides the route (decision 7): the mod on
+  Windows shows a real Claude Code session from WSL, with a picture,
+  updating without a click, inside fixed time limits on the window's thread.
 - `ChatCore` moves from `kudde-mobile` into `kudde-chat`, with times as
   milliseconds; then the send and pending decisions (`chat.rs`,
   `ChatPending.kt`) and the code-block splitter (`ChatScreen.kt`) move there

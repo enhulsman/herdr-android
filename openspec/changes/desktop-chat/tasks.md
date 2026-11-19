@@ -1,7 +1,3 @@
-## 0. Gallery check (design D0)
-
-- [ ] 0.1 Throwaway public repository tagged `herdr-mod`: a mod folder with a generated ~1 MB JS file, a `RECIPE.md` and a `preview.png`; confirm herdr.dev lists it and a gallery install copies the file; delete it afterwards. On failure: decision 7 to Ezra, stop
-
 ## 1. Spike: does the converted core run in the mod (D1)
 
 - [ ] 1.1 Install the wasm32 target, Binaryen and `qjs` on the dev machine (approved, decision 4)
@@ -31,7 +27,7 @@
 - [ ] 3.4 `bridge.js`: fresh memory view per call, `kd_free` on every path, UTF-8, lone surrogates replaced; a trap reloads the module and rebuilds every chat (test: chat B works after chat A trapped)
 - [ ] 3.5 Parity tests under `qjs`: fixtures give the same `view()` JSON as Rust; pending scenarios behave alike
 - [ ] 3.6 `scripts/build-desk.sh [mods-dir]`; `core.js` ignored by git
-- [ ] 3.7 CI: wasm32 build with the pinned `wasm-opt` flags, `wasm2js`, the `qjs` tests with a pinned `qjs`; host and Android jobs stay green
+- [ ] 3.7 CI: a `--check` that rebuilds `core.js` and compares the bytes; wasm32 build with the pinned `wasm-opt` flags, `wasm2js`, the `qjs` tests with a pinned `qjs`; host and Android jobs stay green
 
 ## 4. The desk chat (desktop-chat spec)
 
@@ -53,7 +49,7 @@
 ## 6. Gallery release (D11), after `chat-on-mac`
 
 - [ ] 6.1 Create the gallery repository (public, `herdr-mod` topic) with Ezra's OK; release CI attaches `core.js` here and copies the mod folder there
-- [ ] 6.2 `RECIPE.md` as D11 states, the version file for the update check, the tested herdr version
+- [ ] 6.2 `RECIPE.md` as D11 states, the version file for the update check, the tested herdr version; a Claude in the herdr app installs the mod from a local copy of the gallery folder by the guide's steps, and `core.js` arrives intact (no public listing for this)
 - [ ] 6.3 Draft the listing and preview (staged agents, invented names, no Mac screenshot, lowercase "kudde", kudde.dev link); show Ezra verbatim
 - [ ] 6.4 With Ezra's OK: publish
 - [ ] 6.5 Weekly CI job: new Claude Code or Codex version without a fixture opens an issue

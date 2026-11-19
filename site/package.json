@@ -11,7 +11,7 @@
     "test": "ASTRO_TELEMETRY_DISABLED=1 astro build && node --test tests/site.test.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.23.4"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

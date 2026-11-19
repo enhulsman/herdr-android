@@ -84,3 +84,30 @@ and the phone a text label, and keep touch targets at least 44 px high.
 #### Scenario: Touch targets
 - **WHEN** the buttons on any page are measured at 375 px
 - **THEN** each is at least 44 px high
+
+### Requirement: Unknown paths get the site's own 404 page
+A request for a path that is not a page or a file SHALL be answered with
+status 404 and a page in the site's design, with the shared header and
+footer, one `h1`, and links to `/` and `/install`.
+
+#### Scenario: A mistyped address
+- **WHEN** a visitor opens a path the site does not have
+- **THEN** the response has status 404 and the page shows the header, an `h1`, a link home and a link to Install, and the footer
+
+### Requirement: Responses carry security headers
+Every page, the 404 page and every file SHALL be served with a
+Content-Security-Policy that allows only the site itself (no
+`'unsafe-inline'` or `'unsafe-eval'`, no other origins, `frame-ancestors
+'none'`), Strict-Transport-Security for at least a year,
+`X-Content-Type-Options: nosniff`, a Referrer-Policy and a
+Permissions-Policy. Files under `/_astro/` SHALL be cached for a year as
+immutable.
+
+#### Scenario: Headers on a page and a file
+- **WHEN** a page, the 404 page, a stylesheet and a font are requested
+- **THEN** each response carries every header above, and the stylesheet and font are cached for a year as immutable
+
+#### Scenario: No policy violations
+- **WHEN** any page, the 404 page included, loads at 1440 and at 375 px
+- **THEN** the browser reports no Content-Security-Policy violation
+

@@ -24,6 +24,8 @@ Tests come first: every scenario in `specs/website/spec.md` becomes a check in
 - [ ] 3.2 Ezra reads the page text word for word and approves it
 - [ ] 3.3 Review (Codex), then the PR
 
-## 4. Live (separate, on Ezra's OK)
+## 4. Live
 
-- [ ] 4.1 Deploy to Cloudflare and point kudde.dev at it
+- [x] 4.1 Hosting config in the PR: `site/wrangler.jsonc` (assets only, 404 page, Custom Domain `kudde.dev`), `public/_headers`, the 404 page, and tests through `wrangler dev`
+- [ ] 4.2 On Ezra's OK: the first `wrangler deploy` from a terminal, answering its question about the existing `kudde.dev` record, and removing the apex redirect rule at the same time
+- [ ] 4.3 Git-connected builds in the Cloudflare dashboard, so each merge to `main` deploys

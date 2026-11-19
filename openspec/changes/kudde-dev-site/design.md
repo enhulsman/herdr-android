@@ -42,3 +42,40 @@ time, and a test checks the built page against the file.
 `site/tests/site.test.mjs` runs Playwright (pinned to the version whose
 browser is installed) against a preview of the built site, at 1440 and 375
 px, and checks each spec scenario. `npm test` builds and runs it.
+
+## Hosting
+
+Cloudflare Workers with static assets only: no Worker script runs, so every
+request is answered from `site/dist/`. `site/wrangler.jsonc` names the Worker
+`kudde-site`, points `assets.directory` at `./dist`, sets
+`not_found_handling` to `404-page` (an unknown path gets `dist/404.html` with
+status 404) and routes the apex `kudde.dev` as a Custom Domain, for which
+Cloudflare creates the DNS record and the certificate on deploy. With a route
+set, wrangler leaves the `workers.dev` address off.
+
+- **Paths.** Astro builds `install.html`, not `install/index.html`: the
+  default `html_handling` (`auto-trailing-slash`) serves a file at `/install`
+  but a folder index only at `/install/`, behind a redirect.
+- **Headers.** `site/public/_headers` (copied to `dist/`) sets a
+  Content-Security-Policy that allows only the site itself (`data:` images for
+  the paper grain), HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy:
+  no-referrer` and a Permissions-Policy, and caches the hashed files under
+  `/_astro/` for a year as immutable. Astro is set to write every script and
+  stylesheet to a file and the components use no `style` attributes, so the
+  policy needs neither `'unsafe-inline'` nor hashes.
+  `Cross-Origin-Opener-Policy` is left out: with it, headless Chromium reports
+  no fine pointer and the tag's lean is lost, and a static site without
+  popups gains little from it.
+- **Compatibility date.** `2026-11-11`, the newest date the pinned wrangler's
+  local runtime accepts; nothing in an assets-only Worker depends on it.
+- **Tests.** `npm test` serves `dist/` with `wrangler dev` (local only, no
+  account), so routing, the 404 page and the headers are tested as Cloudflare
+  serves them.
+- **Going live.** A first `wrangler deploy` from a terminal creates the
+  Worker and the Custom Domain. If `kudde.dev` already has a DNS record,
+  wrangler asks before replacing it; without a terminal (CI, Git builds) it
+  replaces it without asking. A redirect rule on the apex runs before the
+  Worker, so the current redirect to the repository must be removed at the
+  same time. After that, Git-connected builds in the dashboard deploy each
+  merge to `main` (build command `npm ci && npm run build`, root `site/`).
+

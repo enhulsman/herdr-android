@@ -1,23 +1,178 @@
 ---
 import Base from '../layouts/Base.astro';
+import { TAG, HOLE } from '../lib/tag.js';
+
+const gap = 28;
 ---
-<Base
-  title="Page not found · kudde"
-  description="This page is not on kudde.dev."
->
-  <div class="page-head">
-    <div class="wrap">
-      <h1 class="display">This page isn’t here.</h1>
-      <p class="lede">The link may be old, or the address may have a typo. Everything on the site is a step from the home page.</p>
-      <div class="actions">
-        <a class="btn ink" href="/">Go to the home page</a>
-        <a class="textlink" href="/install">Install kudde</a>
+<Base title="Page not found · kudde" description="This page is not on kudde.dev.">
+  <div class="page-head lost-page">
+    <div class="wrap lost-layout">
+      <div class="flock" data-flock aria-hidden="true">
+        <svg class="sheep-defs" width="0" height="0" focusable="false">
+          <defs>
+            <!-- One friendly silhouette, shared by the whole flock and its runaway. -->
+            <symbol id="flock-sheep" viewBox="0 0 80 64">
+              <g fill="currentColor">
+                <path data-leg d="M17 43h7v19h-7z" />
+                <path data-leg d="M49 43h7v19h-7z" />
+                <path d="M14 43C3 42 3 29 10 25C5 14 17 7 25 12C30 1 44 4 47 11C60 5 68 15 64 24C76 31 69 46 59 45C52 56 39 54 34 49C24 56 13 52 14 43Z" />
+                <ellipse cx="65" cy="32" rx="11" ry="15" />
+                <path d="M62 22C54 8 49 13 53 23ZM69 22C74 8 80 15 75 24Z" />
+              </g>
+              <circle cx="69" cy="29" r="1.8" fill="var(--color-paper)" />
+            </symbol>
+          </defs>
+        </svg>
+        {Array.from({ length: 100 }, (_, i) => (
+          <div data-flock-slot data-flock-gap={i === gap ? '' : undefined}>
+            {i !== gap && <svg viewBox="0 0 80 64" focusable="false"><use href="#flock-sheep" /></svg>}
+          </div>
+        ))}
+      </div>
+      <div class="lost-copy">
+        <div class="heading-perch">
+          <div class="lost-scene" data-flock-scene aria-hidden="true">
+            <div class="lost-sheep" data-lost-sheep>
+              <svg viewBox="0 0 80 64" focusable="false" overflow="visible">
+                <g class="sheep-facing" data-sheep-facing>
+                  <use href="#flock-sheep" />
+                  <g class="sheep-ear">
+                    <g data-ear-tag transform="translate(48 20) scale(.5)">
+                      <path data-tag-body fill="url(#litTag)" fill-rule="evenodd" d={`${TAG}${HOLE}`} />
+                      <path clip-path="url(#tagClip)" fill="none" stroke="url(#litRim)" stroke-width="1.6" d={TAG} />
+                      <path clip-path="url(#holeClip)" fill="none" stroke="url(#holeWall)" stroke-width=".9" d={HOLE} />
+                      <text class="tag-number" x="32" y="45" text-anchor="middle">404</text>
+                    </g>
+                  </g>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <h1 class="display">Oops. One got away again.</h1>
+        </div>
+        <p class="lede">Ninety-nine pages are right where they should be. This isn’t one of them. The link may be old, or the address may have a typo.</p>
+        <div class="actions">
+          <a class="btn ink" href="/">Back to the herd</a>
+          <a class="textlink" href="/install">Install kudde</a>
+        </div>
       </div>
     </div>
   </div>
 </Base>
 
 <style>
-  .page-head { padding-bottom: var(--space-30); }
-  .actions { margin-top: var(--space-10); }
+  .lost-page { padding: var(--space-30) 0; }
+  .lost-layout {
+    /* The gap is row 3, column 9. Fixed token-sized cells keep its position
+       predictable for the CSS-only hop, even while the copy wraps. */
+    --sheep: var(--space-8);
+    --toward: -1;
+    --away: 1;
+    /* The heading's size, so the perch follows its letters. --foot-at is
+       where the sheep's front-left foot lands, in ems from the heading's
+       left edge: on the "o" of "Oops", with the other foot on the "p". */
+    --perch-font: var(--text-display-md);
+    --foot-at: .88;
+    --lane: calc(var(--sheep) + var(--space-2));
+    --flock-width: calc(10 * var(--lane) - var(--space-2));
+    display: grid;
+    grid-template-columns: var(--flock-width) minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--space-24);
+    color: var(--color-ink);
+  }
+  .flock {
+    display: grid;
+    grid-template-columns: repeat(10, var(--sheep));
+    grid-template-rows: repeat(10, var(--sheep));
+    gap: var(--space-2);
+  }
+  .sheep-defs { position: absolute; }
+  [data-flock-slot] { display: grid; place-items: center; }
+  [data-flock-slot] svg { display: block; width: 100%; height: auto; }
+  .lost-copy { padding-top: var(--space-18); min-width: 0; }
+  .heading-perch { position: relative; }
+  .lost-scene { position: absolute; inset: 0; pointer-events: none; }
+  .lost-sheep {
+    position: absolute;
+    /* Legs start 17/80 into the silhouette; the turn pivots between them
+       (see .sheep-facing), so both feet keep their letters either way. */
+    --perch-x: calc(var(--perch-font) * var(--foot-at) - var(--space-18) * 17 / 80);
+    /* h1 trims to its cap line; the x-height tops of "op" sit .125em lower.
+       The silhouette feet stop at 62/64. */
+    --perch-drop: calc(var(--perch-font) * .125);
+    left: var(--perch-x);
+    bottom: calc(100% - var(--space-18) * .025 - var(--perch-drop));
+    width: var(--space-18);
+    height: calc(var(--space-18) * .8);
+    /* From the perch to the gap centre (relative to this sheep's centre). */
+    --hop-x: calc(-1 * var(--space-24) - 1.5 * var(--lane) + var(--space-1) - var(--perch-x) - var(--space-18) / 2);
+    --hop-y: calc(2.5 * var(--lane) - var(--space-1) - var(--space-18) + var(--space-18) * .375 - var(--perch-drop));
+    animation: lost-hop var(--duration-swing) var(--ease-swing) 1 both;
+  }
+  .lost-sheep > svg { display: block; width: 100%; height: 100%; }
+  .sheep-facing {
+    transform-box: view-box;
+    /* Midway between the legs (36.5 of 80), not the view box centre. */
+    transform-origin: 45.625% 50%;
+    animation: wrong-way var(--duration-swing) var(--ease-default) 1 both;
+  }
+  .tag-number {
+    /* Keep the printed number readable when the sheep faces left. */
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: wrong-way var(--duration-swing) var(--ease-default) 1 both;
+    fill: var(--color-ink);
+    font: var(--weight-bold) calc(var(--text-xl) + var(--space-1) / 2) var(--font-mono);
+  }
+  .lost-page .display { font-size: var(--perch-font); max-width: 10ch; text-box: trim-start cap alphabetic; }
+  .actions { margin-top: var(--space-8); }
+  /* Look down, jump toward the hole in the flock, sail past it, hesitate,
+     hold that position while looking around, turn away, then spring back.
+     Facing changes finish before movement resumes at 80%. */
+  @keyframes lost-hop {
+    0%, 12% { transform: translate(0, 0) rotate(0deg); }
+    18% { transform: translate(0, var(--space-1)) rotate(-8deg); }
+    30% { transform: translate(calc(var(--hop-x) * .45), calc(var(--hop-y) - var(--space-16))) rotate(-8deg); }
+    46% { transform: translate(var(--hop-x), var(--hop-y)) rotate(0deg); }
+    62%, 80% { transform: translate(calc(var(--hop-x) - var(--space-16)), var(--hop-y)) rotate(0deg); }
+    86% { transform: translate(calc(var(--hop-x) * .4), calc(-1 * var(--space-16))) rotate(5deg); }
+    94%, 100% { transform: translate(0, 0) rotate(0deg); }
+  }
+  @keyframes wrong-way {
+    0%, 62% { transform: scaleX(var(--toward)); }
+    66%, 69% { transform: scaleX(var(--away)); }
+    73%, 76% { transform: scaleX(var(--toward)); }
+    80%, 100% { transform: scaleX(var(--away)); }
+  }
+  @media (max-width: 1100px) and (min-width: 861px) {
+    .lost-layout { column-gap: var(--space-10); --perch-font: var(--text-display-sm); --foot-at: .93; }
+    .lost-sheep { --hop-x: calc(-1 * var(--space-10) - 1.5 * var(--lane) + var(--space-1) - var(--perch-x) - var(--space-18) / 2); }
+  }
+  @media (max-width: 860px) {
+    .lost-page { padding: var(--space-10) 0 var(--space-18); }
+    /* 48px matches .page-head .display at this width in global.css. */
+    .lost-layout { --sheep: var(--space-5); --toward: 1; --away: -1; --perch-font: 48px; --foot-at: .84; grid-template-columns: 1fr; }
+    .flock { margin: 0 auto; }
+    /* On phones the same gap sits just above the heading's right side. */
+    .lost-copy { padding-top: var(--space-24); }
+    .lost-sheep {
+      --hop-x: calc((100vw - 2 * var(--space-4) - var(--flock-width)) / 2 + 8.5 * var(--lane) - var(--space-1) - var(--perch-x) - var(--space-18) / 2);
+      --hop-y: calc(-7.5 * var(--lane) + var(--space-1) - var(--space-24) + var(--space-18) * .375 - var(--perch-drop));
+    }
+    .lost-page .display { max-width: 11ch; }
+    @keyframes lost-hop {
+      0%, 12% { transform: translate(0, 0) rotate(0deg); }
+      18% { transform: translate(0, var(--space-1)) rotate(8deg); }
+      30% { transform: translate(calc(var(--hop-x) * .45), calc(var(--hop-y) * .7)) rotate(8deg); }
+      46% { transform: translate(var(--hop-x), var(--hop-y)) rotate(0deg); }
+      62%, 80% { transform: translate(var(--hop-x), calc(var(--hop-y) - var(--space-8))) rotate(0deg); }
+      86% { transform: translate(calc(var(--hop-x) * .4), calc(var(--hop-y) * .5)) rotate(-5deg); }
+      94%, 100% { transform: translate(0, 0) rotate(0deg); }
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lost-sheep, .sheep-facing, .tag-number { animation: none; }
+    .sheep-facing, .tag-number { transform: scaleX(var(--toward)); }
+  }
 </style>

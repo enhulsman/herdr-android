@@ -94,6 +94,14 @@ footer, one `h1`, and links to `/` and `/install`.
 - **WHEN** a visitor opens a path the site does not have
 - **THEN** the response has status 404 and the page shows the header, an `h1`, a link home and a link to Install, and the footer
 
+#### Scenario: One sheep got away again
+- **WHEN** a visitor opens an unknown path
+- **THEN** the page SHALL show a decorative 10 by 10 flock with 99 identical graphite sheep and one visibly empty slot, plus one lost sheep wearing the lit A1 ear tag numbered "404" with each visible foot resting on the ink of the letter directly beneath it in "Oops" in the heading "Oops. One got away again." at 375 px and 1440 px, and tag digits at least 10 CSS px
+- **AND** the lost sheep SHALL look toward the gap, hop toward it, overshoot, stop and hold position while looking around, then turn and move the wrong way in one finite 3–5 second CSS animation, ending still on the same letters facing away from the gap
+- **AND** with reduced motion the sheep SHALL remain on the heading looking toward the gap with no animation
+- **AND** the flock SHALL retain ten rows and ten columns at 375 px and 1440 px without horizontal scroll, with sheep about 16–24 px wide at 375 px
+- **AND** the illustration SHALL be hidden from assistive technology and contain no focusable elements, with yellow confined to the small ear tag
+
 ### Requirement: Responses carry security headers
 Every page, the 404 page and every file SHALL be served with a
 Content-Security-Policy that allows only the site itself (no

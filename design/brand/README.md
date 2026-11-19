@@ -24,3 +24,16 @@ In the app:
   mark in graphite on a tag-yellow tile, lit the same way.
 
 The wordmark is not final.
+
+## Ideas for later
+
+`ideas/` keeps two versions of the app icon on an off-white wool ground
+(2026-11-19), not in use:
+
+- `kudde-tag-A1-icon-wool-lit.svg`: the lit tag with the prompt cut out, so
+  the prompt turns cream.
+- `kudde-tag-A1-icon-wool-ink.svg`: the same with the prompt drawn in
+  graphite, which keeps the terminal reading.
+
+Yellow on off-white has less contrast than on graphite; these suit a light
+theme or the site better than the main launcher icon.

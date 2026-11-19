@@ -96,3 +96,34 @@ about a second after it ends.
 #### Scenario: Two agents in one folder on a Mac
 - **WHEN** two Claude Code agents run in the same folder on a Mac
 - **THEN** each terminal's chat shows its own conversation
+
+## ADDED Requirements
+
+### Requirement: Mac send checks read the current session
+Before dispatch, both first and final send checks on macOS SHALL compare the
+immutable displayed target against fresh process and session facts. Claude
+Code SHALL use the session file and `ps`, or the open-file fallback if the
+facts-first check requires it. Codex SHALL reread open rollout and lock files
+and their times with `lsof` at each check, independently of periodic lookup.
+Unreadable or ambiguous facts SHALL refuse before typing. Uploads and a
+second Enter SHALL keep the original target, never the latest poll's target.
+
+**Owner pick R1-A (proposed):** refuse and preserve the draft on failed
+identity checks; alternative: wait and retry lookup automatically.
+
+#### Scenario: Codex changes thread on a Mac
+- **GIVEN** Codex retains its pid and process start
+- **WHEN** `/new` or `/resume` changes thread before the first check or between first and final checks
+- **THEN** fresh open-file facts refuse the send, type nothing and preserve the draft
+
+#### Scenario: Open files unreadable or ambiguous on a Mac
+- **WHEN** either send check cannot read open files or identify one current thread
+- **THEN** it refuses without cached lookup fallback and preserves the draft
+
+#### Scenario: Claude changes session on a Mac
+- **WHEN** Claude's fresh session facts differ from the displayed target
+- **THEN** the send is refused before typing
+
+#### Scenario: A target changes during upload or before second Enter
+- **WHEN** a poll replaces the session during upload or before a second Enter
+- **THEN** the final check uses the original target and sends nothing to the replacement session

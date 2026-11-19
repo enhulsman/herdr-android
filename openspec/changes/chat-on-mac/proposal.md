@@ -42,8 +42,10 @@ gallery's audience runs agents on a Mac.
 ### Modified Capabilities
 - `chat-view`: the lookup works on macOS, and the switch shows for agents on
   a Mac.
-- `desktop-chat` (once archived): Mac agents are supported. Its delta is
-  written when `desktop-chat` is archived, as this change lands after it.
+- `desktop-chat`: Mac agents are supported. Its delta is drafted against
+  the pending desktop requirements and integrated after desktop-chat tasks
+  2.8 and sections 3–4 pass, before the joint gallery release; archival is
+  not a prerequisite.
 
 ## Impact
 

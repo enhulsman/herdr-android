@@ -86,6 +86,43 @@ scrolls to the top.
 - **THEN** his place stays where it is
 
 ### Requirement: The chat never holds up the window
+The desk SHALL bound synchronous work before calling the core.
+
+**Owner pick R1-D (proposed):** catch-up and older messages appear across
+bounded slices; alternative: pause immediately on a backlog larger than one
+slice. Before each synchronous call the desk SHALL bound input bytes,
+records processed, rows cloned and bytes serialized, using limits measured
+by the spike. First, incremental and older read budgets SHALL be configurable
+for the desk, including the 512 KB first-read fallback; phone defaults SHALL
+remain unchanged. Parsing a record larger than a slice, reparsing older
+history and constructing or serializing views SHALL yield across bounded
+slices or pages without losing or duplicating rows. An unchanged revision
+query SHALL NOT clone or serialize the held rows. Panes SHALL share a work
+queue that yields to window input and other panes between slices.
+
+The spike SHALL use the actual ChatCore through callable wasm32 exports and
+JSON/view calls, after isolated core/clock preparation 2.1–2.2 if needed. It
+SHALL measure first open (at most 300 ms), maximum incremental reads
+(7,864,320 bytes), long retained histories, older-page reparsing, maximum-size
+records, changed and unchanged views, JSON encoding/decoding and multiple
+panes. Subsequent synchronous slices SHALL take at most 50 ms in these
+measurements. A parser-only harness or a ten-tick pause SHALL NOT establish
+this gate; dependent work SHALL wait for a passing spike.
+
+#### Scenario: Backlog and older history
+- **GIVEN** a pane with a long retained history and a maximum incremental read
+- **WHEN** it parses the backlog or loads an older page
+- **THEN** each synchronous call obeys the recorded work limits, yields between slices, and no row is lost or duplicated
+
+#### Scenario: A record larger than a slice
+- **GIVEN** one log record larger than the configured slice budget
+- **WHEN** the desk reads and parses it
+- **THEN** bounded slices preserve the partial record and byte offsets until it is complete, without one unbounded parse call
+
+#### Scenario: Unchanged view with another pane active
+- **WHEN** the desk checks an unchanged revision while another pane catches up
+- **THEN** it does not construct or serialize the held rows, and the catching-up pane yields to other panes and window input
+
 The pane SHALL stop reading when ten reads in a row each spend more than
 50 ms on the window's thread, and SHALL show "The chat is paused: it was slowing the
 window" with an "Open terminal" button. Slow answers from the agent's machine
@@ -149,6 +186,18 @@ recently used pictures first, never one used in the last minute.
 - **THEN** the least recently used pictures are removed until it fits
 
 ### Requirement: Replies go only to the agent whose log is shown
+The desk SHALL check fresh session facts before each send.
+
+**Owner pick R1-A (proposed):** refuse and keep the draft when identity
+cannot be established; alternative: wait and retry lookup automatically.
+Both first and final send checks SHALL compare fresh facts with the immutable
+displayed terminal, agent kind, pid, process start and session. Claude's
+facts SHALL come from its session file and process facts; Codex's SHALL
+include freshly read open rollout and lock files and their times. Unreadable
+or ambiguous facts SHALL refuse before dispatch, without cached lookup
+fallback. The same target SHALL survive uploads and a guarded second Enter.
+These checks SHALL NOT be described as an atomic session guard.
+
 The pane SHALL have a reply box under the chat: Enter sends, Shift+Enter
 starts a new line. A message SHALL be sent only after the send checks
 confirm, right before sending, that the same process and session are still
@@ -159,6 +208,20 @@ at once and follow the pending states `chat-view` states; a send whose
 outcome is unsure SHALL never be sent again by itself. Control characters
 other than newline and tab SHALL be removed; all other text SHALL arrive
 unchanged, including newlines, non-ASCII characters and a leading `-`.
+
+#### Scenario: Codex changes thread before the first check
+- **GIVEN** Codex keeps its pid and process start
+- **WHEN** `/new` or `/resume` changes the displayed thread before the first send check
+- **THEN** fresh open-file facts refuse the send and no text is typed
+
+#### Scenario: Codex changes thread between checks
+- **GIVEN** the first check accepted the displayed thread
+- **WHEN** `/new` or `/resume` changes it before the final check with the same pid and process start
+- **THEN** the final fresh open-file check refuses and preserves the original draft
+
+#### Scenario: Open files cannot identify the thread
+- **WHEN** either send check finds unreadable open files or an ambiguous lookup
+- **THEN** nothing is typed, the draft stays, and the previous lookup is not reused
 
 #### Scenario: A normal reply
 - **WHEN** Ezra types a reply and presses Enter while the agent is idle
@@ -245,3 +308,47 @@ read "This herdr version is not supported yet" with "Open terminal".
 #### Scenario: A newer mod exists
 - **WHEN** the gallery repository publishes a version newer than the installed mod
 - **THEN** the pane shows "A newer kudde chat is available"
+
+### Requirement: The desk preserves delivery certainty
+The adapter SHALL return Typed only for a recognized successful send
+acknowledgement, and Refused only with evidence that nothing was typed
+(a pre-dispatch failure or a recognized no-input herdr-core rejection).
+After dispatch, timeout, disconnect, malformed output or an unrecognized
+failure SHALL be Unsure; exit status, stderr or a rejected promise alone
+SHALL NOT prove refusal. This mapping SHALL apply to direct `hc()` and
+fallback `exec` alike.
+
+**Owner pick R1-C (proposed):** Unsure SHALL remain pending without draft
+restoration, automatic retry, fallback-route retry or second Enter;
+alternative: offer manual retry with a duplicate warning. A definitive
+refusal SHALL remove its pending bubble and restore the original draft,
+merged with text typed meanwhile, as on the phone.
+
+#### Scenario: Delivery followed by lost acknowledgement
+- **GIVEN** the message was delivered through direct hc or fallback exec
+- **WHEN** its acknowledgement is lost through timeout or disconnect
+- **THEN** it remains pending as Unsure, the draft is not restored, and no route sends it or a second Enter again
+
+#### Scenario: An unrecognized command failure
+- **WHEN** either route returns malformed output, nonzero exit/stderr or a rejected promise after dispatch without evidence that nothing was typed
+- **THEN** the result is Unsure, not Refused, and the same pending and no-retry rules apply
+
+#### Scenario: A definitive refusal
+- **WHEN** a pre-dispatch failure or a recognized no-input rejection refuses a send
+- **THEN** the bubble is removed and the original draft is restored alongside anything typed meanwhile
+
+#### Scenario: A successful acknowledgement
+- **WHEN** either route returns a recognized successful send acknowledgement
+- **THEN** the result is Typed and the bubble follows the shared pending states
+
+### Requirement: Mac integration precedes the gallery release
+The gallery release SHALL wait for chat-on-mac's integrated desktop delta,
+checks and review. Mac integration SHALL depend on desktop-chat task 2.8
+and sections 3–4 passing, including bounded-work and adapter tests, rather
+than archival. The changes SHALL apply in order: desktop-chat base, then
+chat-on-mac modifications; both SHALL validate before joint release.
+
+#### Scenario: Integrating Mac support before archival
+- **GIVEN** desktop-chat task 2.8 and sections 3–4 pass and neither change is archived
+- **WHEN** chat-on-mac integrates and passes checks and review
+- **THEN** the joint gallery release can proceed, followed by desktop-chat archival and then chat-on-mac archival

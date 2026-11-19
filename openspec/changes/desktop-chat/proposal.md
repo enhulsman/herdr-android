@@ -64,7 +64,8 @@ shows real pictures, which no chat mod there does today.
 
 ## What Changes
 
-- A spike comes first and decides the route (decision 7): the mod on
+- A spike comes first (only isolated core/clock tasks 2.1–2.2 may prepare
+  it) and decides the route (decision 7): the mod on
   Windows shows a real Claude Code session from WSL, with a picture,
   updating without a click, inside fixed time limits on the window's thread.
 - `ChatCore` moves from `kudde-mobile` into `kudde-chat`, with times as

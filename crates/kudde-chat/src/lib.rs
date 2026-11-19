@@ -4,6 +4,7 @@
 //! Both formats are private and change; [`Parser::health`] is the guard the
 //! view uses to fall back to the terminal.
 
+pub mod core;
 pub mod image;
 pub mod locate;
 pub mod send;

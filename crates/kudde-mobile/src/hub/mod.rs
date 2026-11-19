@@ -348,6 +348,8 @@ struct State {
 }
 
 pub(crate) struct HubCore {
+    /// Fixed origin shared by every chat held by this hub.
+    chat_started: std::time::Instant,
     dir: PathBuf,
     dialer: Arc<dyn Dialer>,
     runtime: tokio::runtime::Handle,
@@ -554,6 +556,14 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 impl HubCore {
+    /// Milliseconds since this hub started, clamped to the core's clock range.
+    fn chat_now(&self) -> u64 {
+        self.chat_started
+            .elapsed()
+            .as_millis()
+            .min(u64::MAX as u128) as u64
+    }
+
     /// Loads the list and seen turns from `dir` and starts suspended. Must be
     /// called inside the tokio runtime the hub's tasks run on.
     pub(crate) fn start(dir: PathBuf, dialer: Arc<dyn Dialer>) -> Arc<HubCore> {
@@ -579,6 +589,7 @@ impl HubCore {
         };
         let snapshot = build_snapshot(&state);
         Arc::new(HubCore {
+            chat_started: std::time::Instant::now(),
             dir,
             dialer,
             runtime: tokio::runtime::Handle::current(),

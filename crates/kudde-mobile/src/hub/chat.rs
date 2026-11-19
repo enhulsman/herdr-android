@@ -7,9 +7,9 @@
 //! or the terminal view needs it (design D5).
 
 use super::HubCore;
-use super::chat_core::{ChatCore, Kind, Read, Row, Term};
 use base64::Engine;
 use herdr_proto::rpc::{CallError, Client, Stream, StreamItem};
+use kudde_chat::core::{ChatCore, Kind, Read, Row, Term};
 use kudde_chat::locate::{self, Lookup};
 use kudde_chat::send::{self, Refusal, Seen};
 use kudde_chat::{Agent, Health, Image, Item, image, tail};
@@ -483,7 +483,7 @@ impl Chat {
                 self.state
                     .lock()
                     .unwrap()
-                    .take_watch_lookup(&t, l, Instant::now());
+                    .take_watch_lookup(&t, l, self.core.chat_now());
                 for _ in 0..2 {
                     let Some(r) = self.state.lock().unwrap().plan_read() else {
                         break;
@@ -491,7 +491,12 @@ impl Chat {
                     let at = Instant::now();
                     let got = read_chunk(&c, &r).await;
                     times.mark("tail", at);
-                    if !self.state.lock().unwrap().take_read(got, Instant::now()) {
+                    if !self
+                        .state
+                        .lock()
+                        .unwrap()
+                        .take_read(got, self.core.chat_now())
+                    {
                         break;
                     }
                 }
@@ -657,7 +662,10 @@ impl Chat {
             }
             match send_outcome(&c.call("terminal.send", params).await) {
                 sent @ (Sent::Typed | Sent::Unsure) => {
-                    self.state.lock().unwrap().sent(&message, Instant::now());
+                    self.state
+                        .lock()
+                        .unwrap()
+                        .sent(&message, self.core.chat_now());
                     *self.sent_to.lock().unwrap() = Some(target);
                     if sent == Sent::Typed {
                         ChatSent::Typed
@@ -750,12 +758,12 @@ impl Chat {
                 self.state
                     .lock()
                     .unwrap()
-                    .take_read(Err("terminal".into()), Instant::now());
+                    .take_read(Err("terminal".into()), self.core.chat_now());
                 return self.view("", false, times);
             }
         };
         times.mark("get", began);
-        let now = Instant::now();
+        let now = self.core.chat_now();
         let lookup = self.state.lock().unwrap().needs_lookup(&t, event, now);
         if lookup {
             let at = Instant::now();
@@ -764,9 +772,9 @@ impl Chat {
             self.state
                 .lock()
                 .unwrap()
-                .take_lookup(&t, l, Instant::now());
+                .take_lookup(&t, l, self.core.chat_now());
         }
-        self.state.lock().unwrap().see(&t, Instant::now());
+        self.state.lock().unwrap().see(&t, self.core.chat_now());
         // A return reads the log's size first, then the new lines.
         for _ in 0..2 {
             let Some(r) = self.state.lock().unwrap().plan_read() else {
@@ -775,7 +783,12 @@ impl Chat {
             let at = Instant::now();
             let got = read_chunk(&c, &r).await;
             times.mark("tail", at);
-            if !self.state.lock().unwrap().take_read(got, Instant::now()) {
+            if !self
+                .state
+                .lock()
+                .unwrap()
+                .take_read(got, self.core.chat_now())
+            {
                 break;
             }
         }

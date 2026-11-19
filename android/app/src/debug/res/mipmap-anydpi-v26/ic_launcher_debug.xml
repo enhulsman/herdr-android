@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The debug build's icon: the release icon inverted (ivory ram on the
-     ram's dark ink), so "Kudde debug" looks finished on the phone yet never
-     passes for the release. Monochrome: the same ram, for themed icons. -->
+<!-- The debug build's icon: the release icon inverted (the ear tag as a
+     graphite outline on tag yellow), so "Kudde debug" looks finished on the
+     phone yet never passes for the release. Monochrome: the same outline, for
+     themed icons. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_debug_background" />
     <foreground android:drawable="@drawable/ic_launcher_debug_foreground" />

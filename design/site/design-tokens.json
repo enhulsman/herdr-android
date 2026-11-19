@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "schemaVersion": "2",
+    "project": "kudde.dev",
+    "projectType": "marketing",
+    "created": "2026-11-19",
+    "updated": "2026-11-19",
+    "aesthetic": "Paper and ink with one lit ear tag: a calm, printed product page where tag yellow only ever appears as an object.",
+    "extends": null
+  },
+  "concept": {
+    "statement": "One tag: the brand colour is never a background but one big, lit ear tag hanging on the page, and the phone with the real app stands on it where the logo's prompt sits.",
+    "mood": "Bright daylight on good paper. A livestock ear tag in thick, slightly glossy yellow plastic, lit softly from above, hanging on a graphite knob through its punched hole; knocked once, it swings on the knob and settles. Ink type, set large and tight. Everything else is quiet.",
+    "subjectWorld": ["livestock ear tag", "punched hole on a knob", "the herd", "a shell prompt", "coding agents on your own machines", "a phone in the hand, away from the desk"],
+    "audienceFeeling": "This is a well-made, independent tool that keeps me in touch with my agents; it looks as considered as the app.",
+    "avoid": [
+      "yellow as a background, band, panel or wash (it turns into a warning sign)",
+      "the app's status marks (spinner, blue dot, grey ring, red edge) as page decoration",
+      "alarm or triage tone ('one needs you', 'they're fine')",
+      "tags as wallpaper or repeated pattern",
+      "glows, frosted glass or any effect over the app's screen",
+      "national flavour of any kind",
+      "herdr's ram or any redraw of it",
+      "AI-generated pictures with invented copy",
+      "capitalised 'Kudde' in reader-facing copy: the name is written 'kudde'"
+    ]
+  },
+  "signature": {
+    "element": "The hanging tag: one A1 ear tag at hero scale, lit like the app icon (gradient, rim light, a punched hole with depth, a soft cast shadow), hanging on a round graphite knob fixed to the page, seen head-on in its punched hole with the hole's top edge resting on it, with the phone standing on its body where the logo's prompt would be.",
+    "location": "Hero, right half on desktop; below the copy at 375 px. The whole tag stays in view and the hole is never cropped.",
+    "implementation": "Inline SVG of the A1 path (viewBox 9 4 46 56) sized by a unit var (13.4px desktop, 13px under 1100px, 7.4px under 860px); fill = lit gradient; rim = clipped stroke; hole wall = clipped gradient stroke; CSS drop-shadow. Knob = a separate SVG in the same viewBox that does not turn: a circle of radius 2.4u centred at (32, 11.8), so its top meets the hole's top edge (hole centre (32, 13), radius 3.6); graphite face lit from above (radial #62655e to #2e302c to #121311), an edge running #8a8d85 to #474a44 to #0b0c0a, a faint top highlight, and a small drop-shadow down and to the right onto the tag and through the hole onto the paper. The tag and the phone turn together around the knob's centre (transform-origin 50% 13.93%). No cord. The phone is the HTML rebuild of the app (phone.css), zoom .84 desktop / .64 mobile, placed at 13u-150px x zoom left and 17u below the tag's top, inside the turning tag. Reference: design/site/slice/onetag2.html.",
+    "boldnessBudget": "Everything else stays quiet: paper ground, ink type, ink buttons, 2px ink rules, no other colour outside the app's screen. One big tag per page; the app icon closes the page."
+  },
+  "imagery": {
+    "strategy": "illustration",
+    "direction": "The only pictures are the real app on a phone (HTML rebuild or real screenshots with invented names: website, api, docs; workstation, server) and the A1 tag and app icon. No photography, no generated scenes.",
+    "sources": ["design/site/brand/kudde-tag-A1.svg", "design/site/brand/kudde-tag-A1-mono.svg", "design/site/brand/kudde-tag-A1-icon.svg (the lit app icon)", "design/site/slice/phone.html + phone.css"]
+  },
+  "layout": {
+    "composition": "Desktop hero: copy left (max 600px), the hanging tag right with its right edge on the 1280px frame. Below the hero, sections on paper separated by 2px ink rules; a 5/7 two-column rhythm for heading versus content. The page ends on the app icon card.",
+    "wireframe": "+--------------------------------------------------+\n| [tag] kudde        Install Setup Security ... [Get]|\n+===========================|======================+\n| Keep in                   |                      |\n| touch with             .--o--.   <- knob in hole |\n| your herd.            /       \\                  |\n| lede                 | [phone] |  lit tag        |\n| [Install] GitHub     |         |                  |\n| [icon] Android 12+   '---------'                  |\n+==================================================+\n| section h2 (5)       | content (7)               |\n+==================================================+\n| Your herd, in      [app icon] kudde              |\n| your pocket.       [Install] or download APK     |\n+--------------------------------------------------+",
+    "rhythm": "Hero min-height max(860px, 100vh - 82px); sections 104-120px vertical padding desktop, 56-72px mobile; 2px ink rule opens each section.",
+    "maxWidth": "1280px",
+    "contentWidth": "720px",
+    "gutter": "40px desktop, 16px under 860px"
+  },
+  "colors": {
+    "background": "#f7f5ef",
+    "surface": "#f7f5ef",
+    "surfaceRaised": "#ece8dc",
+    "text": "#1c1e1b",
+    "textMuted": "#5b5d57",
+    "primary": "#1c1e1b",
+    "secondary": "#f7f5ef",
+    "accent": "#f2c230",
+    "border": "#1c1e1b",
+    "tag": {
+      "flat": "#f2c230",
+      "litTop": "#fcdc72",
+      "litMid": "#f2c230",
+      "litBottom": "#d99d12",
+      "deep": "#e2ac14",
+      "holeShadow": "#8a6204",
+      "rimLight": "#ffffff"
+    },
+    "rule": "#e2ddd0",
+    "codeBackground": "#ece8dc",
+    "graphite": "#1c1e1b",
+    "_usage": "Tag yellow only on the tag, the logo and the app icon; never as a ground and never for text or lines on paper. Text on yellow is ink. Buttons are ink with paper text."
+  },
+  "typography": {
+    "fontFamily": {
+      "display": "\"Bricolage Grotesque\", sans-serif",
+      "heading": "\"Bricolage Grotesque\", sans-serif",
+      "body": "\"Instrument Sans\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", monospace"
+    },
+    "scale": {
+      "xs": "13px",
+      "sm": "14px",
+      "base": "18px",
+      "lg": "21px",
+      "xl": "22px",
+      "2xl": "28px",
+      "3xl": "36px",
+      "4xl": "44px",
+      "5xl": "52px",
+      "display": "104px",
+      "displayMd": "84px",
+      "displaySm": "60px",
+      "closing": "72px"
+    },
+    "_scaleComment": "h1 104px desktop, 84px under 1100px, 60px under 860px; implement with clamp(). Bricolage uses opsz 96 at display size.",
+    "weightPairing": {
+      "display": "Bricolage Grotesque 800 at -0.04em for the hero and closing statements",
+      "emphasis": "Bricolage 700 for section heads, Instrument Sans 400 body, 600 for buttons and links"
+    },
+    "lineHeight": {
+      "tight": "1.05",
+      "snug": "1.2",
+      "normal": "1.55",
+      "relaxed": "1.6",
+      "loose": "2",
+      "display": "0.92"
+    },
+    "fontWeight": {
+      "normal": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700",
+      "extrabold": "800"
+    },
+    "letterSpacing": {
+      "display": "-0.04em",
+      "heading": "-0.03em",
+      "brand": "-0.035em",
+      "normal": "0em"
+    }
+  },
+  "spacing": {
+    "unit": "4px",
+    "scale": {
+      "1": "4px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "5": "20px",
+      "6": "24px",
+      "8": "32px",
+      "10": "40px",
+      "14": "56px",
+      "16": "64px",
+      "18": "72px",
+      "24": "96px",
+      "26": "104px",
+      "30": "120px"
+    }
+  },
+  "borders": {
+    "radius": {
+      "none": "0",
+      "sm": "5px",
+      "md": "10px",
+      "lg": "12px",
+      "icon": "30px at 132px (about 23%)",
+      "phone": "44px at 300px",
+      "full": "9999px"
+    },
+    "width": {
+      "thin": "1px",
+      "default": "1px",
+      "thick": "2px"
+    }
+  },
+  "shadows": {
+    "_comment": "One light from above, slightly left: every shadow falls down and to the right, warm on yellow, neutral on paper.",
+    "sm": "3px 5px 10px -4px rgba(28,30,27,.5)",
+    "md": "14px 24px 34px -14px rgba(28,30,27,.55), 3px 5px 8px -3px rgba(28,30,27,.35)",
+    "lg": "26px 44px 46px -18px rgba(92,62,0,.5), 6px 10px 12px -4px rgba(60,40,0,.35)",
+    "xl": "drop-shadow(18px 30px 28px rgba(92,64,0,.24)) drop-shadow(3px 5px 4px rgba(92,64,0,.18))",
+    "glow": ""
+  },
+  "animations": {
+    "duration": {
+      "instant": "0ms",
+      "fast": "150ms",
+      "normal": "300ms",
+      "slow": "1200ms",
+      "swing": "4800ms"
+    },
+    "easing": {
+      "default": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "swing": "cubic-bezier(.45,0,.55,1)",
+      "knock": "cubic-bezier(.2,.6,.35,1)",
+      "sway": "cubic-bezier(.2,.7,.2,1)"
+    },
+    "choreography": "On load the hero tag is knocked once on its knob and swings around the knob's centre, losing about a third each way (0, -9deg, 6.4, -4.4, 3, -1.9, 1.1, -.5, 0 at even steps over 4.8s, 300ms delay; the knock eases out, each later stretch eases in and out like a pendulum), then settles. The phone turns with the tag. Afterwards it leans up to 1.5deg toward a fine pointer. Nothing else moves on its own.",
+    "patterns": ["text links underline on hover, the underline turning tag deep", "ink buttons go to pure black on hover"],
+    "hero": {
+      "archetype": "Minimal Motion",
+      "library": "CSS keyframes + 15 lines of vanilla JS for the pointer lean",
+      "reducedMotionStrategy": "show the settled tag; no swing, no lean"
+    }
+  },
+  "breakpoints": {
+    "sm": "375px",
+    "md": "860px",
+    "lg": "1100px",
+    "xl": "1280px"
+  },
+  "accessibility": {
+    "wcag": "AA",
+    "minContrastRatioText": 4.5,
+    "minContrastRatioLarge": 3.0,
+    "minContrastRatioUI": 3.0,
+    "minTouchTarget": "44px",
+    "respectReducedMotion": true,
+    "measured": "ink on paper 15.4; muted on paper 6.1; ink on tag yellow 10.0; ink on deep yellow 7.0; yellow on paper 1.5 (decorative only, never text or a lone indicator)"
+  },
+  "components": {
+    "header": "Paper, 80px (68px mobile), 2px ink rule below; colour A1 mark 34px + 'kudde' in Bricolage 700 28px; links Instrument Sans 500 16px; ink 'Get kudde' button. Under 860px links collapse, the button stays.",
+    "hero": "h1, lede (21px), ink primary button + text link, then the app-icon line (36px icon, mono meta). The hanging tag with the phone on the right.",
+    "hangingTag": "See signature.implementation.",
+    "phone": "HTML rebuild of the real agent list (phone.css), metal edge, one side key, warm cast shadow on the tag. Invented names only.",
+    "buttonPrimary": "Ink #1c1e1b, paper text, 48px min height, radius 12px, Instrument Sans 600 16px.",
+    "buttonSecondary": "Transparent with a 2px inset ink line.",
+    "textLink": "Instrument Sans 600, 2px underline at 5px offset; hover turns the underline tag deep.",
+    "stepMarker": "40px A1 outline tag with the step number in Bricolage 800; the current step is filled with tag yellow.",
+    "rulesList": "Two-column list, each item opened by a 2px ink rule, Bricolage 700 22px title, muted body.",
+    "code": "JetBrains Mono 14px on #ece8dc, radius 5px.",
+    "appCard": "Closing block: lit app icon 132px (radius 30px, md shadow), 'kudde' Bricolage 700 40px, one line, ink install button + 'or download the signed APK' link.",
+    "footer": "2px ink rule; 'Independent app, built on herdr-core. Not made by the herdr project.' and 'Apache-2.0 · Source on GitHub', 14px muted."
+  }
+}

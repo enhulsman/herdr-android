@@ -1,21 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kudde's ear tag (design/brand/kudde-tag-A1.svg) in tag yellow on the
-     108 dp layer, the mark at 62 dp inside the 66 dp safe zone. The prompt
-     and the hole are cut out (even-odd), so the graphite tile shows through
-     and the same layer serves as the themed-icon monochrome. -->
+<!-- Kudde's ear tag (design/brand/kudde-tag-A1-icon.svg) on the 108 dp layer:
+     the mark at 62 dp inside the 66 dp safe zone, raised 2.5 dp so its wide
+     body does not sit low. A soft shadow under it, the tag yellow running
+     light to amber, a rim light along the top edge. The prompt and the hole
+     are cut out (even-odd), so the graphite shows through. Themed icons use
+     the flat ic_launcher_monochrome.xml. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
         android:translateX="23"
-        android:translateY="23"
+        android:translateY="20.5"
         android:scaleX="0.96875"
         android:scaleY="0.96875">
+        <group
+            android:translateX="32"
+            android:translateY="61"
+            android:scaleX="24"
+            android:scaleY="4.5">
+            <path android:pathData="M-1,0a1,1 0 1,0 2,0a1,1 0 1,0 -2,0z">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                        android:type="radial"
+                        android:centerX="0"
+                        android:centerY="0"
+                        android:gradientRadius="1">
+                        <item android:offset="0" android:color="#8C000000" />
+                        <item android:offset="1" android:color="#00000000" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
         <path
-            android:fillColor="#F2C230"
             android:fillType="evenOdd"
-            android:pathData="M32 4A9 9 0 0 1 41 12.8A14 14 0 0 0 49.91 25.55A8 8 0 0 1 55 33V51A9 9 0 0 1 46 60H18A9 9 0 0 1 9 51V33A8 8 0 0 1 14.09 25.55A14 14 0 0 0 23 12.8A9 9 0 0 1 32 4ZM32 9.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2ZM20.109 31.491L29.509 40.891A2.7 2.7 0 0 1 29.509 44.709L20.109 54.109A2.7 2.7 0 0 1 16.291 50.291L23.782 42.8L16.291 35.309A2.7 2.7 0 0 1 20.109 31.491ZM33.4 49.5H45.8A2.7 2.7 0 0 1 45.8 54.9H33.4A2.7 2.7 0 0 1 33.4 49.5Z" />
+            android:pathData="M32 4A9 9 0 0 1 41 12.8A14 14 0 0 0 49.91 25.55A8 8 0 0 1 55 33V51A9 9 0 0 1 46 60H18A9 9 0 0 1 9 51V33A8 8 0 0 1 14.09 25.55A14 14 0 0 0 23 12.8A9 9 0 0 1 32 4ZM32 9.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2ZM20.109 31.491L29.509 40.891A2.7 2.7 0 0 1 29.509 44.709L20.109 54.109A2.7 2.7 0 0 1 16.291 50.291L23.782 42.8L16.291 35.309A2.7 2.7 0 0 1 20.109 31.491ZM33.4 49.5H45.8A2.7 2.7 0 0 1 45.8 54.9H33.4A2.7 2.7 0 0 1 33.4 49.5Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="0"
+                    android:startY="4"
+                    android:endX="0"
+                    android:endY="60">
+                    <item android:offset="0" android:color="#FFFCDC72" />
+                    <item android:offset="0.45" android:color="#FFF2C230" />
+                    <item android:offset="1" android:color="#FFD99D12" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <group>
+            <clip-path android:pathData="M32 4A9 9 0 0 1 41 12.8A14 14 0 0 0 49.91 25.55A8 8 0 0 1 55 33V51A9 9 0 0 1 46 60H18A9 9 0 0 1 9 51V33A8 8 0 0 1 14.09 25.55A14 14 0 0 0 23 12.8A9 9 0 0 1 32 4Z" />
+            <path
+                android:pathData="M32 4A9 9 0 0 1 41 12.8A14 14 0 0 0 49.91 25.55A8 8 0 0 1 55 33V51A9 9 0 0 1 46 60H18A9 9 0 0 1 9 51V33A8 8 0 0 1 14.09 25.55A14 14 0 0 0 23 12.8A9 9 0 0 1 32 4Z"
+                android:strokeWidth="1.6">
+                <aapt:attr name="android:strokeColor">
+                    <gradient
+                        android:type="linear"
+                        android:startX="0"
+                        android:startY="4"
+                        android:endX="0"
+                        android:endY="34">
+                        <item android:offset="0" android:color="#B3FFFFFF" />
+                        <item android:offset="1" android:color="#00FFFFFF" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
     </group>
 </vector>

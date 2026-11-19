@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The alert icon: the launcher's ear tag (ic_launcher_foreground.xml) alone,
      in white with the prompt and the hole cut out: Android draws small icons
-     from alpha. -->
+     from alpha. Raised 1.5 units, as the launcher tag is. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="64"
     android:viewportHeight="64">
+    <group android:translateY="-1.5">
     <path
         android:fillColor="#FFFFFFFF"
         android:fillType="evenOdd"
         android:pathData="M32 4A9 9 0 0 1 41 12.8A14 14 0 0 0 49.91 25.55A8 8 0 0 1 55 33V51A9 9 0 0 1 46 60H18A9 9 0 0 1 9 51V33A8 8 0 0 1 14.09 25.55A14 14 0 0 0 23 12.8A9 9 0 0 1 32 4ZM32 9.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2ZM20.109 31.491L29.509 40.891A2.7 2.7 0 0 1 29.509 44.709L20.109 54.109A2.7 2.7 0 0 1 16.291 50.291L23.782 42.8L16.291 35.309A2.7 2.7 0 0 1 20.109 31.491ZM33.4 49.5H45.8A2.7 2.7 0 0 1 45.8 54.9H33.4A2.7 2.7 0 0 1 33.4 49.5Z" />
+    </group>
 </vector>

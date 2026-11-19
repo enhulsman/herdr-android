@@ -1547,12 +1547,8 @@ async fn a_test_request_writes_a_new_test_value() {
     .await;
 
     rig.hub.send_test(WS).unwrap();
-    core.doc_call(
-        "doc.get",
-        "kudde-push",
-        json!({"value": doc, "version": 5}),
-    )
-    .await;
+    core.doc_call("doc.get", "kudde-push", json!({"value": doc, "version": 5}))
+        .await;
     let set = core
         .doc_call("doc.set", "kudde-push", json!({"version": 6}))
         .await;
@@ -1617,12 +1613,8 @@ async fn turning_alerts_off_takes_the_entry_back() {
 
     rig.hub.set_push(None);
     assert_eq!(alerts(&rig.hub.snapshot()), None);
-    core.doc_call(
-        "doc.get",
-        "kudde-push",
-        json!({"value": doc, "version": 5}),
-    )
-    .await;
+    core.doc_call("doc.get", "kudde-push", json!({"value": doc, "version": 5}))
+        .await;
     let set = core
         .doc_call("doc.set", "kudde-push", json!({"version": 6}))
         .await;
@@ -1681,12 +1673,8 @@ async fn a_second_endpoint_change_mid_write_leaves_only_the_latest() {
 
     // The first change reads the document and sends its write ...
     rig.hub.set_push(Some(registration(UP_NEW)));
-    core.doc_call(
-        "doc.get",
-        "kudde-push",
-        json!({"value": old, "version": 5}),
-    )
-    .await;
+    core.doc_call("doc.get", "kudde-push", json!({"value": old, "version": 5}))
+        .await;
     let set = core.request().await;
     assert_eq!(set["method"], "doc.set", "{set}");
     assert_eq!(

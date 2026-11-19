@@ -9,10 +9,10 @@
 use super::HubCore;
 use super::chat_core::{ChatCore, Kind, Read, Row, Term};
 use base64::Engine;
+use herdr_proto::rpc::{CallError, Client, Stream, StreamItem};
 use kudde_chat::locate::{self, Lookup};
 use kudde_chat::send::{self, Refusal, Seen};
 use kudde_chat::{Agent, Health, Image, Item, image, tail};
-use herdr_proto::rpc::{CallError, Client, Stream, StreamItem};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

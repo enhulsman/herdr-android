@@ -11,7 +11,7 @@ import uniffi.kudde_mobile.PushRegistration
  * The UnifiedPush receiver (alerts spec, "Alerts arrive through UnifiedPush,
  * not Google"): the distributor starts it with the app closed. A new endpoint
  * is stored and handed to the hub, which writes it into each machine's
- * `hdroid-push` at once if connected, else at the next connection; messages,
+ * `kudde-push` at once if connected, else at the next connection; messages,
  * decrypted by the connector with its web-push keys, go to [Alerts].
  */
 class KuddePushService : PushService() {

@@ -17,7 +17,7 @@ pub(super) fn is_start_read(req: &Value) -> bool {
 /// A machine with no layout and a check that finds nothing.
 pub(super) fn quiet_answer(req: &Value) -> Value {
     if req["method"] == "machine.exec" {
-        exec_out("herdr-home:/home/dev\nherdr-done\n", Some(0))
+        exec_out("kudde-home:/home/dev\nkudde-done\n", Some(0))
     } else {
         json!({"value": null, "version": 0})
     }
@@ -30,11 +30,11 @@ fn exec_out(stdout: &str, code: Option<i32>) -> Value {
 }
 
 fn found(words: &[&str]) -> Value {
-    let mut out = String::from("herdr-home:/home/dev\n\x1b]0;zsh\x07");
+    let mut out = String::from("kudde-home:/home/dev\n\x1b]0;zsh\x07");
     for w in words {
-        out.push_str(&format!("herdr-has:{w}\n"));
+        out.push_str(&format!("kudde-has:{w}\n"));
     }
-    out.push_str("herdr-done\n");
+    out.push_str("kudde-done\n");
     exec_out(&out, Some(0))
 }
 
@@ -253,7 +253,7 @@ async fn a_failed_check_offers_terminal_only_and_runs_again_when_the_sheet_opens
         vec![],
         layout(),
         exec_out(
-            "herdr-home:/home/dev\nfish: Unsupported use of 'do'.\n",
+            "kudde-home:/home/dev\nfish: Unsupported use of 'do'.\n",
             Some(127),
         ),
     )

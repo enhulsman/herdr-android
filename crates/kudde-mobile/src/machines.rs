@@ -31,7 +31,7 @@ pub struct Machine {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_connected_ms: Option<u64>,
     /// The push endpoint this phone last wrote into the machine's
-    /// `hdroid-push` (hub/push.rs); not exported.
+    /// `kudde-push` (hub/push.rs); not exported.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub push_endpoint: Option<String>,
 }

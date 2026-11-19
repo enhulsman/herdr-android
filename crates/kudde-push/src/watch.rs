@@ -98,7 +98,7 @@ pub struct Watcher {
     status: Status,
     /// Per endpoint, the last `test` value answered.
     tests: BTreeMap<String, Value>,
-    /// Endpoints seen in `hdroid-push` before: a new one is sent the alerts
+    /// Endpoints seen in `kudde-push` before: a new one is sent the alerts
     /// still open, which went out before it registered.
     known: BTreeSet<String>,
     canary_at: Option<u64>,

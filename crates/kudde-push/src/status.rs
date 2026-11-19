@@ -1,4 +1,4 @@
-//! The `hdroid-push-status` document (alerts spec, "Delivery status is shown as
+//! The `kudde-push-status` document (alerts spec, "Delivery status is shown as
 //! what it is"): what ntfy last answered, per phone, and notes. "Accepted" is
 //! all the watcher can know; it never claims a push was delivered.
 
@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::deliver::Outcome;
 
-pub const DOC: &str = "hdroid-push-status";
+pub const DOC: &str = "kudde-push-status";
 
 /// Rewritten at least this often, so a stale status shows its age.
 pub const REFRESH_MS: u64 = 30 * 60 * 1000;

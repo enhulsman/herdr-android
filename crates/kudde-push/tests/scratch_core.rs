@@ -230,7 +230,7 @@ fn both_document_names_pass_the_cores_rule() {
             return;
         };
         let c = core.client().await;
-        for name in ["hdroid-push", "hdroid-push-status"] {
+        for name in ["kudde-push", "kudde-push-status"] {
             watch::write_doc(&c, name, json!({"x": 1}))
                 .await
                 .unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -249,7 +249,7 @@ fn a_blocked_agent_alerts_clears_and_reports_its_status() {
         let c = core.client().await;
         let phone = json!({"endpoint": ENDPOINT, "p256dh": UA_PUBLIC, "auth": AUTH,
                            "machine": "workstation"});
-        watch::write_doc(&c, "hdroid-push", json!({"phones": [phone.clone()]}))
+        watch::write_doc(&c, "kudde-push", json!({"phones": [phone.clone()]}))
             .await
             .unwrap();
 
@@ -319,7 +319,7 @@ fn a_blocked_agent_alerts_clears_and_reports_its_status() {
         // "Send test alert" from the phone.
         let mut asked = phone.clone();
         asked["test"] = json!("1");
-        watch::write_doc(&c, "hdroid-push", json!({"phones": [asked]}))
+        watch::write_doc(&c, "kudde-push", json!({"phones": [asked]}))
             .await
             .unwrap();
         rec.until("test").await;
@@ -327,7 +327,7 @@ fn a_blocked_agent_alerts_clears_and_reports_its_status() {
         let status = tokio::time::timeout(WAIT, async {
             loop {
                 let s = c
-                    .call("doc.get", json!({"name": "hdroid-push-status"}))
+                    .call("doc.get", json!({"name": "kudde-push-status"}))
                     .await
                     .unwrap();
                 if s["value"]["endpoints"][ENDPOINT]["status"] == "accepted 200" {
@@ -383,7 +383,7 @@ fn a_phone_registering_after_the_block_still_gets_the_alert_once() {
 
         let phone = json!({"endpoint": ENDPOINT, "p256dh": UA_PUBLIC, "auth": AUTH,
                            "machine": "workstation"});
-        watch::write_doc(&c, "hdroid-push", json!({"phones": [phone]}))
+        watch::write_doc(&c, "kudde-push", json!({"phones": [phone]}))
             .await
             .unwrap();
         let alert = rec.until("alert blocked").await;

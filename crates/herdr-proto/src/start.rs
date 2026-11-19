@@ -191,9 +191,9 @@ pub fn fresh_space_id() -> String {
 
 // ---- the installed-agents check (design D5)
 
-const HOME_MARK: &str = "herdr-home:";
-const HAS_MARK: &str = "herdr-has:";
-const DONE_MARK: &str = "herdr-done";
+const HOME_MARK: &str = "kudde-home:";
+const HAS_MARK: &str = "kudde-has:";
+const DONE_MARK: &str = "kudde-done";
 
 /// `machine.exec` argv: home from the outer `sh`, then each `words` entry the
 /// person's interactive shell finds (aliases count), then a done marker.

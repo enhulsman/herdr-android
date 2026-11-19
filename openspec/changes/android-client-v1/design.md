@@ -131,7 +131,7 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
   if the state moves on. The last alerted `(state, turn)` per terminal is
   persisted; on start the watcher alerts for blocked terminals never alerted,
   and after `missed` it diffs a fresh snapshot against that record.
-- **Registration:** the phone writes `hdroid-push` on each machine:
+- **Registration:** the phone writes `kudde-push` on each machine:
   `{phones: [{endpoint, p256dh, auth, machine, test?}]}`. `machine` is the
   phone's own name for that machine, echoed in each push as `machine`, so the
   phone knows which of its machines spoke without the watcher knowing its names. Doc names satisfy herdr-core's
@@ -152,7 +152,7 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
   than its arrival (issue #22).
 - **Health:** a canary push every 6 hours (the first at once on a fresh install); the phone records the last push of
   any kind per machine and a local periodic check posts a quiet "Alert health"
-  notice after 13 hours of silence. The watcher writes `hdroid-push-status`
+  notice after 13 hours of silence. The watcher writes `kudde-push-status`
   (`{version, last_push_at, last_push_status, endpoints: {endpoint: {status, at}}, notes}`;
   `last_push_*` is the last answer from ntfy, accepted or refused; an endpoint's
   status is `accepted 200`, `refused 403`, `failed: ...` or `ignored: host not allowed`)
@@ -191,7 +191,7 @@ the doc are normalised (`t7` and `<this core>/t7` resolve to the same terminal).
 
 Upstream: no questions asked (maintainers rarely answer Discussions; see
 `decisions.md`). The spec assumes no upstream change and relies, unconfirmed, on
-the client-owned flat doc name `hdroid-push` and on a grace delay instead of
+the client-owned flat doc name `kudde-push` and on a grace delay instead of
 viewer presence.
 
 Spikes, all answered in M0 (`decisions.md`, 2026-11-01): libghostty on the Pixel

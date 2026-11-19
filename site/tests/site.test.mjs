@@ -578,6 +578,249 @@ describe('The home page content', () => {
 });
 
 describe('The 404 page', () => {
+  const art = '[data-flock-scene]';
+  // Each visible foot of the lost sheep must stand on the letter ink right
+  // beneath it: no hovering over lower x-height letters, no sinking into them.
+  // The heading is photographed with the sheep hidden, and every pixel column
+  // under each foot is scanned for its first dark pixel.
+  async function restingPlace(page) {
+    const feet = await page.evaluate(() => {
+      const matrix = document.querySelector('[data-lost-sheep] use').getScreenCTM();
+      return [...document.querySelectorAll('#flock-sheep [data-leg]')].map((leg) => {
+        const b = leg.getBBox();
+        const [p, q] = [b.x, b.x + b.width].map((x) => new DOMPoint(x, b.y + b.height).matrixTransform(matrix));
+        return { left: Math.min(p.x, q.x), right: Math.max(p.x, q.x), y: (p.y + q.y) / 2 };
+      });
+    });
+    assert.equal(feet.length, 2, 'two visible feet');
+    const h1 = await page.locator('h1').boundingBox();
+    const clip = { x: Math.floor(h1.x), y: Math.floor(Math.min(...feet.map((f) => f.y)) - 24), width: Math.ceil(h1.width), height: 64 };
+    const scene = page.locator('[data-flock-scene]');
+    await scene.evaluate((el) => { el.style.visibility = 'hidden'; });
+    const png = await page.screenshot({ clip, scale: 'css' });
+    await scene.evaluate((el) => { el.style.removeProperty('visibility'); });
+    // Decode on a blank page: the site's CSP rightly refuses data: images.
+    const blank = await page.context().newPage();
+    const tops = await blank.evaluate(async ({ b64, clip, feet }) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const ctx = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height }).getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const px = ctx.getImageData(0, 0, img.width, img.height).data;
+      const inkTop = (x) => {
+        for (let y = 0; y < img.height; y++) {
+          const i = (y * img.width + x) * 4;
+          if (px[i] + px[i + 1] + px[i + 2] < 3 * 140) return clip.y + y;
+        }
+        return null;
+      };
+      return feet.map((f) => {
+        const cols = [];
+        for (let x = Math.ceil(f.left) - clip.x; x < Math.floor(f.right) - clip.x; x++) cols.push(inkTop(x));
+        return cols;
+      });
+    }, { b64: png.toString('base64'), clip, feet });
+    await blank.close();
+    feet.forEach((foot, i) => {
+      const where = `foot ${i + 1} at x ${foot.left.toFixed(1)}-${foot.right.toFixed(1)}, y ${foot.y.toFixed(1)}; ink tops ${JSON.stringify(tops[i])}`;
+      const ink = tops[i].filter((t) => t !== null);
+      assert.ok(ink.length > 0, `letter ink under ${where}`);
+      assert.ok(Math.abs(foot.y - Math.min(...ink)) <= 3, `rests on the highest ink beneath it: ${where}`);
+      assert.ok(ink.filter((t) => Math.abs(t - foot.y) <= 4).length * 2 >= tops[i].length, `most of the foot is supported: ${where}`);
+    });
+  }
+
+  async function visibleSheep(page) {
+    const sheep = page.locator('[data-flock-slot] use, [data-lost-sheep] use');
+    assert.equal(await sheep.count(), 100);
+    const visible = await sheep.evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect();
+      // What is left of the sheep after the viewport and every clipping
+      // ancestor (overflow, contain: paint, an inner svg's own box) cut it.
+      let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+      for (let ancestor = el; ancestor; ancestor = ancestor.parentElement) {
+        const cs = getComputedStyle(ancestor);
+        if (cs.display === 'none' || cs.visibility !== 'visible' || Number(cs.opacity) === 0) return false;
+        // A clip-path or mask could hide any part of it; do not guess.
+        if (cs.clipPath !== 'none' || cs.maskImage !== 'none' || (cs.clip !== 'auto' && cs.position === 'absolute')) return false;
+        if (ancestor !== el && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible' || /paint|strict|content/.test(cs.contain))) {
+          const a = ancestor.getBoundingClientRect();
+          clip = { left: Math.max(clip.left, a.left), top: Math.max(clip.top, a.top), right: Math.min(clip.right, a.right), bottom: Math.min(clip.bottom, a.bottom) };
+        }
+      }
+      const shown = Math.max(0, Math.min(r.right, clip.right) - Math.max(r.left, clip.left))
+        * Math.max(0, Math.min(r.bottom, clip.bottom) - Math.max(r.top, clip.top));
+      if (shown < .9 * r.width * r.height) return false;
+      const cs = getComputedStyle(el);
+      return r.width > 12 && r.height > 12 && cs.fill !== 'none' && cs.fill !== 'rgba(0, 0, 0, 0)'
+        && Number(cs.fillOpacity) > 0 && [...(document.querySelector(el.getAttribute('href'))?.querySelectorAll('g, path, ellipse') ?? [])]
+          .some((shape) => {
+            for (let node = shape; node?.closest('symbol'); node = node.parentElement) {
+              const style = getComputedStyle(node);
+              if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0) return false;
+            }
+            const style = getComputedStyle(shape);
+            return shape instanceof SVGGeometryElement && style.fill !== 'none' && style.fill !== 'rgba(0, 0, 0, 0)' && Number(style.fillOpacity) > 0;
+          });
+    }));
+    assert.ok(visible.every(Boolean), 'every rendered sheep has visible ink and area');
+  }
+
+  test('the approved copy and destinations are exact', async () => {
+    const { page, context } = await open(MISSING);
+    assert.equal(await page.title(), 'Page not found · kudde');
+    assert.equal(await page.locator('meta[name="description"]').getAttribute('content'), 'This page is not on kudde.dev.');
+    assert.equal(await page.locator('h1').innerText(), 'Oops. One got away again.');
+    assert.equal(await page.locator('main .lede').innerText(), 'Ninety-nine pages are right where they should be. This isn’t one of them. The link may be old, or the address may have a typo.');
+    assert.equal(await page.locator('main .btn.ink').innerText(), 'Back to the herd');
+    assert.equal(await page.locator('main .btn.ink').getAttribute('href'), '/');
+    assert.equal(await page.locator('main .textlink').innerText(), 'Install kudde');
+    assert.equal(await page.locator('main .textlink').getAttribute('href'), '/install');
+    await context.close();
+  });
+
+  for (const viewport of [DESKTOP, PHONE]) {
+    test(`a visible 10 by 10 flock with one real gap at ${viewport.width}`, async () => {
+      const { page, context } = await open(MISSING, { viewport, reducedMotion: 'reduce' });
+      const slots = page.locator('[data-flock-slot]');
+      assert.equal(await slots.count(), 100);
+      assert.equal(await slots.locator('use[href="#flock-sheep"]').count(), 99);
+      const gap = page.locator('[data-flock-gap]');
+      assert.equal(await gap.count(), 1);
+      assert.equal(await gap.locator('*').count(), 0, 'gap is empty, with no hidden sheep');
+      assert.ok(await gap.isVisible());
+      const positions = await slots.evaluateAll((els) => els.map((el) => {
+        const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+        return { x: Math.round(r.x), y: Math.round(r.y), w: r.width, h: r.height, visible: cs.visibility === 'visible' && cs.opacity === '1' };
+      }));
+      assert.equal(new Set(positions.map((r) => r.x)).size, 10);
+      assert.equal(new Set(positions.map((r) => r.y)).size, 10);
+      assert.ok(positions.every((r) => r.w > 0 && r.h > 0 && r.visible));
+      const grid = await page.locator('[data-flock]').boundingBox();
+      assert.ok(grid.x >= 0 && grid.x + grid.width <= viewport.width);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (viewport.width === 375) {
+        const sheep = await slots.locator('svg').first().boundingBox();
+        assert.ok(sheep.width >= 16 && sheep.width <= 24, `phone sheep width: ${sheep.width}`);
+      }
+      const colours = await slots.locator('svg').evaluateAll((els) => els.map((el) => getComputedStyle(el).color));
+      assert.ok(colours.every((c) => c === 'rgb(28, 30, 27)'), 'graphite flock');
+      assert.equal(await page.locator('symbol#flock-sheep').count(), 1, 'one reusable sheep');
+      assert.equal(await page.locator('[data-lost-sheep]').count(), 1);
+      assert.equal(await page.locator('[data-ear-tag] text').textContent(), '404');
+      assert.equal(await page.locator('[data-ear-tag] [data-tag-body]').getAttribute('fill'), 'url(#litTag)');
+      await visibleSheep(page);
+      const tag = await page.locator('[data-ear-tag]').evaluate((el) => {
+        const text = el.querySelector('text'); const m = text.getScreenCTM();
+        const r = el.querySelector('[data-tag-body]').getBoundingClientRect();
+        return { font: parseFloat(getComputedStyle(text).fontSize) * Math.hypot(m.c, m.d), w: r.width, h: r.height };
+      });
+      assert.ok(tag.font >= 10, `404 digits: ${tag.font} CSS px`);
+      assert.ok(tag.w <= 30 && tag.h <= 36, 'tag stays a small ear object');
+      await restingPlace(page);
+      await context.close();
+    });
+
+    test(`reduced motion keeps the decorative sheep on the heading at ${viewport.width}`, async () => {
+      const { page, context } = await open(MISSING, { viewport, reducedMotion: 'reduce' });
+      const decorations = '[data-flock], [data-flock-scene]';
+      for (const root of await page.locator(decorations).all()) {
+        assert.equal(await root.getAttribute('aria-hidden'), 'true');
+        assert.equal(await root.evaluate((el) => el.matches('a, button, input, select, textarea, [contenteditable], [tabindex]')), false, 'decoration root cannot receive focus');
+        assert.equal(await root.locator('a, button, input, select, textarea, [contenteditable], [tabindex], svg:not([focusable="false"])').count(), 0);
+        assert.deepEqual(await root.evaluate((el) => el.getAnimations({ subtree: true }).map((a) => a.playState)), []);
+      }
+      await restingPlace(page);
+      await context.close();
+    });
+
+    test(`the sheep hops toward the gap, overshoots and turns away once at ${viewport.width}`, { timeout: 15000 }, async () => {
+      const { page, context } = await open(MISSING, { viewport });
+      const timings = await page.locator(art).evaluate((el) => el.getAnimations({ subtree: true })
+        .map((a) => ({ iterations: a.effect.getTiming().iterations, duration: a.effect.getTiming().duration })));
+      // Reject infinite/invalid motion before touching Animation.finished.
+      assert.ok(timings.length > 0);
+      assert.ok(timings.every((t) => t.iterations === 1 && t.duration >= 3000 && t.duration <= 5000));
+      const motion = await page.locator(art).evaluate(async (el) => {
+        const animations = el.getAnimations({ subtree: true });
+        const lost = el.querySelector('[data-lost-sheep]');
+        const gap = document.querySelector('[data-flock-gap]').getBoundingClientRect();
+        const facing = el.querySelector('[data-sheep-facing]');
+        const samples = [];
+        for (const fraction of [0, .18, .30, .46, .62, .68, .74, .80, .86, .94, 1]) {
+          for (const a of animations) { a.pause(); a.currentTime = a.effect.getTiming().duration * fraction; }
+          const r = lost.getBoundingClientRect();
+          const m = new DOMMatrix(getComputedStyle(lost).transform);
+          samples.push({ x: r.x + r.width / 2, y: r.y + r.height / 2,
+            angle: Math.atan2(m.b, m.a), facing: new DOMMatrix(getComputedStyle(facing).transform).a });
+        }
+        for (const a of animations) { a.currentTime = 0; a.play(); }
+        let timer;
+        try {
+          await Promise.race([
+            Promise.all(animations.map((a) => a.finished)),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('404 motion did not finish')), 6000); }),
+          ]);
+        } finally { clearTimeout(timer); }
+        return { samples, gap: { x: gap.x + gap.width / 2, y: gap.y + gap.height / 2 }, states: animations.map((a) => a.playState) };
+      });
+      assert.ok(motion.states.every((s) => s === 'finished'));
+      const [start, look, airborne, hop, overshoot, hold1, hold2, turned, returning, landed, end] = motion.samples;
+      const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      const toward = viewport.width === 375 ? 1 : -1;
+      assert.equal(Math.sign(start.facing), toward);
+      assert.ok(Math.abs(look.angle) >= .1 && Math.sign(look.angle) === toward, 'looks down toward gap');
+      assert.ok(distance(airborne, start) > 20 && distance(airborne, motion.gap) < distance(start, motion.gap), 'hops toward gap');
+      assert.ok(distance(hop, motion.gap) <= 5, 'actually reaches gap centre');
+      const axis = viewport.width === 375 ? 'y' : 'x';
+      assert.ok(overshoot[axis] <= motion.gap[axis] - 24, 'overshoots by a visible distance');
+      for (const hold of [hold1, hold2, turned]) assert.ok(distance(overshoot, hold) <= 1, 'stops throughout look-around and turn');
+      assert.equal(Math.sign(overshoot.facing), toward);
+      assert.equal(Math.sign(hold1.facing), -toward, 'looks around while stopped');
+      assert.equal(Math.sign(hold2.facing), toward, 'looks back while stopped');
+      assert.equal(Math.sign(turned.facing), -toward, 'turns away before moving');
+      assert.ok(distance(returning, overshoot) > 12 && distance(returning, start) < distance(overshoot, start), 'moves the wrong way after turning');
+      assert.equal(Math.sign(returning.facing), -toward);
+      assert.equal(Math.sign(end.facing), -toward);
+      assert.ok(distance(landed, end) <= 1 && distance(start, end) <= 1, 'lands and stays still');
+      await restingPlace(page);
+      await page.waitForTimeout(150);
+      await restingPlace(page);
+      assert.ok(await page.locator(art).evaluate((el) => el.getAnimations({ subtree: true }).every((a) => a.playState === 'finished')), 'stays finished');
+      await context.close();
+    });
+  }
+
+  test('yellow remains a small tag and never a background in main', async () => {
+    const { page, context } = await open(MISSING, { reducedMotion: 'reduce' });
+    const violations = await page.locator('main, main *').evaluateAll((els) => {
+      // Include lit shades and gradients rather than only exact flat yellow.
+      const yellow = (paint) => [...paint.matchAll(/rgba?\(([^)]+)\)/g)].some((m) => {
+        const [r, g, b, alpha = 1] = m[1].split(/[,\s/]+/).map(Number);
+        return alpha > 0 && r > 160 && g > 110 && r > g && g > b * 1.3;
+      });
+      const svgYellow = (fill) => {
+        if (yellow(fill)) return true;
+        const id = fill.match(/#([^"')]+)/)?.[1];
+        return id && [...(document.getElementById(id)?.querySelectorAll('stop') ?? [])]
+          .some((stop) => yellow(getComputedStyle(stop).stopColor));
+      };
+      return els.flatMap((el) => {
+        const cs = getComputedStyle(el); const r = el.getBoundingClientRect();
+        const backgrounds = [cs, getComputedStyle(el, '::before'), getComputedStyle(el, '::after')];
+        if (backgrounds.some((s) => yellow(s.backgroundColor) || yellow(s.backgroundImage))) return ['yellow background'];
+        if (el instanceof SVGGraphicsElement && svgYellow(cs.fill) && r.width > 0 && r.height > 0
+          && (!el.closest('[data-ear-tag]') || r.width > 30 || r.height > 36)) return ['yellow outside small tag'];
+        return [];
+      });
+    });
+    assert.deepEqual(violations, []);
+    assert.equal(await page.locator('main [style], main script:not([src])').count(), 0);
+    assert.deepEqual(await page.evaluate(() => window.__csp), []);
+    await context.close();
+  });
+
   test('an unknown path answers 404 with the site’s own page', async () => {
     const res = await fetch(base + MISSING);
     assert.equal(res.status, 404);

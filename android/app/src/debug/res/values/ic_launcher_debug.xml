@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The release icon's colours swapped (main/res/values/ic_launcher.xml). -->
-    <color name="ic_launcher_debug_background">#F2C230</color>
+    <!-- Graphite, the release tag's ink, for the outline on the yellow tile. -->
     <color name="ic_launcher_debug_foreground">#1C1E1B</color>
 </resources>

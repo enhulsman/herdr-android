@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The ivory tile of design/renders/icons/herdr.svg. -->
-    <color name="ic_launcher_background">#F4F1E9</color>
+    <!-- Graphite, the ear tag's ink (design/brand/README.md). -->
+    <color name="ic_launcher_background">#1C1E1B</color>
 </resources>

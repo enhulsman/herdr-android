@@ -49,5 +49,3 @@ release archives (renamed only, as Android resource names must be lowercase).
   Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part
   of Feather (MIT); all other copyright (c) for Lucide are held by Lucide
   Contributors 2022), drawn in the app from their paths.
-- The app's launcher icon (`android/app/src/main/res/drawable/ic_launcher_foreground.xml`)
-  is the ram from herdr's logo (Apache-2.0), via `design/renders/icons/herdr.svg`.

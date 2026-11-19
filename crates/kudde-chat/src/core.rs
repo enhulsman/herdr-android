@@ -9,25 +9,25 @@ use crate::{Agent, Gauge, Health, Item, Key, Parser, keep_keys};
 
 /// The first open reads at most this much of the log's end; so does a
 /// return after more than this was written.
-pub const FIRST_BUDGET: u64 = 2_000_000;
+const FIRST_BUDGET: u64 = 2_000_000;
 /// A read back starts this far before the oldest line held, doubled while a
 /// single line is longer.
-pub const OLDER_BUDGET: u64 = 2_000_000;
+const OLDER_BUDGET: u64 = 2_000_000;
 /// No read spans more than the tail script's limit, nor less: a record the
 /// script does not skip must fit one read.
-pub use crate::tail::READ_MAX;
+use crate::tail::READ_MAX;
 /// With the same process in front, the log is looked up again this often (milliseconds).
-pub const RELOCATE: u64 = 10_000;
+const RELOCATE: u64 = 10_000;
 /// After a `/` command, every poll looks the log up for this many milliseconds; a turn
 /// starting this soon after a `/` or `!` command is not held to the
 /// per-turn rule; and a turn's end is judged on the lines read this long
 /// after it.
-pub const RELOOK: u64 = 5_000;
-pub const TURN_GRACE: u64 = 5_000;
+const RELOOK: u64 = 5_000;
+const TURN_GRACE: u64 = 5_000;
 
-pub const FAILED_READ: &str = "Can't read new messages; retrying";
-pub const SKIPPED: &str = "A message too large to show was skipped";
-pub const OLDER_FAILED: &str = "Earlier messages could not be loaded";
+const FAILED_READ: &str = "Can't read new messages; retrying";
+const SKIPPED: &str = "A message too large to show was skipped";
+const OLDER_FAILED: &str = "Earlier messages could not be loaded";
 /// [`crate::locate::lookup`]'s reason when the desk did not answer.
 const NO_ANSWER: &str = "the desk did not answer";
 

@@ -1,6 +1,6 @@
 //! The chat's state, driven with made-up terminals, lookups and reads
 //! (chat-view spec: lookup, /clear, exit, bounded reading, live updates,
-//! held chats, health guard; design D3, D5, D6, D12).
+//! health guard; design D3, D5, D6, D12).
 
 use super::*;
 use crate::tail::Chunk;

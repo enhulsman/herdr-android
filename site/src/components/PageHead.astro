@@ -1,0 +1,11 @@
+---
+// The opening of an inner page: the h1 and a lede.
+interface Props { title: string }
+const { title } = Astro.props;
+---
+<div class="page-head">
+  <div class="wrap">
+    <h1 class="display">{title}</h1>
+    <p class="lede"><slot /></p>
+  </div>
+</div>

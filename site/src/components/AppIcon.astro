@@ -1,0 +1,14 @@
+---
+// The lit app icon: the A1 tag on graphite, lit from above, prompt cut out.
+import { TAG, HOLE, PROMPT_CUT } from '../lib/tag.js';
+interface Props { class?: string }
+const { class: cls } = Astro.props;
+---
+<svg class={cls} viewBox="0 0 108 108" aria-hidden="true" focusable="false">
+  <rect width="108" height="108" fill="url(#icBgGrad)" />
+  <g transform="translate(23 20.5) scale(.96875)">
+    <g transform="translate(32 61) scale(24 4.5)"><circle r="1" fill="url(#icSh)" /></g>
+    <path fill="url(#litTag)" fill-rule="evenodd" d={`${TAG}${HOLE}${PROMPT_CUT}`} />
+    <path clip-path="url(#tagClip)" fill="none" stroke="url(#litRim)" stroke-width="1.6" d={TAG} />
+  </g>
+</svg>

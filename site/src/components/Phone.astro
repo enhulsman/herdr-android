@@ -1,0 +1,62 @@
+---
+// The kudde agent list, rebuilt in HTML from the app's tokens (412 x 912 dp
+// screen drawn at 0.68). Invented names only: website, api, docs; workstation,
+// server. The whole phone is one labelled image.
+---
+<div class="phone" role="img" aria-label="The kudde app on a phone: a list of agents on your own machines." data-phone>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><g id="agentGlyph" fill="#d97757"><path d="M3 4h14v9H3z"/><path d="M1 8h2v3H1zM17 8h2v3h-2zM4 13h2v3H4zM7 13h2v3H7zM11 13h2v3h-2zM14 13h2v3h-2z"/><path d="M6 7h2v2H6zM12 7h2v2h-2z" fill="#101114"/></g></defs></svg>
+  <div class="screen"><div class="app">
+    <div class="status"><span>9:41</span><i></i><svg viewBox="0 0 44 12" fill="#d2d4d9"><path d="M1 9.5 10 1.5v8zM16 4.2a7 7 0 0 1 10 0l-5 5.6z"/><rect x="31" y="1.5" width="12" height="9" rx="2"/></svg></div>
+    <div class="bar"><div class="title">Agents</div><svg viewBox="0 0 22 22"><path d="M11 3.5v15M3.5 11h15"/></svg><svg viewBox="0 0 22 22"><rect x="3" y="3.5" width="16" height="6.2" rx="2"/><rect x="3" y="12.3" width="16" height="6.2" rx="2"/></svg></div>
+    <div class="sec needs">Needs you <em>1</em></div>
+    <div class="card"><div class="row"><svg class="agent" viewBox="0 0 20 20"><use href="#agentGlyph"/></svg><div class="txt"><b>Pricing page copy</b><span>website / 2 · workstation</span></div><time>4m</time></div><div class="ask"><b>Permission</b><code>approve plan</code></div></div>
+    <div class="sec done">Done <em>1</em></div>
+    <div class="row"><svg class="agent" viewBox="0 0 20 20"><use href="#agentGlyph"/></svg><div class="txt"><b>api tests</b><span>api · server</span></div><time>12m</time><i class="st dot"></i></div>
+    <div class="sec working">Working <em>2</em></div>
+    <div class="row"><svg class="agent" viewBox="0 0 20 20"><use href="#agentGlyph"/></svg><div class="txt"><b>Docs sidebar</b><span>docs · workstation</span></div><time>&lt;1m</time><i class="st spin"></i></div>
+    <div class="row"><svg class="agent" viewBox="0 0 20 20"><use href="#agentGlyph"/></svg><div class="txt"><b>Build checks</b><span>api · server</span></div><time>3m</time><i class="st spin"></i></div>
+    <div class="sec idle">Idle <em>1</em></div>
+    <div class="row idle"><svg class="agent" viewBox="0 0 20 20"><use href="#agentGlyph"/></svg><div class="txt"><b>Changelog draft</b><span>docs · workstation</span></div><time>1h</time><i class="st ring"></i></div>
+    <div class="other"><span>Other terminals<em>3</em></span><svg viewBox="0 0 14 14"><path d="M5 2.5 9.5 7 5 11.5"/></svg></div>
+    <div class="gesture"></div>
+  </div></div>
+</div>
+
+<style>
+  /* The app's own colours (graphite theme), not the site's: this is a picture of the app. */
+  .phone{width:300px;height:640px;border-radius:var(--radius-phone);background:#1c1e1b;padding:10px;box-shadow:0 30px 60px -30px rgba(28,30,27,.45)}
+  .screen{width:280px;height:620px;border-radius:35px;overflow:hidden;background:#101114;position:relative}
+  .app{width:412px;height:912px;transform:scale(.6796);transform-origin:0 0;background:#101114;color:#eeeeef;font:400 16px/1.25 var(--font-app);position:relative}
+  .status{height:36px;display:flex;align-items:center;justify-content:space-between;padding:6px 24px 0;font-size:13.5px;font-weight:500;color:#d2d4d9}
+  .status i{width:11px;height:11px;border-radius:50%;background:#000;position:absolute;left:50%;top:13px;margin-left:-5.5px}
+  .status svg{width:44px;height:12px}
+  .bar{height:60px;display:flex;align-items:center;padding:0 20px 0 17px;gap:26px}
+  .bar .title{font:600 22px/1 var(--font-app);letter-spacing:-.01em;flex:1;margin:0;color:#eeeeef}
+  .bar svg{width:22px;height:22px;stroke:#aeaeb0;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .sec{height:40px;display:flex;align-items:center;gap:8px;padding:6px 17px 0;font-size:13px;font-weight:500}
+  .sec em{font-style:normal;color:#696a6d;font-weight:400}
+  .sec.needs{color:#f0705f}.sec.done{color:#76a8ff}.sec.working{color:#e5c07b}.sec.idle{color:#696a6d}
+  .row{height:64px;display:flex;align-items:center;padding:0 20px 0 17px}
+  .agent{width:20px;height:20px;flex:none;margin-right:14px}
+  .txt{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .txt b{font-weight:400;font-size:16px}
+  .txt span,time{font-size:13px;color:#696a6d}
+  .row.idle b{color:#98999b}
+  time{margin-right:14px}
+  .st{width:18px;height:18px;display:grid;place-items:center;flex:none}
+  .st.dot::after{content:"";width:9px;height:9px;border-radius:50%;background:#76a8ff}
+  .st.ring::after{content:"";width:9px;height:9px;border-radius:50%;border:1.8px solid #696a6d}
+  .st.spin::after{content:"";width:15px;height:15px;border-radius:50%;border:3.2px solid #e5c07b3d;border-top-color:#e5c07b;transform:rotate(100deg);animation:kspin .9s linear infinite}
+  .card{margin:2px 8px 6px;background:#25272b;border:1px solid #ffffff18;border-radius:14px;padding:12px 14px 13px 13px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#f0705f}
+  .card .row{height:auto;padding:0 0 12px 0}.card .row time{margin-right:0}
+  .ask{background:#131518;border-radius:9px;padding:9px 11px}
+  .ask b{display:block;font-size:12px;font-weight:600;color:#f0705f;margin-bottom:3px}
+  .ask code{font:400 13px/1.45 var(--font-mono);color:#d2d4d9;font-variant-ligatures:none;background:none;padding:0;border-radius:0}
+  .other{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 17px;font-size:13px;color:#696a6d;font-weight:500}
+  .other span em{font-style:normal;font-weight:400;margin-left:6px}
+  .other svg{width:14px;height:14px;stroke:#696a6d;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .gesture{position:absolute;left:50%;bottom:10px;width:112px;height:4px;margin-left:-56px;border-radius:2px;background:#eeeeef66}
+  @keyframes kspin{to{transform:rotate(460deg)}}
+  @media (prefers-reduced-motion: reduce){.st.spin::after{animation:none}}
+</style>

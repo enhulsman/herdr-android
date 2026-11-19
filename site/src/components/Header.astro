@@ -1,0 +1,79 @@
+---
+// Paper header with the colour mark, the page links and the ink "Get kudde"
+// button, closed by the 2px ink rule the hero tag hangs from.
+import Mark from './Mark.astro';
+import { NAV, REPO } from '../lib/site.js';
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+---
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/" data-brand aria-current={path === '/' ? 'page' : undefined}>
+      <Mark size={34} />
+      <span>kudde</span>
+    </a>
+    <nav aria-label="Main">
+      <ul>
+        {NAV.map(({ href, label }) => (
+          <li><a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a></li>
+        ))}
+        <li><a href={REPO}>GitHub</a></li>
+        <li><a class="btn ink" href="/install">Get kudde</a></li>
+      </ul>
+    </nav>
+    <a class="btn ink menu" href="/install">Get kudde</a>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: relative;
+    z-index: 4;
+    background: var(--color-paper);
+    border-bottom: var(--rule-thick) solid var(--color-ink);
+  }
+  .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--header-height);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--touch-min);
+    font: var(--weight-bold) var(--text-2xl) / 1 var(--font-display);
+    letter-spacing: var(--tracking-brand);
+    text-decoration: none;
+  }
+  ul {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-weight: var(--weight-medium);
+    font-size: 16px;
+  }
+  nav a:not(.btn) {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    text-decoration: none;
+  }
+  nav a:not(.btn):hover,
+  nav a[aria-current='page'] {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-thickness: 2px;
+  }
+  nav a:not(.btn):hover { text-decoration-color: var(--color-tag-deep); }
+  .menu { display: none; }
+
+  @media (max-width: 860px) {
+    nav { display: none; }
+    .menu { display: inline-flex; }
+    .brand { font-size: 26px; }
+  }
+</style>

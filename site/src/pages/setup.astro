@@ -1,0 +1,125 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHead from '../components/PageHead.astro';
+import StepMarker from '../components/StepMarker.astro';
+import { REPO, guide } from '../lib/site.js';
+---
+<Base
+  title="Set up kudde"
+  description="Add a machine to kudde, place the phone key on it, and turn on encrypted alerts with kudde-push and your own ntfy server."
+>
+  <PageHead title="Set up kudde.">
+    Three steps, once kudde is on your phone: add a machine, place the phone key on it, and turn on alerts. Not installed yet? Start with <a class="textlink" href="/install">Install</a>.
+  </PageHead>
+
+  <section class="section guide step" aria-labelledby="machine" data-step>
+    <div class="wrap split">
+      <div class="step-head">
+        <StepMarker n={1} current />
+        <h2 class="section-title" id="machine">Add a machine</h2>
+      </div>
+      <div class="prose">
+        <p>In kudde, tap “Add machine” and enter the machine’s address, port and user.</p>
+        <p>Before you go on, compare the host key fingerprint kudde shows with the machine’s own. On the machine, this prints it:</p>
+        <pre><code>ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code></pre>
+        <p>kudde remembers that host key, and a changed key stops the connection.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide step" aria-labelledby="key" data-step>
+    <div class="wrap split">
+      <div class="step-head">
+        <StepMarker n={2} />
+        <h2 class="section-title" id="key">Place the phone key</h2>
+      </div>
+      <div class="prose">
+        <p>kudde made a key for this phone in its secure hardware, and the key never leaves it. Tap “Add the phone key”, then Copy, and get the line to the machine. A note or a message to yourself works: the line is public.</p>
+        <p>On the machine, run this, paste the line, press Enter, then Ctrl-D:</p>
+        <pre><code>mkdir -m 700 -p ~/.ssh && cat &gt;&gt; ~/.ssh/authorized_keys</code></pre>
+        <p>The line lets the key run only <span class="nb">herdr-core</span>: no shell session, no forwarding. <span class="nb">herdr-core</span> can still run commands as that user, so treat the key like a shell login.</p>
+        <p>The first connection starts <span class="nb">herdr-core</span>, so the card may show “Unreachable” once before it connects.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section guide step" aria-labelledby="alerts" data-step>
+    <div class="wrap split">
+      <div class="step-head">
+        <StepMarker n={3} />
+        <h2 class="section-title" id="alerts">Turn on alerts</h2>
+      </div>
+      <div class="prose">
+        <p><code>kudde-push</code> runs on the machine as a systemd user service. It watches <span class="nb">herdr-core</span> and sends an encrypted push when an agent needs you or finishes, through your ntfy server to the ntfy app on the phone.</p>
+        <h3>On the machine</h3>
+        <ol>
+          <li><p>From the <a href={`${REPO}/releases/latest`}>latest release</a>, download the <code>kudde-push</code> for your machine (<code>uname -m</code> names it: <code>kudde-push-x86_64</code> or <code>kudde-push-aarch64</code>), its <code>.sig</code> and <code>SHA256SUMS</code>, and <a href={guide('docs/install.md#checking-kudde-push-on-a-machine')}>check them</a>. Then install it:</p>
+            <pre><code>install -m 755 kudde-push-$(uname -m) ~/.local/bin/kudde-push</code></pre></li>
+          <li><p>Put an ntfy access token in <code>~/.config/kudde-push/ntfy-token</code> (mode 600), for a dedicated ntfy user that may only write to <code>up*</code> topics, never read. On your own ntfy server, as its admin:</p>
+            <pre><code>ntfy user add kudde-push
+ntfy access kudde-push 'up*' write-only
+ntfy token add kudde-push</code></pre>
+            <p>On a server someone else runs, ask its admin for such a user and a token.</p></li>
+          <li><p>Write <code>~/.config/kudde-push/config</code> with the core to watch and the ntfy server pushes may go to:</p>
+            <pre><code># find the socket with ls /run/user/$(id -u)/herdr-core/
+socket = /run/user/1000/herdr-core/default.sock
+allow = https://ntfy.example.org</code></pre></li>
+          <li><p>Install and start the service with the unit file from <a href={guide('contrib/kudde-push.service')}>contrib/kudde-push.service</a>:</p>
+            <pre><code>mkdir -p ~/.config/systemd/user
+curl -fsSL -o ~/.config/systemd/user/kudde-push.service \
+  https://raw.githubusercontent.com/enhulsman/kudde/main/contrib/kudde-push.service
+systemctl --user daemon-reload
+systemctl --user enable --now kudde-push
+loginctl enable-linger "$USER"</code></pre>
+            <p>On WSL, systemd must be on.</p></li>
+        </ol>
+        <h3>On the phone</h3>
+        <ol>
+          <li>Install the ntfy app and point it at your ntfy server.</li>
+          <li>In kudde, tap “Turn on” on the machine card’s Alerts row, and allow notifications.</li>
+          <li>Tap “Send” on “Send test alert”. The row says “Test received” when the alert arrives.</li>
+        </ol>
+        <p class="muted">“Finished” alerts are silent by default. To hear them, open Android settings, go to kudde’s notifications, open “Finished”, and set it to alerting.</p>
+        <p class="more"><a href={guide('docs/kudde-push.md')}>The full kudde-push guide on GitHub</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section next" aria-labelledby="next">
+    <div class="wrap">
+      <h2 class="section-title" id="next">Curious how it stays safe?</h2>
+      <a class="btn line" href="/security">Read about security</a>
+    </div>
+  </section>
+</Base>
+
+<script>
+  // Fill the marker of the step most in view. Without JavaScript the first stays filled.
+  const steps = [...document.querySelectorAll<HTMLElement>('[data-step]')];
+  const visible = new Map<HTMLElement, number>();
+  const mark = () => {
+    let best = steps[0];
+    let most = -1;
+    for (const s of steps) {
+      const v = visible.get(s) ?? 0;
+      if (v > most) { most = v; best = s; }
+    }
+    for (const s of steps) {
+      s.querySelector('[data-step-marker]')?.toggleAttribute('data-current', s === best);
+    }
+  };
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) visible.set(e.target as HTMLElement, e.isIntersecting ? e.intersectionRect.height : 0);
+    mark();
+  }, { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] });
+  steps.forEach((s) => io.observe(s));
+</script>
+
+<style>
+  .step-head { display: flex; flex-direction: column; gap: var(--space-4); }
+  .step-head :global(.step-marker) { width: 56px; height: 56px; }
+  @media (max-width: 860px) {
+    .step-head { flex-direction: row; align-items: center; }
+    .step-head :global(.step-marker) { width: 40px; height: 40px; }
+  }
+</style>

@@ -4,7 +4,9 @@
 
 **Answered (Ezra, 2026-11-20):** 2, one command at the machine, as picked.
 The command's exact text, the other decisions and the words and renders (8)
-are still open, so task 1.1 stays open.
+are still open, so task 1.1 stays open. Also 2026-11-20: the walkthrough
+gains a screen that explains the title bar's gestures (D11); where it sits
+is decision 9, and its texts are drafts.
 
 **Decisions that are yours** (my pick first in each; nothing is built into
 the app's screens before 1, 2 and 8 are answered):
@@ -44,8 +46,17 @@ the app's screens before 1, 2 and 8 are answered):
      target SDK 37. kudde targets 36 and is not affected. It comes with
      the move to 37, as its own issue; `design.md` D9 has what is known.
 8. **The words and the look.** Every text on the new screens is in
-   `design.md` under "Texts", and needs your approval. Six new renders
-   (13 to 18) and two changed ones (1 and 8) need your sign-off.
+   `design.md` under "Texts", and needs your approval. Seven new renders
+   (13 to 19) and two changed ones (1 and 8) need your sign-off.
+9. **Where the gestures screen sits.** You asked for a step that explains
+   the title bar's gestures (sideways through the tab's panes with the
+   bounce, up and down through the agents that need you, a tap on the
+   tab's map). *One screen, "Getting around", after step 3 of the first
+   machine only, not numbered* (pick): nothing is stored, and the three
+   setup steps keep their numbers. Or: a numbered fourth step for every
+   machine. Or: a hint the first time a terminal opens, which needs one
+   stored "seen" flag. Either way it explains the gestures of
+   `spaces-navigation`, so it is built after them.
 
 **What changes for the person using the app:** the first screen says what
 kudde is and the three things setup needs, with one button to start.
@@ -55,8 +66,10 @@ at the machine, with Copy and Share; it checks ownership, corrects the SSH
 directory and file modes, adds the phone's key and only then prints
 the fingerprint, which you compare on the phone before you trust the
 machine. Step 3 says the machine is connected and shows your agents, or
-how to start the first one. If you leave half way, the app brings you back
-to the same step. A phone without a screen lock is told to set one,
+how to start the first one. After the first machine, one more screen
+explains how to move around from a terminal's title bar. If you leave
+half way, the app brings you back to the same step. A phone without a
+screen lock is told to set one,
 instead of seeing an error. What is trusted, and when, stays exactly as
 strict as it is.
 
@@ -104,6 +117,8 @@ theirs.
   "No agents yet" gets a "New terminal" button.
 - The hub reports which kind of failure it met, so the screens need not
   read error texts.
+- After step 3 of the first machine: "Getting around", the title bar's
+  gestures as `spaces-navigation` defines them; built after that change.
 - README: "Setting up" follows the app's steps; the broken herdr-core
   link is corrected.
 
@@ -111,7 +126,7 @@ theirs.
 
 ### New Capabilities
 - `first-run`: the welcome, the screen-lock notice, the three setup
-  steps, the setup command, what each failure says, the way back into an
+  steps, the gestures screen after the first setup, the setup command, what each failure says, the way back into an
   unfinished setup, and setup with a screen reader and large text.
 
 ### Modified Capabilities
@@ -130,7 +145,7 @@ theirs.
   and `PhoneKey`), the form, the home's empty states and notices, the
   machine card's texts and links, `strings.xml`. No new permission, no
   new dependency.
-- Design: renders 13 to 18, changed renders 1 and 8, `design-tokens.json`
+- Design: renders 13 to 19, changed renders 1 and 8, `design-tokens.json`
   entries for the new components, goldens in both themes.
 - Docs: README "Setting up" and "What you need"; release notes.
 - Stored data: none changes. People who already have machines never see
@@ -139,7 +154,10 @@ theirs.
   Android 17 for the local network question. The screen-lock notice is
   checked in Robolectric only: removing a test phone's lock would destroy
   its key.
-- Estimate: 7 to 10 builder sessions, plus the renders and two phone
+- Depends on `spaces-navigation` for the gestures screen only: its tab
+  walk with the bounce, the map in the title bar and the tab overview must
+  be on main first. Everything else ships without it.
+- Estimate: 8 to 11 builder sessions, plus the renders and two phone
   checks. Confidence: moderate.
 
 ## Sources

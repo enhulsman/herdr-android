@@ -468,6 +468,51 @@ turned on, and SHALL NOT ask for the notification permission.
 - **WHEN** the machine goes out of reach while step 3 shows
 - **THEN** the step says so in the words of the failure table and keeps "Done"; it does not go back to step 2
 
+### Requirement: After the first setup, one screen explains the title bar
+After step 3 of the first machine's setup, the app SHALL show one more
+screen, "Getting around", without a step number, that explains the
+gestures on the title bar of a terminal and its chat. The gesture set is
+the one capability spaces (change `spaces-navigation`) defines, and this
+screen SHALL explain exactly these and no others: a sideways swipe walks
+the panes of the open terminal's tab, and the bar bounces at the tab's
+first and last pane; a swipe up or down walks the agents that need the
+person; a tap on the tab's map opens the tab overview. It SHALL be due when
+the machine just set up is the only machine listed, so no flag is stored.
+When it is due, each of step 3's buttons ("Show my agents", "Start a
+terminal or agent", "Done") SHALL open it first, and its one button "Got
+it" SHALL then lead where the tapped button leads. Back from it SHALL
+return to step 3. It SHALL NOT be shown for a second machine. A screen
+reader SHALL read its heading on arrival, and each gesture's line SHALL be
+read as one item.
+
+#### Scenario: The first machine
+- **GIVEN** no machine was listed before, and workstation is now connected on step 3
+- **WHEN** the person taps "Show my agents"
+- **THEN** "Getting around" shows, and after "Got it" the home shows the agents
+
+#### Scenario: Starting a terminal after it
+- **GIVEN** "Getting around" is due on step 3
+- **WHEN** the person taps "Start a terminal or agent" and then "Got it"
+- **THEN** the "New terminal" sheet opens with workstation chosen
+
+#### Scenario: A second machine
+- **GIVEN** one machine is already listed, and a second one is set up
+- **WHEN** the person taps "Done" on its step 3
+- **THEN** the step closes without "Getting around"
+
+#### Scenario: Back from it
+- **GIVEN** "Getting around" shows
+- **WHEN** the person goes back
+- **THEN** step 3 shows again
+
+#### Scenario: What it explains
+- **WHEN** "Getting around" shows
+- **THEN** it explains the sideways swipe inside the tab with its bounce, the swipe up and down through the agents that need the person, and the tap on the tab's map, and nothing else
+
+#### Scenario: With TalkBack
+- **WHEN** "Getting around" opens with TalkBack on
+- **THEN** it reads "Getting around" first, and each gesture's line is one item
+
 ### Requirement: An unfinished setup is easy to find
 The home SHALL show each machine whose setup is unfinished: one that has
 never connected and is not being connected right now, or one that waits

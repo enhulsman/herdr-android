@@ -319,6 +319,30 @@ the repository's README at "Setting up" in the browser, and kudde.dev's
 Setup page once the site (#83) serves one. One constant. The app has no
 other link today; this one is decision 6 of the proposal.
 
+### D11. Getting around: the title bar's gestures, once
+
+Added on 2026-11-20 (Ezra): the walkthrough gains a step that explains the
+gestures on the title bar of a terminal and its chat. The gestures are
+defined by the change `spaces-navigation` (its decision 1, answered the
+same day): a sideways swipe walks the panes of the open tab and bounces at
+the tab's ends; up and down walk the agents that need the person; a tap on
+the tab's map opens the tab overview. So this screen is built only after
+those are on main, and it explains those three and nothing else; if
+`spaces-navigation` changes them, the texts here change with them.
+
+Where it sits is proposal decision 9 (open). Pick: one unnumbered screen
+after step 3, due while the machine just set up is the only one listed.
+That is derived from the machine list, like the welcome (D1), so nothing is
+stored, and the three setup steps keep their numbers. Step 3's buttons pass
+through it once; "Got it" goes on to where the tapped button leads. In
+`MachineFlows` it is one more state of `Screen.Setup` after step 3, saved
+with the step (D6), so a process death on it lands on it again.
+*Over* a numbered fourth step for every machine: a person who sets up a
+second machine has seen it already, and "Step n of 4" would change S2 for
+every step. *Over* a hint the first time a terminal opens: closer to where
+the gestures are used, but it needs a stored "seen" flag, which this change
+avoids.
+
 ## New and changed screens (each needs the owner's sign-off)
 
 All within the existing language: chrome background, Geist, muted and dim
@@ -335,8 +359,13 @@ colour, no icon, no illustration, no logo on the welcome.
 | 18 | Step 3 | caption and heading; a machine card's head (dot, name, status line); the agent line; solid and outlined button; the alerts line in `secondary` dim |
 | 8 (changed) | Trust dialog | the same dialog, new first paragraph, one more `DialogNote` |
 | 1 (changed) | Home with an unfinished machine | the machine notice line of render 1, reading "workstation · finish setup" |
+| 19 | Getting around (draft; needs `spaces-navigation`'s signed-off title bar render) | heading at `machineName`, no step caption; the intro in `body` muted; three two-line rows (`rowName`, then `secondary` dim), the third with the tab map of `spaces-navigation` in place of a row's mark; solid "Got it". Whether the first two rows get a small drawing of the swipe is the owner's call at the render |
 
-Goldens for each in graphite and paper, and steps 1 to 3 at font size 2x.
+Goldens for each in graphite and paper, and steps 1 to 3 and Getting
+around at font size 2x. The numbers 13 to 23 are already taken by the
+Changes renders on main, and `spaces-navigation` also plans renders from
+13: use the next free numbers when drawing and correct the references
+here.
 
 ## Texts (every line needs the owner's approval)
 
@@ -432,6 +461,18 @@ trust: "Phone key locked", "Unlock", and the too-old texts.
 | P1 | One command to run on this machine (card row "Add the phone key") | One line for this machine's authorized_keys |
 | P2 | To let this phone into a machine, run this there, signed in as the user your agents run under: | Add this line to ~/.ssh/authorized_keys of the user you sign in as on each machine. |
 | P3 | Copy only the key line | Copy |
+
+**Getting around** (drafts awaiting approval; they describe the gestures of
+`spaces-navigation` and change if those change)
+
+| Id | Text | Was |
+|---|---|---|
+| G1 | Getting around | new |
+| G2 | In a terminal or a chat, swipe or tap the bar at the top to move around. | new |
+| G3 | Swipe sideways / The next or previous pane of the same tab. At the first or last pane the bar bounces. | new |
+| G4 | Swipe up or down / Up: the next agent that needs you, wherever it is. Down goes back. | new |
+| G5 | Tap the tab's map / See all panes of the tab at once, and open any of them. The map shows when a tab has more than one pane. | new |
+| G6 | Got it | new |
 
 ## Risks / Trade-offs
 

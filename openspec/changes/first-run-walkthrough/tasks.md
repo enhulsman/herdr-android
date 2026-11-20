@@ -6,7 +6,8 @@ then 3.1 → 3.2 → 3.3 → 3.4 → 3.5 (3.2 tests deliberately fail until 3.3)
 They implement logic and test seams with numbered stub screens only, not
 approved production screens. They keep the
 proposed wording in `strings.xml` only, where 1.1 can change it in one
-place. Section 4 waits for 1.1 and 1.3. All tasks below remain unchecked until
+place. Section 4 waits for 1.1 and 1.3; 4.7 and 4.8 also wait for
+`spaces-navigation`'s gestures (see there). All tasks below remain unchecked until
 implemented and verified; this fix round completes their instructions only.
 No unattended task settles an owner decision or ships the proposed texts.
 Do not introduce dependencies or new stored fields.
@@ -19,9 +20,11 @@ Checks, from the repository root unless said otherwise:
 
 ## 1. Decisions and renders
 
-- [ ] 1.1 **[owner]** Answers to the proposal's decisions 1 to 7, and approval of every text in `design.md` "Texts" and of the command in D3, word for word. Record them in `decisions.md`; correct `design.md`, the spec and `strings.xml` to the approved wording. Check: `openspec validate first-run-walkthrough --strict`
+- [ ] 1.1 **[owner]** Answers to the proposal's decisions 1 to 7 and 9, and approval of every text in `design.md` "Texts" and of the command in D3, word for word. Record them in `decisions.md`; correct `design.md`, the spec and `strings.xml` to the approved wording. Check: `openspec validate first-run-walkthrough --strict`
 - [ ] 1.2 Draw renders 13 to 18 and the changed renders 1 and 8 in `design/renders/screens.html`, graphite and paper, from the table in `design.md` "New and changed screens", with invented names only; add their components to `design-tokens.json` and their rows to `design-brief.md`. Check: each opens with `?s=<id>`; `python3 -m json.tool design-tokens.json`
 - [ ] 1.3 **[owner]** Sign off the renders; save them to `design/checkpoints/` as 13 to 18, and 1 and 8 again
+- [ ] 1.4 Draw render 19, "Getting around", from the row in `design.md` "New and changed screens" and texts G1 to G6, graphite and paper, with the tab map exactly as `spaces-navigation`'s signed-off title bar render draws it. Depends on `spaces-navigation` task 4.2 (its renders signed off). Check: it opens with `?s=<id>`
+- [ ] 1.5 **[owner]** Sign off render 19 and texts G1 to G6; save it to `design/checkpoints/`
 
 ## 2. The core (Rust), no phone needed
 
@@ -49,6 +52,9 @@ Checks, from the repository root unless said otherwise:
 - [ ] 4.5 Step 3: connected, the agent count following the snapshot, "Show my agents", "Start a terminal or agent" opening the New sheet with the machine chosen, "Done", the alerts line. Check: Android, goldens against render 18 **[owner]**
 - [ ] 4.6 The home's "finish setup" notice and "Continue setup"; "New terminal" under "No agents yet"; the Machines card's texts and links; the Phone key row with the command without the host key part and "Copy only the key line". Remove what is no longer reached (`AddMachineScreen`'s old order, `PhoneKeyScreen`'s old texts, strings no longer used). Check: Android, goldens against render 1 **[owner]**
 
+- [ ] 4.7 Tests first for "Getting around" (spec "After the first setup, one screen explains the title bar", design D11), as decision 9 was answered: in `MachineFlowsTest`, due only while the machine just set up is the only one listed; each of step 3's three buttons opens it first, and "Got it" then leads where that button leads; Back returns to step 3; not shown for a second machine; restored on it after process death. Semantics: the heading is read first, each gesture's line is one item. Goldens against render 19 in graphite and paper and at font size 2x. Depends on `spaces-navigation` tasks 3.4 (the tab walk with the bounce), 5.4 (the map in the title bar) and 6.2 (the overview from the map) being on main, and on 1.1 and 1.5. Check: Android (they fail until 4.8)
+- [ ] 4.8 Build "Getting around" as one more state of `Screen.Setup` after step 3, with the approved texts G1 to G6 and the tab map of `spaces-navigation`. Needs 4.7. Check: Android, goldens against render 19 **[owner]**
+
 ## 5. Docs
 
 - [ ] 5.1 README: "Setting up" step 2 rewritten to the app's three steps, with the command described and not repeated; "What you need" gains the screen lock; the herdr-core link at `README.md:75` corrected to `herdrdev/herdr-core`; a short "When setup stops" list (host keys outside `/etc/ssh`, fish, an account with a group-writable default mode, `scripts/check-restricted-key.sh`). Public wording rules apply. Check: `git diff --stat` touches only `README.md`; the pre-commit denylist passes
@@ -56,7 +62,7 @@ Checks, from the repository root unless said otherwise:
 
 ## 6. On a phone
 
-- [ ] 6.1 **[phone]** Test phone, debug build with its data cleared, against the desk with the fake agent: the welcome; step 1 with a wrong address, then the right one; the command shared to a notes app and pasted at the desk; the fingerprint compared; step 3; "Show my agents". Then the same with the command not run (the "did not accept" text, then fixed at the desk without touching the phone), and with the app left for three minutes on step 2. Note the reason texts the phone gives for a name that does not exist and for a closed port. Follow `docs/phone-testing.md`; afterwards remove the test line from the desk's `authorized_keys`
+- [ ] 6.1 **[phone]** Test phone, debug build with its data cleared, against the desk with the fake agent: the welcome; step 1 with a wrong address, then the right one; the command shared to a notes app and pasted at the desk; the fingerprint compared; step 3; "Show my agents". Then the same with the command not run (the "did not accept" text, then fixed at the desk without touching the phone), and with the app left for three minutes on step 2. Once 4.8 is built: "Getting around" after step 3, and each gesture it names tried once in a terminal. Note the reason texts the phone gives for a name that does not exist and for a closed port. Follow `docs/phone-testing.md`; afterwards remove the test line from the desk's `authorized_keys`
 - [ ] 6.2 **[phone]** **[owner]** TalkBack through the three steps (he listens; adb taps cannot drive TalkBack), and one pass at font size 2x; restore both settings
 - [ ] 6.3 **[phone]** Android 17 test phone, kudde as built (target SDK 36): it connects to a machine on the Wi-Fi with no system dialog; note whether Android's settings offer a "Nearby devices" switch for kudde and what turning it off does. Result into `research/first-run-walkthrough-2026-11.md` and into the issue for the move to target SDK 37
 - [ ] 6.4 Not on a phone: the screen-lock notice is checked in Robolectric only (3.5). Do not remove a test phone's screen lock: that destroys its phone key

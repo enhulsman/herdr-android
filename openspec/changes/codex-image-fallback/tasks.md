@@ -43,7 +43,8 @@ A further integration regression failed on internal barriers changing Claude for
 added for chat consumers rather than changing raw Chunk.text semantics.
 
 ## Tail cost (synthetic measurement, not a real-log estimate)
-Compared with dropping all response_item records:
+Historical first-build measurement, compared with dropping all response_item
+records (current wire behavior is described in sections 3 and 5):
 - custom_tool_call: 135 + call-id bytes + turn-id bytes of JSON, plus offset
   digits and two wire separator bytes. Supplied real-shape fixture: 204 JSON /
   209 wire bytes for call 1, 204 JSON / 210 wire bytes for call 2.
@@ -201,32 +202,33 @@ history with reparsing. Generated data stays in the build directory.
 | 2: decoded bitmap retained under unchanged key | next card 3.5 | review documents Kotlin bypass | deliberately unfixed; no Kotlin edits |
 
 ### Decision and wire cost
-Use Rust's existing serde_json parser rather than implement another JSON parser
-in awk. The shell passes bounded scrubbed records and performs no Codex header
-reduction or response/token classification. parse_chunk reads top-level type,
-payload.type, payload.call_id and
+Use Rust's existing serde_json parser for authoritative structural classification
+and call reduction. Section 5 adds a narrow shell fast path for fixed canonical
+prefixes; any deviation still reaches parse_chunk. parse_chunk reads top-level
+type, payload.type, payload.call_id and
 payload.internal_chat_message_metadata_passthrough.turn_id; it reduces only
 actual Codex calls. Nested unrelated identities cannot participate. Claude
-rows remain unchanged by this classification. Inputs are removed before the
-chunk enters retained history; they now cross the bounded wire. No dependency,
-strict pairing rule or byte limit changed.
+rows remain unchanged by this classification. Inputs cross the bounded wire
+but are removed before retained history. No dependency or byte limit changed.
 
-This supersedes the earlier shell-header cost and input-omission statements:
+Current wire cost, superseding the first-build shell-header measurements:
 - Supplied fixture call 1: 483 wire bytes instead of 209, **+274**.
 - Supplied fixture call 2: 397 wire bytes instead of 210, **+187**.
-- Fixture token-usage rows: **+758 and +764 wire bytes**; Rust drops them.
+- Fixture token-usage rows: **0 wire bytes** (formerly 758 and 764).
 - Outputs, views and other retained event rows: **0 extra wire bytes**.
-- Other formerly hidden response/world-state records now cross the wire at
-  their scrubbed JSON length plus offset digits and two separator bytes,
-  then are dropped structurally. Earlier token counts also cross the wire;
-  Rust retains only the last per chunk.
+- Canonical known irrelevant response/world-state records cost zero wire bytes.
+  Their noncanonical variants cross at scrubbed JSON length plus offset digits
+  and two separator bytes, then Rust drops them structurally.
+- Only the last canonical token_count per read crosses the wire; noncanonical
+  counts also cross. Rust chooses the count with the greatest file offset.
 - General call overhead versus reduction equals scrubbed full JSON bytes minus
   the former reduced header bytes (offset framing cancels). Inputs can consume
   the existing 7,864,320-byte read budget; oversized calls become barriers.
   Retained history does not keep those inputs. No real-log percentage is inferred.
 
-The shell only suppresses a skip marker for the existing anchored api-request
-family; a partial response_item prefix is never evidence of irrelevance.
+The shell suppresses a skip marker only for the existing anchored api-request
+family or a canonical prefix proving a fixed irrelevant kind. An unknown,
+noncanonical, call/output or token-count oversized record still gets a barrier.
 
 ### Check output
 - `cargo test -p kudde-chat -p kudde-mobile`: all chat suites pass, including
@@ -303,3 +305,70 @@ Earlier strict-rule evidence above records earlier rounds; this section and
 current proposal/spec supersede that policy. No prior work was discarded and
 no real logs were read. The coordinator still runs the real-log check and the
 socket tests outside the sandbox; Kotlin cache revalidation remains task 3.5.
+
+
+## 5. Conservative wire trimming (007g)
+- [x] 5.1 Verify a clean tree, structural Rust filtering and canonical fixture prefixes;
+  measure the unchanged fixture at 6027 wire bytes, viewed 3 and paired 3.
+- [x] 5.2 Observe all five production-script wire regressions fail before implementation.
+- [x] 5.3 Drop only fixed irrelevant canonical prefixes; buffer the last canonical
+  token count within the existing wire budget. Preserve structural classification,
+  scrubbed call identities/outputs, byte offsets and uncertainty barriers.
+- [x] 5.4 Correct wire-cost documentation and verify the fixture at 4505 bytes.
+- [x] 5.5 Run the required suites, CI clippy, formatting and strict validation;
+  complete the suites with exactly the two known sandbox socket tests skipped.
+
+### Prefix and ordering decisions (confidence: high)
+The fast path inspects at most the first 200 bytes, starting at byte zero:
+`timestamp` (an unescaped string), `ordinal` (a nonnegative integer), `type`,
+then `payload`. For response_item and event_msg, payload.type must come first.
+For world_state and token_usage_record the top-level kind alone suffices after
+`payload:{`; the fixture's token-usage payload has no type field. No content or
+nested field is searched. Unknown subtypes, different key order, extra prefix
+keys, whitespace and long/escaped timestamps pass through for Rust to decide.
+All listed dropped kinds are unused by the parser; none needed exemption.
+
+Only response_item message, reasoning, additional_tools, function_call,
+function_call_output and configuration_update, plus world_state and
+token_usage_record, are unconditionally hidden. custom_tool_call and
+custom_tool_call_output remain scrubbed full records on the wire. Every event
+other than earlier canonical token_count records remains. The last canonical
+count is emitted at the end of the read. A later noncanonical count may already
+have crossed, so Rust chooses by original file offset, preserving existing
+last-count semantics. The buffered count is included in the output budget.
+Oversized token counts still need barriers: they are not unconditionally hidden.
+
+### Tests first: observed failures
+All tests are in `crates/kudde-chat/tests/tail_wire.rs`. Each runs production SCRIPT.
+The forgery/deviation tests also include a canonical drop control, proving the
+filter is active while their preservation assertions stay intact.
+
+| New test | Before implementation |
+|---|---|
+| wire_drops_only_known_prefixes_and_keeps_last_count | message record crossed the wire |
+| wire_forged_prefixes_cannot_hide_claude_or_codex_output | canonical control was not filtered; forged rows survived |
+| wire_deviations_pass_through_for_structural_parsing | canonical control was not filtered; deviations survived |
+| wire_oversized_known_drop_has_no_barrier_but_unknown_does | hidden message had a skip barrier, expected none |
+| wire_mixed_count_formats_keep_the_latest_by_file_offset | earlier canonical count crossed the wire |
+
+After implementation: all five pass. Existing tests were unchanged, including
+payload identity, nested Claude input, padded oversized skips and Claude fixtures.
+
+### Check output
+All Cargo commands used --offline; TMPDIR was under the worktree's target/.
+- `cargo test --offline -p kudde-chat -p kudde-mobile`: all chat suites pass;
+  mobile `154 passed; 2 failed`, only the known sandbox socket tests
+  `here_sockets_are_not_refused` and `other_connect_failures_stay_connection_failures`.
+- With exactly those two skipped: mobile `154 passed; 0 failed; 2 filtered out`;
+  integration and doc tests pass.
+- `cargo clippy --offline --locked --all-targets --features kudde-mobile/vt,kudde-mobile/spike -- -D warnings`:
+  `Finished dev profile`; no warnings.
+- `cargo fmt --all --check`: exit 0.
+- `openspec validate codex-image-fallback --strict`:
+  `Change 'codex-image-fallback' is valid`.
+- `images_check` fixture: `viewed 3`, `paired 3`, `wire bytes 4505`.
+  Before: 6027 bytes. Reduction: 1522 bytes, exactly the two token-usage rows.
+- `git diff --check`: exit 0.
+
+No real logs, phone or live infrastructure were accessed. The coordinator still
+measures real-log wire cost and reruns the two socket tests unrestricted.

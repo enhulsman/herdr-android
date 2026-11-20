@@ -12,7 +12,9 @@ parts; the supplied structure report disproves those assumptions.
 ## What Changes
 - Retain payload call and turn identity using structural JSON parsing, omitting
   custom tool inputs from retained chunks/history. The bounded shell response
-  carries scrubbed inputs; byte cost is recorded in tasks.md.
+  carries scrubbed inputs; byte cost is recorded in tasks.md. A fixed anchored
+  prefix fast path drops known irrelevant canonical records and keeps only the
+  last canonical token count; deviations still reach structural parsing.
 - Associate ImageView events with the sole call open at the event, across
   intervening events; item ids are unrelated to call ids.
 - Recover equal, nonzero numbers of viewed images and input_image parts in

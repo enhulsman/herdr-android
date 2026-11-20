@@ -24,7 +24,9 @@
 //!
 //! [`parse_chunk`] classifies JSON structurally, reduces Codex call records to
 //! payload identities, drops irrelevant response records and retains only the
-//! last token count. The bounded wire response includes scrubbed call inputs;
+//! last token count. The shell first trims only exact, anchored known Codex
+//! prefixes and keeps the last matching token count. Deviations reach Rust.
+//! The bounded wire response includes scrubbed call inputs;
 //! those inputs are omitted before history or the chat parser sees the chunk.
 //!
 //! A whole record longer than [`READ_MAX`] can never fit a read: it is
@@ -52,10 +54,18 @@ n=$((e - o))
 if [ "$n" -le 0 ]; then echo "from $o"; echo "next $o"; exit 0; fi
 HC_TAIL_F=$f; export HC_TAIL_F
 tail -c +$((o + 1)) "$f" | head -c "$n" | LC_ALL=C awk -v start="$o" -v skip="$skip" -v total="$n" -v size="$s" -v nl="$nl" -v max="$max" -v omax=8000000 '
-# A prefix is not enough to classify a Codex response as irrelevant.
-# Only the anchored request family is known not to participate in pairing.
+# Recognize only the canonical key order at byte zero, within 200 bytes.
+# Any deviation costs bytes instead of losing a potentially relevant record.
+function codex(h,   p) {
+  if (!match(h, /^\{"timestamp":"[^"\\]*","ordinal":(0|[1-9][0-9]*),"type":/)) return 0
+  p=substr(h,RLENGTH+1)
+  if (p ~ /^"(world_state|token_usage_record)","payload":\{/) return 1
+  if (p ~ /^"response_item","payload":\{"type":"(message|reasoning|additional_tools|function_call|function_call_output|configuration_update)"[,}]/) return 1
+  if (p ~ /^"event_msg","payload":\{"type":"token_count"[,}]/) return 2
+  return 0
+}
 function hidden(h) {
-  return index(h, "{\"type\":\"api-request") == 1
+  return index(h, "{\"type\":\"api-request") == 1 || codex(h) == 1
 }
 # Decode ASCII escapes in keys before deciding whether a value is an image URL.
 function keytext(s,   out,i,c,h,a,b) {
@@ -103,7 +113,9 @@ BEGIN { from = -1 }
   used += len
   if (skip && NR == 1) next
   if (from < 0) from = at
-  if (index($0, "{\"type\":\"api-request") == 1) next
+  hd = substr($0, 1, 200)
+  if (hidden(hd)) next
+  kind = codex(hd)
   # Raw log references have no provenance, including escaped keys and values.
   line = (index($0, "image_url") || index($0, "\\u")) ? scrub($0) : $0
   out = ""; k = 0
@@ -114,15 +126,19 @@ BEGIN { from = -1 }
     line = substr(line, RSTART + RLENGTH); k++
   }
   p = at " " out line
+  # Reserve the pending count inside the same output budget.
   # What is printed stays under what exec keeps: offsets make it longer than what was read.
-  if (outb + length(p) + 1 > omax) {
+  if (outb - (kind == 2 ? tcb : 0) + length(p) + 1 > omax) {
     if (outb == 0) { print "skip " at " " len; outb = 1; exit }
     used -= len; exit
   }
+  if (kind == 2) outb -= tcb
   outb += length(p) + 1
-  print p
+  if (kind == 2) { tc = p; tcb = length(p) + 1 }
+  else print p
 }
 END {
+  if (tc != "") print tc
   if (full) {
     # A line that did not fit: measure it whole. A cut first line is passed
     # over; a whole record over the limit is skipped (with a note unless it
@@ -174,8 +190,8 @@ pub fn parse_chunk(out: &str) -> Option<Chunk> {
             let (at, line) = l.split_once(' ')?;
             let at = at.parse().ok()?;
             // Classify complete JSON by paths, never by text inside tool input.
-            // The remote shell only bounds and scrubs records; it cannot safely
-            // infer object ownership with substring searches.
+            // The remote shell trims only fixed canonical prefixes; deviations
+            // still need structural classification here.
             let record = serde_json::from_str::<serde_json::Value>(line).ok();
             let mut header = None;
             if let Some(v) = &record {
@@ -197,7 +213,11 @@ pub fn parse_chunk(out: &str) -> Option<Chunk> {
                     "response_item" if p["type"] != "custom_tool_call_output" => continue,
                     "world_state" | "token_usage_record" => continue,
                     "event_msg" if p["type"] == "token_count" => {
-                        token_count = Some((at, line));
+                        // The shell emits its buffered canonical count last;
+                        // a later noncanonical count may already have arrived.
+                        if token_count.is_none_or(|(previous, _)| at > previous) {
+                            token_count = Some((at, line));
+                        }
                         continue;
                     }
                     _ => {}

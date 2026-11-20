@@ -80,6 +80,13 @@ pub enum Image {
     /// log line that starts at byte `line`: one path viewed twice is two
     /// images.
     File { path: String, line: u64 },
+    /// A file paired with its positional Codex output copy. The fallback is
+    /// a bounded log reference, never a guess from another call.
+    FileWithFallback {
+        path: String,
+        line: u64,
+        copy: Box<Image>,
+    },
     /// Emptied with no way back, or a shape this parser does not know.
     Missing,
 }
@@ -159,6 +166,68 @@ pub struct Parser {
     /// Claude Code: the texts queued while the agent works, oldest first
     /// (`queue-operation` records; an enqueue without text holds a place).
     queue: VecDeque<String>,
+    codex_calls: HashMap<String, ImageCall>,
+    image_reasons: std::collections::BTreeMap<u64, String>,
+}
+
+#[derive(Default)]
+struct ImageCall {
+    turn: String,
+    views: Vec<u64>,
+    closed: bool,
+    invalid: bool,
+}
+
+// Validate the entire call before pairing views and copies by position.
+fn pair_image(call: &ImageCall, p: &Value, at: u64) -> Result<Vec<Image>, &'static str> {
+    if call.invalid {
+        return Err("uncertain call");
+    }
+    if call.closed {
+        return Err("second output");
+    }
+    if call.turn.is_empty()
+        || p["internal_chat_message_metadata_passthrough"]["turn_id"].as_str() != Some(&call.turn)
+    {
+        return Err("turn mismatch");
+    }
+    let parts = p["output"].as_array().ok_or("malformed output")?;
+    if parts
+        .iter()
+        .any(|p| p["type"] != "input_text" && p["type"] != "input_image")
+    {
+        return Err("unknown part");
+    }
+    let images: Vec<_> = parts
+        .iter()
+        .filter(|p| p["type"] == "input_image")
+        .collect();
+    if call.views.len() != images.len() {
+        return Err("unequal counts");
+    }
+    if images.is_empty() {
+        return Err("multiple images");
+    }
+    images
+        .into_iter()
+        .map(|image| {
+            let url = image["image_url"].as_str().ok_or("invalid copy")?;
+            let (line, n) = url
+                .strip_prefix('@')
+                .and_then(|s| s.split_once(':'))
+                .ok_or("invalid copy")?;
+            let line: u64 = line.parse().map_err(|_| "invalid copy")?;
+            let n: u32 = n.parse().map_err(|_| "invalid copy")?;
+            if line != at {
+                return Err("invalid copy");
+            }
+            Ok(Image::InLog {
+                line,
+                n,
+                media_type: String::new(),
+            })
+        })
+        .collect()
 }
 
 impl Parser {
@@ -190,6 +259,8 @@ impl Parser {
             version: None,
             gauge: None,
             queue: VecDeque::new(),
+            codex_calls: HashMap::new(),
+            image_reasons: std::collections::BTreeMap::new(),
         }
     }
 
@@ -338,6 +409,10 @@ impl Parser {
             self.unknown += 1;
             return;
         };
+        if v["type"] == "kudde_skipped" && self.agent == Agent::Claude {
+            self.lines -= 1;
+            return;
+        }
         match self.agent {
             Agent::Claude => self.claude(&v),
             Agent::Codex => self.codex(&v),
@@ -855,6 +930,43 @@ impl Parser {
         }
         self.recognised += 1;
         let p = &v["payload"];
+        if kind == "kudde_skipped" {
+            let views: Vec<_> = self
+                .codex_calls
+                .values_mut()
+                .flat_map(|c| {
+                    c.invalid = true;
+                    c.views.clone()
+                })
+                .collect();
+            for at in views {
+                self.set_codex_copy(at, None);
+                self.image_reasons.insert(at, "skipped record".into());
+            }
+            return;
+        }
+        if kind == "response_item" && p["type"] == "custom_tool_call" {
+            if let Some(id) = p["call_id"].as_str().filter(|s| !s.is_empty()) {
+                let entry = self
+                    .codex_calls
+                    .entry(id.to_owned())
+                    .or_insert_with(|| ImageCall {
+                        turn: p["internal_chat_message_metadata_passthrough"]["turn_id"]
+                            .as_str()
+                            .unwrap_or("")
+                            .into(),
+                        ..Default::default()
+                    });
+                if entry.closed || !entry.views.is_empty() {
+                    entry.invalid = true;
+                }
+            }
+            return;
+        }
+        if kind == "response_item" && p["type"] == "custom_tool_call_output" {
+            self.codex_image_output(p);
+            return;
+        }
         match kind {
             "session_meta" => {
                 self.version = p["cli_version"].as_str().map(str::to_owned);
@@ -894,6 +1006,72 @@ impl Parser {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn codex_image_output(&mut self, p: &Value) {
+        let Some(id) = p["call_id"].as_str() else {
+            return;
+        };
+        let Some(call) = self.codex_calls.get_mut(id) else {
+            return;
+        };
+        let result = pair_image(call, p, self.at);
+        call.closed = true;
+        let views = call.views.clone();
+        for (position, at) in views.into_iter().enumerate() {
+            self.image_reasons.insert(
+                at,
+                result.as_ref().err().copied().unwrap_or("paired").into(),
+            );
+            self.set_codex_copy(
+                at,
+                result.as_ref().ok().map(|copies| copies[position].clone()),
+            );
+        }
+    }
+
+    /// Counts only: no paths, call identifiers or conversation content.
+    pub fn image_counts(&self) -> std::collections::BTreeMap<String, usize> {
+        let mut counts = std::collections::BTreeMap::new();
+        for reason in self.image_reasons.values() {
+            *counts.entry(reason.clone()).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    fn set_codex_copy(&mut self, at: u64, copy: Option<Image>) {
+        let mut touched = Vec::new();
+        for (i, row) in self.items.iter_mut().enumerate() {
+            if let Item::Tools { calls } = row {
+                for call in calls {
+                    for image in &mut call.images {
+                        match image {
+                            Image::File { path, line }
+                            | Image::FileWithFallback { path, line, .. }
+                                if *line == at =>
+                            {
+                                *image = match &copy {
+                                    Some(copy) => Image::FileWithFallback {
+                                        path: path.clone(),
+                                        line: *line,
+                                        copy: Box::new(copy.clone()),
+                                    },
+                                    None => Image::File {
+                                        path: path.clone(),
+                                        line: *line,
+                                    },
+                                };
+                                touched.push(i);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        for i in touched {
+            self.touch(i);
         }
     }
 
@@ -996,6 +1174,32 @@ impl Parser {
                     .map(percent_decode)
                     .unwrap_or_else(|| raw.to_owned());
                 let shown = self.relative(&path);
+                let open: Vec<_> = self
+                    .codex_calls
+                    .iter()
+                    .filter(|(_, c)| !c.closed)
+                    .map(|(id, _)| id.clone())
+                    .collect();
+                let reason = match open.as_slice() {
+                    [id] => {
+                        let c = self.codex_calls.get_mut(id).unwrap();
+                        c.views.push(self.at);
+                        if turn != Some(c.turn.as_str()) || c.turn.is_empty() {
+                            c.invalid = true;
+                            "turn mismatch"
+                        } else {
+                            "no output"
+                        }
+                    }
+                    [] => "no open call",
+                    _ => {
+                        for id in open {
+                            self.codex_calls.get_mut(&id).unwrap().invalid = true;
+                        }
+                        "multiple open calls"
+                    }
+                };
+                self.image_reasons.insert(self.at, reason.into());
                 self.add_call(
                     None,
                     ToolCall {

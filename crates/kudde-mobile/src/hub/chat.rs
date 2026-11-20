@@ -217,6 +217,21 @@ fn chat_images(images: &[Image], session: &str) -> Vec<ChatImage> {
                 key: format!("file:{line}:{path}"),
                 media_type: String::new(),
             },
+            Image::FileWithFallback { path, line, copy } => {
+                let Image::InLog {
+                    line: copy_line, n, ..
+                } = copy.as_ref()
+                else {
+                    return ChatImage {
+                        key: "missing".into(),
+                        media_type: String::new(),
+                    };
+                };
+                ChatImage {
+                    key: format!("copy:{}", json!([session, line, path, copy_line, n])),
+                    media_type: String::new(),
+                }
+            }
             Image::Missing => ChatImage {
                 key: "missing".into(),
                 media_type: String::new(),
@@ -288,6 +303,19 @@ fn image_argv(key: &str, log: Option<(&str, &str)>, held: &str) -> Option<Value>
         let path = file_path(key)?;
         Some(json!(["sh", "-c", image::FILE_SCRIPT, "sh", path, held]))
     }
+}
+
+/// The ordered sources of a paired image, restricted to the open session.
+fn image_sources(key: &str, open: Option<&str>) -> Option<(String, String)> {
+    let (session, line, path, copy_line, n): (String, u64, String, u64, u32) =
+        serde_json::from_str(key.strip_prefix("copy:")?).ok()?;
+    if Some(session.as_str()) != open {
+        return None;
+    }
+    Some((
+        format!("file:{line}:{path}"),
+        format!("log:{session}:{copy_line}:{n}"),
+    ))
 }
 
 /// The path of a `file:<line>:<path>` key.
@@ -407,7 +435,9 @@ async fn read_chunk(c: &Client, r: &Read) -> Result<tail::Chunk, String> {
     if out.trim() == "missing" {
         return Err("The log is gone".into());
     }
-    tail::parse_chunk(&out).ok_or_else(|| "Couldn't read the log: unexpected output".into())
+    tail::parse_chunk(&out)
+        .map(tail::with_barrier)
+        .ok_or_else(|| "Couldn't read the log: unexpected output".into())
 }
 
 /// The lookup script's result for the agent in front, and the process start
@@ -697,6 +727,10 @@ impl Chat {
     /// The bytes of one image from [`ChatImage::key`], fetched from the desk
     /// the first time; `None` when it is gone or cannot be read. Blocks.
     pub fn image(&self, key: String) -> Option<Vec<u8>> {
+        if key.starts_with("file:") || key.starts_with("copy:") {
+            let core = self.core.clone();
+            return core.runtime().block_on(self.fetch_image(&key));
+        }
         if let Some(b) = self.images.lock().unwrap().get(&key) {
             return Some(b.clone());
         }
@@ -844,6 +878,22 @@ impl Chat {
             };
             session.zip(path)
         };
+        if key.starts_with("copy:") {
+            let (file, copy) = image_sources(key, log.as_ref().map(|(s, _)| s.as_str()))?;
+            if let Some(bytes) = Box::pin(self.fetch_image(&file)).await {
+                return Some(bytes);
+            }
+            if let Some(bytes) = self.images.lock().unwrap().get(&copy).cloned() {
+                return Some(bytes);
+            }
+            let bytes = Box::pin(self.fetch_image(&copy)).await?;
+            let mut cache = self.images.lock().unwrap();
+            if cache.values().map(Vec::len).sum::<usize>() + bytes.len() > IMAGE_CACHE {
+                cache.clear();
+            }
+            cache.insert(copy, bytes.clone());
+            return Some(bytes);
+        }
         let file = file_path(key);
         let held = file
             .map(|p| held_time(&self.files.lock().unwrap(), p))
@@ -882,6 +932,138 @@ impl Chat {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codex_copy_keeps_file_first_and_rejects_another_session() {
+        let key = chat_images(
+            &[Image::FileWithFallback {
+                path: "/work/website:a.png".into(),
+                line: 12,
+                copy: Box::new(Image::InLog {
+                    line: 24,
+                    n: 0,
+                    media_type: String::new(),
+                }),
+            }],
+            "session-a",
+        )
+        .remove(0)
+        .key;
+        assert_eq!(
+            image_sources(&key, Some("session-a")),
+            Some((
+                "file:12:/work/website:a.png".into(),
+                "log:session-a:24:0".into()
+            ))
+        );
+        assert!(image_sources(&key, Some("session-b")).is_none());
+        assert!(image_sources(&key, None).is_none());
+    }
+
+    #[test]
+    fn image_rechecks_recreated_file_and_separates_copy_cache() {
+        use herdr_proto::wire;
+        use tokio::io::AsyncWriteExt;
+        struct NoDial;
+        impl crate::link::Dialer for NoDial {
+            fn dial(&self, _: crate::link::Target) -> crate::link::Dialing {
+                Box::pin(async { Err(crate::link::DialError::Rejected) })
+            }
+        }
+        let dir = std::env::current_dir()
+            .unwrap()
+            .join("../../target/mobile-image-cache-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("website.png");
+        let _ = std::fs::remove_file(&file);
+        let log = dir.join("invented.jsonl");
+        std::fs::write(&log, "{\"type\":\"response_item\",\"payload\":{\"type\":\"custom_tool_call_output\",\"output\":[{\"type\":\"input_image\",\"image_url\":\"data:image/png;base64,Y29weQ==\"}]}}\n").unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let hub;
+        {
+            let _enter = rt.enter();
+            hub = HubCore::start(dir.clone(), Arc::new(NoDial));
+            let (app, remote) = tokio::io::duplex(65536);
+            let (r, w) = tokio::io::split(app);
+            let client = Client::start(r, w);
+            let mut live = super::super::Live::paused();
+            live.epoch = 1;
+            hub.state
+                .lock()
+                .unwrap()
+                .live
+                .insert("workstation".into(), live);
+            let conn = super::super::Conn {
+                epoch: 1,
+                client,
+                sizes: tokio::sync::watch::channel(Arc::new(HashMap::new())).1,
+            };
+            hub.conns.lock().unwrap().insert(
+                "workstation".into(),
+                tokio::sync::watch::channel(Some(conn)).0,
+            );
+            rt.spawn(async move {
+                let (mut r, mut w) = tokio::io::split(remote);
+                while let Ok(Some(frame)) = wire::read_frame(&mut r).await {
+                    if frame.channel != 0 || frame.kind != wire::DATA { continue; }
+                    let req: Value = serde_json::from_slice(&frame.payload).unwrap();
+                    assert_eq!(req["method"], "machine.exec");
+                    let args: Vec<_> = req["params"]["argv"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+                    let out = std::process::Command::new(args[0]).args(&args[1..]).output().unwrap();
+                    assert!(out.status.success());
+                    let reply = json!({"jsonrpc":"2.0","id":req["id"],"result":{"stdout":base64::engine::general_purpose::STANDARD.encode(out.stdout),"truncated":false}});
+                    if w.write_all(&wire::encode(0, wire::DATA, reply.to_string().as_bytes())).await.is_err() { break; }
+                }
+            });
+        }
+        let chat = Chat::new(hub.clone(), "workstation".into(), "t1".into());
+        chat.state.lock().unwrap().take_lookup(
+            &Term {
+                agent: Some(Agent::Codex),
+                ..Default::default()
+            },
+            Some(Lookup::Found {
+                path: log.to_str().unwrap().into(),
+                session: "session-a".into(),
+            }),
+            Instant::now(),
+        );
+        let key = chat_images(
+            &[Image::FileWithFallback {
+                path: file.to_str().unwrap().into(),
+                line: 1,
+                copy: Box::new(Image::InLog {
+                    line: 0,
+                    n: 0,
+                    media_type: String::new(),
+                }),
+            }],
+            "session-a",
+        )[0]
+        .key
+        .clone();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"copy");
+        std::fs::write(&file, b"file").unwrap();
+        assert_eq!(
+            chat.image(key.clone()).unwrap(),
+            b"file",
+            "recreated file wins over a cached copy"
+        );
+        std::fs::write(&file, b"new-file").unwrap();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"new-file");
+        std::fs::remove_file(&file).unwrap();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"copy");
+        assert!(!chat.images.lock().unwrap().contains_key(&key));
+        assert_eq!(
+            chat.images
+                .lock()
+                .unwrap()
+                .get("log:session-a:0:0")
+                .unwrap(),
+            b"copy"
+        );
+        hub.shutdown();
+    }
 
     #[test]
     fn image_paths_go_first_one_per_line() {

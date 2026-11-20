@@ -52,15 +52,14 @@ review; decision 7 settled 2026-11-20 after the spike):
 - **R1-B: blank input stays in the box.** If removing stray control
   characters leaves no text or pictures, nothing is sent, without a new
   error.
+- **R1-G, in case the send probe needs it: desk replies ship.** If herdr
+  does not tell the desk why it refused a message (for example, the agent
+  just started working), the desk does not wait for herdr-core to say so;
+  it recognises herdr's refusal text wherever it can, and otherwise the
+  bubble stays, reads "Not in the conversation yet", and you retype the
+  message.
 
-**Open for you:**
-- **After the send probe (R1-G), only if it comes up:** if herdr does not
-  tell the desk why it refused a message (for example, the agent just
-  started working), should desk replies wait until herdr-core says so, which
-  needs a change upstream that may take long or never come, or ship with:
-  the bubble stays, reads "Not in the conversation yet", and you retype the
-  message? Pick: ship, recognising herdr's refusal text wherever the probe
-  shows it.
+Nothing is open for you on this change until the in-app session.
 
 No longer asked: R1-D (how to keep the desk fast: updates are well inside
 the limits, 5 ms; opening, older messages and long catch-ups are split into

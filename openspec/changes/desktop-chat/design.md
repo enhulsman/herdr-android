@@ -181,16 +181,15 @@ typed. Apply this mapping to the route selected by the probe, never retry a
 send through the other route. Unsure never restores the draft or triggers
 another send or second Enter.
 
-**Owner pick R1-G (conditional, after task 2.10):** if neither route lets
-the desk tell a guard refusal (for example "the agent just started
-working") from a lost answer, either desk replies wait until herdr-core
-reports refusals in a form the desk can read, which needs an upstream change
-that may take long or never come (`decisions.md`, 2026-10-31: maintainers
-rarely answer), or desk replies ship and such a refusal looks unsure: the
-bubble stays, reads "Not in the conversation yet" after 30 s, and Ezra
-retypes the message. Pick: ship; the desk recognises herdr's refusal text
-wherever the probe shows it, and only the rest looks unsure. Confidence:
-moderate. Do not invent error shapes or silently change refusals.
+**R1-G, answered in advance (Ezra, 2026-11-20):** if task 2.10 finds that
+neither route lets the desk tell a guard refusal (for example "the agent
+just started working") from a lost answer, desk replies ship anyway; they do
+not wait for herdr-core to report refusals in a readable form, an upstream
+change that may take long or never come (`decisions.md`, 2026-10-31:
+maintainers rarely answer). The desk recognises herdr's refusal text
+wherever the probe shows it; only the rest looks unsure: the bubble stays,
+reads "Not in the conversation yet" after 30 s, and Ezra retypes the
+message. Do not invent error shapes or silently change refusals.
 
 If the probe finds Windows argument passing unsafe, the text goes base64 as
 an argument to a fixed script on the agent machine that decodes `"$1"`,

@@ -2,6 +2,10 @@
 
 ## Plain summary
 
+**Answered (Ezra, 2026-11-20):** 2, one command at the machine, as picked.
+The command's exact text, the other decisions and the words and renders (8)
+are still open, so task 1.1 stays open.
+
 **Decisions that are yours** (my pick first in each; nothing is built into
 the app's screens before 1, 2 and 8 are answered):
 

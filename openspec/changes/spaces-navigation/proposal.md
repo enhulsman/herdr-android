@@ -2,15 +2,25 @@
 
 ## Plain summary
 
-**Answered (Ezra, 2026-11-20):** 2 to 6 as picked. 1 is the pick for now,
-but a short brainstorm and comparison with Ezra comes first, before task 3.3
-is built. The texts and pictures still wait for approval, so task 1.1 stays
-open.
+**Answered (Ezra, 2026-11-20):** 2 to 6 as picked. 1 after a short
+brainstorm the same day: option (b), not the pick; the sideways walk stays
+inside the tab. Also answered that day: 7 (the map, no pane dots) and 8
+(a quieter title bar, in this change). The texts and pictures still wait
+for approval, so task 1.1 stays open.
 
 **Decisions that are yours** (my pick first; every text on screen and every
 new picture waits for your approval, see "Texts" and "New on screen"):
 
 1. **What a sideways swipe on the title bar walks.**
+   **Answered: (b), not the pick.** A sideways swipe walks only the panes
+   of the open terminal's tab, in the desk's order, and stops at the tab's
+   ends. At an end it opens nothing: the title bar bounces a little, with
+   the end haptic. It does not wrap, and never goes into another tab,
+   space or machine. Up and down stay as they are. Why (Ezra): going
+   further than a few terminals is quicker through the Agents or Spaces
+   view than by swiping, so a bounded walk makes sense. Accepted: in a tab
+   of one pane a sideways swipe now only bounces, where today it opens the
+   next agent of the Agents list.
    *Pick: the desk's order, all the way.* The panes of this tab left to
    right and top to bottom, then the space's next tab, then the machine's
    next space, then the next machine. A plain shell in a pane is a stop too,
@@ -54,6 +64,21 @@ new picture waits for your approval, see "Texts" and "New on screen"):
    sheet and has nothing to do with order. It stays specified in
    `android-client-v1`, and #27 stays open for it alone.
    Other option: build it here, after everything else.
+7. **Map or pane dots in the title bar.**
+   **Answered: the map.** The title bar keeps the tab's map (as in 3 and
+   "New on screen" 4): the open terminal's cell marked, a tap opens the tab
+   overview, no map in a tab of one pane. No pane dots, as Herdr's app
+   has: map or dots, never both.
+8. **A quieter title bar.**
+   **Answered: in this change**, because it decides whether the map fits.
+   Changes moves into a menu behind a three-dot button at the end of the
+   title bar, where later options can go too. The Terminal and Chat
+   switch shows an icon instead of a word; a screen reader still says
+   "Terminal" or "Chat". The chat's context indicator becomes a small ring,
+   as in the Claude app; a screen reader still hears its value. All three
+   are new pictures: they come in the render round (task 4.1) and wait for
+   your sign-off (4.2). The icons, the ring's look and the menu's texts are
+   not decided here.
 
 **What changes for you:**
 
@@ -61,12 +86,18 @@ new picture waits for your approval, see "Texts" and "New on screen"):
   **Spaces** (your machines' spaces, tabs and terminals in the desk's
   order). Each tab has a small map of its splits; a terminal that needs you
   shows its card in its place.
-- In a terminal, a sideways swipe on the title bar takes you to the
-  neighbour on the desk, not to the next agent of the list by state. A
-  stronger tick tells you when you enter another tab.
+- In a terminal, a sideways swipe on the title bar takes you to the next
+  or previous pane of the same tab, not to the next agent of the list by
+  state. At the tab's first or last pane it opens nothing: the title bar
+  bounces and the phone gives the end tick. In a tab of one pane that is
+  all it does. To reach another tab, space or machine, go through Spaces
+  or the tab's map. Up and down still walk the agents that need you.
 - When a tab has more than one pane, the title bar shows the tab's map with
   your pane marked. A tap on it shows the tab as tiles; a tap on a tile
   opens that pane.
+- The title bar gets quieter: Changes moves into a menu behind three dots,
+  the Terminal and Chat switch becomes an icon, and the chat's context
+  figure becomes a small ring.
 - Swiping past terminals no longer resizes them on the desk: a terminal is
   taken over only once you stay on it for 0.4 seconds, or at once when you
   type, tap or send text there.
@@ -75,7 +106,8 @@ new picture waits for your approval, see "Texts" and "New on screen"):
   under you.
 - A machine out of reach keeps its spaces as last seen, marked "as of".
 - With TalkBack, the title bar has the actions "Next terminal" and
-  "Previous terminal", and everything can be reached by taps.
+  "Previous terminal" (inside the tab, like the swipe), and everything can
+  be reached by taps.
 - Nothing is ever changed on the desk: no renaming, moving or closing.
 
 **Found wrong on the way** (details in
@@ -113,12 +145,16 @@ only the spaces' names.
 - A tab map (a small drawing of a tab's splits) on each tab's line and in
   the title bar.
 - **BREAKING for habit, not for data:** the sideways swipe on the title bar
-  walks the desk's order instead of the list by state. Plain shells in a
-  pane become stops.
+  walks the panes of the open tab in the desk's order instead of the list
+  by state, and bounces at the tab's ends. Plain shells in a pane become
+  stops. It never crosses into another tab, space or machine.
 - A terminal reached by a step is attached only after 400 ms on screen, or
   at once on input; a compose text is cleared only when it was handed to
   an attached terminal.
 - The title bar gets four screen-reader actions; a step is announced.
+- A quieter title bar: Changes goes into an overflow menu, the view switch
+  becomes an icon with the same spoken names, and the context indicator a
+  small ring with a spoken value.
 - A tab overview with tiles, opened from a tab's line and from the title
   bar's map.
 - The `spaces` requirements for the drawer, lenient reading and the tab
@@ -132,7 +168,8 @@ only the spaces' names.
 - `spaces`: the desk's order on the phone: reading the layout in order,
   following it, the Spaces view, tab maps, the sideways walk and its rules,
   what happens when the desk changes or a machine is out of reach, the tab
-  overview, and the ways without a swipe.
+  overview, the ways without a swipe, and the title bar's controls (the
+  overflow menu, the view switch, the context gauge).
 
 ### Modified Capabilities
 - None in `openspec/specs/`. Two requirements of the open change
@@ -157,12 +194,17 @@ only the spaces' names.
 | Spoken: the switch | "Agents, selected" · "Spaces, selected" |
 | Screen-reader actions | "Next terminal" · "Previous terminal" · "Next agent that needs you" · "Previous agent that needs you" |
 | Spoken after a step | "<name>, <place>" as the title bar shows them (for example "Pricing page copy, website / 2 · workstation") |
-| Spoken at the end | "No more terminals" |
+| Spoken at the tab's end | "No more terminals in this tab" |
+| Title bar: the overflow button, spoken | "More options" |
+| Title bar menu: its item | "Changes" |
+| Title bar: the view switch, spoken | "Chat" (in the terminal) · "Terminal" (in the chat), the words shown today |
+| Spoken: the context gauge | "Context, 47% used" (window known) · "Context, 223k tokens used" (window not known) |
 
 ## New on screen (each needs the owner's sign-off against a render)
 
-All five use only colours, type and marks that exist in
-`design-tokens.json`; none has a render yet (task 4.1 makes them).
+All of them use only colours and type that exist in `design-tokens.json`;
+new icons follow the existing line icons. None has a render yet (task 4.1
+makes them, 4.2 is the sign-off).
 
 1. **The home switch.** The top bar's title becomes two words in the screen
    title's type, "Agents" and "Spaces"; the chosen one in the text colour,
@@ -179,14 +221,21 @@ All five use only colours, type and marks that exist in
    the row's 18 dp slot); a tab line (map, then the tab's name in the
    secondary type); under it the existing needs-you card, agent row and
    other-terminal row.
-4. **The title bar with the map**, as a 48 dp button before the Changes
-   button, in the terminal and in the chat. The chat's bar also holds the
+4. **The title bar with the map**, as a 48 dp button, in the terminal and
+   in the chat, before the overflow button. The chat's bar also holds the
    gauge and the view switch; the render must show it at 412 dp and at 130%
    font size, and you choose what gives way if it does not fit.
 5. **The tab overview.** A sub-screen with the back bar the Changes screen
    has, titled with the space's name; the space's tabs as a row of tab maps
    with names; the chosen tab's tiles in popover colour with the program
    mark, name and state mark.
+6. **The overflow menu.** A 48 dp three-dot button, last in the title bar,
+   and the menu it opens, holding "Changes".
+7. **The view switch as an icon.** A 48 dp icon button in place of the
+   "Terminal" / "Chat" pill.
+8. **The context gauge as a ring.** A small ring in place of "42%" or
+   "223k", filled to the share used when the window is known, and showing
+   no share when it is not (Claude Code).
 
 ## Impact
 
@@ -196,9 +245,13 @@ All five use only colours, type and marks that exist in
 - Android: a new `ui/spaces/` package; `ui/agents/AgentsHome.kt` (the
   walk), `AgentsRoute.kt` and `AgentsScreen.kt` (the switch),
   `ui/terminal/TerminalScreen.kt` and `TerminalRoute.kt` (map, actions,
-  dwell), `ui/chat/ChatScreen.kt` (map in the shared bar).
-- Design: four renders, five component entries in `design-tokens.json`,
-  checkpoints, goldens.
+  dwell, bounce, the overflow menu), `ui/chat/ChatScreen.kt` (map in the
+  shared bar, the icon switch, the ring gauge), `ui/chat/ChatState.kt`
+  (the gauge's spoken value), `ui/changes/ChangesRoute.kt` (the Changes
+  button leaves the bar).
+- Design: four renders (the title bar render now also shows the menu, the
+  icon switch and the ring), three new icons, eight component entries in
+  `design-tokens.json`, checkpoints, goldens.
 - Specs: `android-client-v1` amended in place (two requirements).
 - Shares files with #28 (wide layout: `AgentsRoute.kt`, `TerminalRoute.kt`)
   and `desktop-chat` (the hub's chat code moves; this change does not touch
@@ -209,6 +262,8 @@ All five use only colours, type and marks that exist in
   showing which pane the desk has in focus (the document does not say).
   Until the peek change, a sub-agent's terminal that sits in a pane shows
   as an empty cell in Spaces; the Agents view lists what it lists today.
-- Estimate: 10 to 13 builder runs and one design session with the owner.
+- Estimate: 14 to 17 builder runs (the narrowing of the walk, then three
+  for the title bar and one for its fit) and one design session with the
+  owner.
   Confidence: moderate for the Rust and the walk, low for the screens until
   the renders are signed off.

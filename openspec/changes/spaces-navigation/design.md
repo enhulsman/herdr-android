@@ -139,7 +139,12 @@ last.
   `Core`, `rig`; `tests/starting.rs:293-325` already answers `doc.get` for
   `herdr-app` and sends a `doc` event).
 
-## D3. The walk is computed when the finger lifts
+## D3. The walk stays in the tab and is computed when the finger lifts
+
+Decision 1 was answered on 2026-11-20 as option (b): the sideways swipe
+walks only the stops of the open terminal's tab and stops at the tab's
+ends, with a bounce. Walking further is quicker through the Agents or
+Spaces view than by swiping.
 
 The list by state needs a frozen order (`AgentsHome.walk`,
 `ui/agents/AgentsHome.kt:57`), because opening an agent re-sorts that list.
@@ -147,25 +152,46 @@ Desk order does not move when a terminal is opened, so the sideways walk
 reads the current snapshot at each step:
 
 ```
-stops(snapshot): for each machine in snapshot order, if connected and it has a desk:
-    for space, tab, cell in desk order: a Terminal cell's address, if a row exists
-    then the machine's loose addresses, if a row exists
+stops(snapshot, current): the machine of current, if connected and it has a desk:
+    the tab whose cells hold current's address; its Terminal cells in desk order, if a row exists
+    empty when current is in no tab (loose, a sub-agent, gone, or its machine is not connected)
 next(stops, current) / previous(stops, current); null at an end
 ```
 
 - Which terminals may be stops is decided in Rust (`seat`, D1); "a row
   exists" only covers the gap between two snapshots.
-- A current terminal that is in no stop list (its machine just went out of
-  reach, or it is a sub-agent's terminal opened from "Other terminals") has
-  no next or previous: the end haptic.
+- Loose terminals and other machines are never stops. A current terminal
+  with no tab, or alone in its tab, has no next or previous: the end.
+- At an end the title bar gives the end haptic (`REJECT`, as today,
+  `ui/terminal/TerminalScreen.kt`) and bounces: the bar's content moves
+  about 12 dp in the swipe's direction and springs back, in about 200 ms
+  (the exact distance and timing are the render's and the phone check's).
+  With the system's animations off (`ANIMATOR_DURATION_SCALE` 0, read as
+  `ui/chat/ChatRoute.kt` reads it) there is no bounce, only the haptic. The
+  up and down walk keeps its end haptic without a bounce, and so does a
+  step refused because the compose sheet holds text (D4): the bounce means
+  "end of the tab" only.
+- A step gives the light haptic (`CLOCK_TICK`). There is no stronger haptic
+  any more: a step never enters another tab. The `entersAnotherTab` flag
+  and `HapticFeedbackConstants.CONTEXT_CLICK` of the first version go.
 - `AgentsHome.tab` (`:153`) changes to this walk; `step` (`:129`), `walk`,
   `behind` and `ahead` stay for the up and down swipe. A sideways step
   still clears `behind` and `ahead`, as today.
-- A step enters another tab when the tab id, the space id or the machine of
-  the two stops differ, or one of them is loose and the other is not. That
-  decides the stronger haptic (`HapticFeedbackConstants.CONTEXT_CLICK`; the
-  light one stays `CLOCK_TICK`, the end stays `REJECT`,
-  `ui/terminal/TerminalScreen.kt:282-284`).
+
+**What 3.1 already built.** `ui/spaces/DeskOrder.kt` (commit 1b4c1b7)
+implements the first version: `stops(snapshot)` is one list across every
+connected machine, every space and tab, then the loose terminals, and
+`DeskStep` carries `entersAnotherTab`. Task 3.3 narrows it: `stops` takes
+the current terminal and returns its tab's stops only, and the flag goes.
+`next` and `previous` keep their rule.
+
+**What of the Rust work is still needed: all of it.** The walk no longer
+needs stops that span machines, but the Spaces view lists every machine's
+spaces, tabs and loose terminals in desk order (D6), the title bar's map and
+the tab overview need each tab's cells with their geometry (D7, D8), and a
+machine out of reach keeps its last layout. So `desk`, `seat`, the held
+layout per machine and `MachineView.desk` (2.1 to 2.4) all stay as built;
+nothing in Rust changes for decision 1.
 
 Existing tests in `AgentsHomeTest` that assert the sideways walk follows
 the list by state encode the old rule. They are rewritten to the new rule,
@@ -283,14 +309,59 @@ last screen in a tile, can be a later issue.
 
 - The title bar's merged node gets `customActions` for the four steps; the
   result is spoken with `announceForAccessibility` (name and place, or "No
-  more terminals").
+  more terminals in this tab" when a sideways action opened nothing).
 - TalkBack cannot be driven over adb, and a UI dump pauses it. So merged
   semantics are tested in Robolectric (as `ReadOnceTest` does), and the
   owner listens once on a phone.
 - Tap targets are 48 dp; the map in the title bar is a button with the
   spoken name "Tab overview, terminal 2 of 3".
 
-## Risks
+## D10. A quieter title bar
+
+Answered 2026-11-20 with decisions 7 and 8. What the title bar holds today:
+`TitleBar` (`ui/terminal/TerminalScreen.kt`) draws Back, the program mark,
+the name and its line, then a `trailing` slot. The terminal fills the slot
+with `ChangesButton` and `ViewSwitch("Chat")`; the chat
+(`ui/chat/ChatScreen.kt`) with `Gauge`, `ChangesButton` and
+`ViewSwitch("Terminal")`.
+
+- **Changes into a menu.** `ChangesButton` (`ui/changes/ChangesRoute.kt`)
+  is already an icon (`LineIcon.Changes`, 44 dp, spoken "Show the files
+  this agent changed", `CHANGES_DESCRIPTION` in `ChangesText.kt`). It
+  leaves the bar. A new `TitleBarMenu` in `ui/terminal/` takes its place at
+  the end of the slot: a 48 dp button with a three-dot `LineIcon` and a
+  menu in a `Popup` from Compose UI (the app uses Compose Foundation only,
+  no Material, and takes no new dependency), on the tokens' popover
+  colour. Its one item opens Changes through the existing
+  `onChanges` (`openChanges` in `ui/terminal/TerminalRoute.kt`, which also
+  hides the keyboard). The menu takes a list of items, so a later option is
+  one more entry. `TitleBar`'s drag handler is on the whole row, so a swipe
+  that starts on the button still steps; a tap opens the menu.
+- **The switch as an icon.** `ViewSwitch` (`ui/chat/ChatScreen.kt`) is a
+  text pill, "Chat" or "Terminal", in `KuddeType.pill` on the raised
+  colour, without a button role. In the title bar it becomes a 48 dp icon
+  button (two new `LineIcon`s, the chosen icons from the render), role
+  Button, `contentDescription` "Chat" or "Terminal". `ViewSwitch` itself
+  stays for the chat's "Show the terminal" buttons in the body, which keep
+  their words.
+- **The gauge as a ring.** `Gauge` (`ui/chat/ChatScreen.kt`) is text today:
+  `gaugeLabel` (`ui/chat/ChatState.kt`) gives "42%" when Codex reports a
+  window and the tokens ("223k") otherwise; a tap toggles
+  `ChatState.gaugeOpen`, which shows `gaugeDetail` in a strip under the
+  bar. It shows only in the chat; the terminal has none. It becomes a ring
+  of about 18 dp in a 48 dp touch area, drawn on a `Canvas`: the track in
+  the border colour, the used share in the text colour when
+  `gaugePercent` is known. Claude Code's log has no window size
+  (decisions.md, 2026-11-14), so it has tokens only and no share: the
+  ring then draws no fill, and how it says "tokens only" is the render's.
+  A pure function `gaugeSpoken(used, window, percent)` beside `gaugeLabel`
+  gives the spoken value, set as the node's `stateDescription`, with
+  `progressBarRangeInfo` only when the share is known. The tap and the
+  detail strip stay as they are.
+- The map (D7) joins the same slot. The menu button is always last; the
+  render decides the order of the map, the gauge and the switch, their
+  spacing, and how they fit at 412 dp and 130% font.
+
 
 - **Pane order is our reading of the tree.** herdr documents moving between
   panes by direction only. Depth first matches what the official phone app
@@ -302,8 +373,13 @@ last screen in a tile, can be a later issue.
   suite in CI runs against the newest herdr-core; it does not cover the
   desk app's document. A fixture copied from a real document, with invented
   names, guards the reader (task 2.1).
-- **The title bar is tight under the chat** (gauge, map, Changes, view
-  switch). Settled at the render (proposal, "New on screen" 4).
+- **The title bar is tight under the chat** (map, gauge, view switch,
+  overflow button). D10 frees room: Changes goes into the menu and the
+  switch and gauge become icon-sized. Settled at the render (proposal,
+  "New on screen" 4, 6 to 8).
+- **A tab of one pane gets no sideways walk.** Accepted with decision 1:
+  where today a sideways swipe opens the next agent of the Agents list, it
+  now only bounces. Most terminals sit alone in their tab, so this is felt.
 - **The reach of the title bar** on a tall phone. If it bothers in use, the
   two-finger swipe of decision 5 is the follow-up.
 - **400 ms** may feel slow or too short. One constant; phone check.

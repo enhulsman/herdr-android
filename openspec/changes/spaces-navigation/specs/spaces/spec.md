@@ -1,8 +1,9 @@
 # spaces Specification (delta)
 
 Words used below. **Desk order**: the order the herdr app shows things in,
-as its layout document lists them. **Stop**: a terminal the sideways swipe
-can open. **Placeholder**: a pane the phone cannot show (a mod pane, or a
+as its layout document lists them. **Stop**: a terminal in a pane of a tab
+that the sideways swipe can open; the swipe walks only the stops of the open
+terminal's own tab. **Placeholder**: a pane the phone cannot show (a mod pane, or a
 node of a kind it does not know). **Vacant**: a pane whose terminal the
 phone does not list in Spaces (it is not live, or it is a sub-agent).
 **Sub-agent**: a terminal whose record has a `parent`, whether or not it
@@ -278,38 +279,47 @@ name, how many terminals it holds and how many need the person.
 - **WHEN** its map is drawn
 - **THEN** the map is one cell
 
-### Requirement: A sideways swipe on the title bar walks the desk order
+### Requirement: A sideways swipe on the title bar walks the open tab
 From an open terminal or its chat, a sideways swipe on the title bar SHALL
 open the next stop (finger moving left) or the previous stop (finger moving
-right) in desk order: the stops of this tab, then of the space's next tab,
-then of the machine's next space, then the machine's stops under "Not in a
-space", then the next connected machine in the phone's order. Every live
-terminal that is not a sub-agent SHALL be a stop, with or without agent
-status; placeholders, vacant panes, sub-agents and terminals of machines
-that are not connected SHALL NOT be stops. From an open terminal that is
-not a stop itself, a sideways swipe SHALL give the end haptic and open
-nothing. The order SHALL be taken from the layout as it
-is when the finger lifts. The walk SHALL NOT wrap: at either end the swipe
-gives the end haptic and opens nothing. A step SHALL give a light haptic,
-and a stronger one when it enters another tab.
+right) of the open terminal's own tab, in desk order. Every live terminal
+that is not a sub-agent and sits in a pane of that tab SHALL be a stop, with
+or without agent status; placeholders, vacant panes and sub-agents SHALL NOT
+be stops. The walk SHALL stay inside the tab: it SHALL NOT open a terminal
+of another tab, another space or another machine, nor one under "Not in a
+space". The order SHALL be taken from the layout as it is when the finger
+lifts. The walk SHALL NOT wrap.
+
+At either end of the tab, in a tab of one pane, and from an open terminal
+that is in no tab (in no pane, a sub-agent, or of a machine that is not
+connected), a sideways swipe SHALL open nothing, SHALL give the end haptic
+and SHALL make the title bar bounce briefly in the swipe's direction. With
+the system's animations off, the bounce SHALL be left out and the end
+haptic SHALL stay. A step SHALL give a light haptic.
 
 The swipe up and down on the title bar SHALL stay the walk through the
-agents that need the person (capability agent-list).
+agents that need the person (capability agent-list), across tabs, spaces
+and machines as today, and SHALL NOT bounce.
 
 #### Scenario: The next pane
 - **GIVEN** a tab with the terminals A, B and a shell, in that order, and A open
 - **WHEN** the person swipes left on the title bar twice
 - **THEN** B opens, then the shell, each with a light haptic
 
-#### Scenario: Into the next tab and the next space
-- **GIVEN** the open terminal is the last of its tab, and the last tab of its space is the one after
-- **WHEN** the person swipes left until the stops of that tab are passed
-- **THEN** the first terminal of the next tab opens with the stronger haptic, and after that tab's last terminal the first terminal of the next space opens
-
-#### Scenario: The end
-- **GIVEN** the open terminal is the last stop of the last connected machine
+#### Scenario: The end of the tab
+- **GIVEN** the open terminal is the last stop of its tab, and the space has another tab after it
 - **WHEN** the person swipes left
-- **THEN** nothing opens and the end haptic is given
+- **THEN** nothing opens, the title bar bounces and the end haptic is given; no terminal of the next tab opens
+
+#### Scenario: The start of the tab
+- **GIVEN** the open terminal is the first stop of its tab, and the space has another tab before it
+- **WHEN** the person swipes right
+- **THEN** nothing opens, the title bar bounces and the end haptic is given
+
+#### Scenario: A tab of one pane
+- **GIVEN** the open terminal is alone in its tab, and other agents are listed in the Agents view
+- **WHEN** the person swipes left or right on the title bar
+- **THEN** nothing opens, the title bar bounces and the end haptic is given
 
 #### Scenario: A placeholder is passed over
 - **GIVEN** a tab with terminal A, a mod pane, and terminal B, with A open
@@ -324,41 +334,48 @@ agents that need the person (capability agent-list).
 #### Scenario: From a sub-agent's terminal
 - **GIVEN** the person opened a sub-agent's shell from "Other terminals" in the Agents view
 - **WHEN** the person swipes left or right on the title bar
-- **THEN** nothing opens and the end haptic is given
+- **THEN** nothing opens, the title bar bounces and the end haptic is given
 
-#### Scenario: A machine out of reach is passed over
-- **GIVEN** three machines in the phone's order, the second unreachable, and the last stop of the first machine open
-- **WHEN** the person swipes left
-- **THEN** the first stop of the third machine opens
+#### Scenario: From a terminal in no pane
+- **GIVEN** the person opened an agent that the Spaces view lists under "Not in a space"
+- **WHEN** the person swipes left or right on the title bar
+- **THEN** nothing opens, the title bar bounces and the end haptic is given
 
 #### Scenario: Opened from the list by state
-- **GIVEN** the person opened agent C from the Agents view, where it stood first
+- **GIVEN** the person opened agent C from the Agents view, where it stood first, and C is the first of three panes in its tab
 - **WHEN** the person swipes left on the title bar
-- **THEN** the stop after C in desk order opens, not the second agent of the Agents view
+- **THEN** the second terminal of C's tab opens, not the second agent of the Agents view
+
+#### Scenario: Animations off
+- **GIVEN** the system's animations are off and the open terminal is the last stop of its tab
+- **WHEN** the person swipes left
+- **THEN** nothing opens and the end haptic is given, without a bounce
 
 #### Scenario: Up and down are unchanged
-- **GIVEN** three agents need the person
+- **GIVEN** three agents need the person, in different spaces
 - **WHEN** the person swipes up on the title bar
-- **THEN** the next agent that needs the person opens, as before this change
+- **THEN** the next agent that needs the person opens, as before this change, also when it sits in another tab or space
 
 #### Scenario: The view chosen stays
-- **GIVEN** the person chose Chat, and the next stop is a shell without a conversation
-- **WHEN** the person swipes left twice, past the shell to an agent with a readable log
+- **GIVEN** the person chose Chat, and the open agent's tab holds next a shell without a conversation and then an agent with a readable log
+- **WHEN** the person swipes left twice, past the shell to the agent
 - **THEN** the shell shows its terminal and the agent after it shows its chat
 
 ### Requirement: The desk never moves the person
 A change of the layout SHALL NOT open, close or switch a terminal on the
-phone. When the open terminal's pane moves, the title bar's map and the
-next and previous stops SHALL follow the new layout. When the open
-terminal's pane is closed on the desk while the terminal lives on, the
-terminal SHALL stay open, the title bar SHALL show no map, and the terminal
-SHALL count as one under "Not in a space". When the terminal itself is gone,
+phone. When the open terminal's pane moves, also to another tab, the title
+bar's map and the next and previous stops SHALL follow the new layout: the
+stops are then those of the tab it sits in now. When the open terminal's
+pane is closed on the desk while the terminal lives on, the terminal SHALL
+stay open, the title bar SHALL show no map, the terminal SHALL count as one
+under "Not in a space", and a sideways swipe SHALL open nothing, with the
+bounce and the end haptic. When the terminal itself is gone,
 the screen SHALL close as it does today.
 
 #### Scenario: The open pane moves to another tab
 - **GIVEN** terminal A is open, second of three in the tab "main"
 - **WHEN** the desk moves A's pane to the tab "2", where it is alone
-- **THEN** A stays open, the map shows one cell, and a swipe left opens the stop after tab "2"
+- **THEN** A stays open, the title bar shows no map, and a swipe left or right opens nothing, with the bounce and the end haptic
 
 #### Scenario: Panes are reordered around the open one
 - **GIVEN** a tab with A, B, C in that order and B open
@@ -368,12 +385,12 @@ the screen SHALL close as it does today.
 #### Scenario: The pane is closed, the terminal lives on
 - **GIVEN** terminal A is open
 - **WHEN** the desk parks A, so it sits in no pane
-- **THEN** A stays open without a map, and a swipe right opens the last stop of the machine's spaces
+- **THEN** A stays open without a map, and a swipe left or right opens nothing, with the bounce and the end haptic
 
 #### Scenario: The layout changes during a swipe
-- **GIVEN** the person's finger is down on the title bar, moving left
-- **WHEN** the layout changes before the finger lifts
-- **THEN** the stop that opens is the next one in the new layout
+- **GIVEN** the person's finger is down on the title bar, moving left, in a tab with A, B, C and A open
+- **WHEN** the desk reorders the tab to A, C, B before the finger lifts
+- **THEN** C opens, the next stop in the new layout
 
 ### Requirement: Steps start only on the title bar
 A step SHALL come only from a drag that starts on the title bar, outside
@@ -405,7 +422,7 @@ the end haptic.
 - **THEN** the terminal scrolls and no step is taken
 
 #### Scenario: Selecting text
-- **GIVEN** the person long-pressed the terminal and is selecting text
+- **GIVEN** the person long-pressed the terminal and is selecting text, in a tab with another pane after it
 - **WHEN** the person swipes left on the title bar
 - **THEN** the next stop opens and nothing is selected there
 
@@ -426,12 +443,12 @@ left before 400 ms have passed SHALL NOT be attached or resized. A terminal
 opened by a tap SHALL open at once, as today.
 
 #### Scenario: Three quick steps
-- **GIVEN** the terminals A, B, C, D in desk order and A open
+- **GIVEN** the terminals A, B, C, D in one tab, in that order, and A open
 - **WHEN** the person steps to B at 0 ms, to C at 300 ms and to D at 600 ms, and stays on D
 - **THEN** D is opened at 1000 ms at the phone's size, and B and C were never attached and kept their desk size
 
 #### Scenario: Three slow steps
-- **GIVEN** the terminals A, B, C, D in desk order and A open
+- **GIVEN** the terminals A, B, C, D in one tab, in that order, and A open
 - **WHEN** the person steps to B at 0 ms, to C at 450 ms and to D at 900 ms
 - **THEN** B was opened at 400 ms and C at 850 ms, each is detached when it is left, and D is opened at 1300 ms
 
@@ -502,12 +519,13 @@ The title bar of the terminal and of its chat SHALL show the tab's map, with
 the open terminal's cell marked, while that terminal sits in a tab with more
 than one pane. A tap on the map SHALL open the tab overview. In a
 tab of one pane, and for a terminal in no pane, the title bar SHALL show no
-map. The line under the name SHALL stay as capability agent-names sets it.
+map. The title bar SHALL NOT show pane dots, beside the map or in its place.
+The line under the name SHALL stay as capability agent-names sets it.
 
 #### Scenario: Second of three
 - **GIVEN** the open terminal is the second of three panes in its tab
 - **WHEN** the title bar shows
-- **THEN** it shows the tab's map with the second cell marked, spoken as "Tab overview, terminal 2 of 3"
+- **THEN** it shows the tab's map with the second cell marked, spoken as "Tab overview, terminal 2 of 3", and no pane dots
 
 #### Scenario: A step moves the mark
 - **GIVEN** the title bar shows the second cell marked
@@ -565,12 +583,14 @@ app SHALL NOT draw live terminals side by side at phone width.
 
 ### Requirement: Every step has a way without a swipe
 Every stop SHALL be reachable by taps alone: through the Spaces view, and
-within a space through the title bar's map and the tab overview. With a
-screen reader on, the title bar SHALL offer the actions "Next terminal",
-"Previous terminal", "Next agent that needs you" and "Previous agent that
-needs you", which do what the four swipes do; after one of them the app
-SHALL say the new terminal's name and place once, or "No more terminals"
-when nothing opened. The switch, the tab lines, the maps and the tiles SHALL
+within a space through the title bar's map and the tab overview. A terminal
+of another tab, which the sideways swipe does not reach, SHALL be reachable
+the same way. With a screen reader on, the title bar SHALL offer the actions
+"Next terminal", "Previous terminal", "Next agent that needs you" and
+"Previous agent that needs you", which do what the four swipes do (the
+first two inside the open tab, as the sideways swipe); after one of them
+the app SHALL say the new terminal's name and place once, or "No more
+terminals in this tab" when a sideways action opened nothing. The switch, the tab lines, the maps and the tiles SHALL
 be at least 48 dp high and wide to the touch and SHALL have spoken names;
 the switch SHALL say which view is chosen. All of it SHALL hold at the
 largest font size.
@@ -583,12 +603,12 @@ largest font size.
 #### Scenario: A screen reader steps
 - **GIVEN** a screen reader is on and the title bar has its focus
 - **WHEN** the person chooses the action "Next terminal"
-- **THEN** the next stop in desk order opens and the app says its name and place once
+- **THEN** the next stop of the open tab opens and the app says its name and place once
 
 #### Scenario: A screen reader at the end
-- **GIVEN** a screen reader is on and the last stop is open
+- **GIVEN** a screen reader is on and the last stop of its tab is open, with another tab after it
 - **WHEN** the person chooses the action "Next terminal"
-- **THEN** nothing opens and the app says "No more terminals"
+- **THEN** nothing opens and the app says "No more terminals in this tab"
 
 #### Scenario: A space is read once
 - **GIVEN** a screen reader is on
@@ -598,3 +618,113 @@ largest font size.
 #### Scenario: The largest font size
 - **WHEN** the phone's font size is at its largest
 - **THEN** the switch, a space header, a tab line with its map and the title bar with its map show their text uncut
+
+### Requirement: The title bar keeps its options in one menu
+The title bar of the terminal and of its chat SHALL end with an overflow
+button (three dots), at least 48 dp to the touch, with the spoken name
+"More options". A tap on it SHALL open a menu that holds "Changes"; choosing
+it SHALL open the Changes view exactly as the Changes button did (capability
+changes-view). The title bar SHALL NOT show a separate Changes button. The
+menu SHALL be the place for options the title bar gains later. Opening and
+closing the menu SHALL NOT send anything to the terminal. A swipe that
+starts on the overflow button SHALL be handled as a swipe on the title bar.
+
+#### Scenario: Changes from the menu
+- **GIVEN** a terminal is open
+- **WHEN** the person taps the overflow button and then "Changes"
+- **THEN** the Changes view opens for that agent's repository, as it did from the Changes button
+
+#### Scenario: The same in the chat
+- **GIVEN** the chat of an agent is open
+- **WHEN** the person taps the overflow button
+- **THEN** the menu holds "Changes"
+
+#### Scenario: No Changes button
+- **WHEN** the title bar of a terminal or a chat shows
+- **THEN** it shows no Changes button outside the menu
+
+#### Scenario: Closing the menu
+- **GIVEN** the menu is open
+- **WHEN** the person taps outside it or goes back
+- **THEN** the menu closes, the terminal stays open, and nothing was sent to it
+
+#### Scenario: Spoken name
+- **GIVEN** a screen reader is on
+- **WHEN** its focus lands on the overflow button
+- **THEN** it reads "More options" and that it is a button
+
+### Requirement: The view switch is an icon
+The title bar's switch SHALL show an icon and no word. It is the button
+that switches between an agent's terminal and its chat: in the terminal it
+shows the icon of the chat, in the chat the icon of the terminal. It SHALL be at least 48 dp to
+the touch, SHALL have the role of a button, and SHALL keep the words as its
+spoken names: "Chat" in the terminal, "Terminal" in the chat. It SHALL show
+and act as today in every other way: it shows only where the chat is
+offered, and a tap switches the view. Buttons outside the title bar that
+lead to the terminal ("Show the terminal") SHALL keep their words.
+
+#### Scenario: From the terminal
+- **GIVEN** a terminal whose agent has a readable conversation
+- **WHEN** the title bar shows
+- **THEN** the switch shows the chat's icon and no text, and a screen reader reads it as "Chat", a button
+
+#### Scenario: From the chat
+- **GIVEN** the chat of an agent is open
+- **WHEN** the person taps the switch
+- **THEN** the terminal shows, as it did from the "Terminal" button
+
+#### Scenario: No chat offered
+- **GIVEN** a terminal whose program has no conversation the app can read
+- **WHEN** the title bar shows
+- **THEN** there is no switch, as today
+
+#### Scenario: Words outside the title bar
+- **GIVEN** the chat shows "Show the terminal" under a message that it cannot show
+- **WHEN** the person looks at it
+- **THEN** it is still a button with those words
+
+### Requirement: The context gauge is a small ring
+In the chat's title bar, the context indicator SHALL be a small circular
+gauge in place of today's text ("42%", "223k"). When the session's context
+window is known, the ring SHALL be filled to the share of the window used.
+When the window is not known, as for Claude Code, the gauge SHALL NOT draw
+a share it does not know. The gauge SHALL be at least 48 dp to the touch;
+a tap SHALL show and hide the detail line under the title bar as today
+("223k of 475k tokens", "283k tokens used"). Its value SHALL be available
+to a screen reader: "Context, 42% used" when the window is known, "Context,
+223k tokens used" when it is not. When nothing is known about the context,
+the chat SHALL show no gauge, as today. The terminal's title bar SHALL show
+no gauge, as today.
+
+#### Scenario: A share of a known window
+- **GIVEN** a Codex chat that used 223k of a 475k token window
+- **WHEN** the title bar shows
+- **THEN** the gauge is a ring filled to 47%, shows no text, and a screen reader reads "Context, 47% used"
+
+#### Scenario: Tokens without a window
+- **GIVEN** a Claude Code chat that used 223k tokens, whose window is not known
+- **WHEN** the title bar shows
+- **THEN** the gauge draws no share, and a screen reader reads "Context, 223k tokens used"
+
+#### Scenario: The detail on a tap
+- **WHEN** the person taps the gauge
+- **THEN** the line "223k of 475k tokens" shows under the title bar, and a second tap hides it
+
+#### Scenario: Nothing known
+- **GIVEN** a chat whose log has no token count yet
+- **WHEN** the title bar shows
+- **THEN** there is no gauge
+
+### Requirement: The title bar fits its controls
+The title bar of the terminal and of the chat SHALL hold Back, the
+program's mark, the name and the line under it, and then, each when shown,
+the tab's map, the gauge (chat only), the view switch and, last, the
+overflow button; the order among the map, the gauge and the switch is the
+signed-off render's. At 412 dp wide and at 130% font size the controls
+SHALL NOT overlap and SHALL NOT be cut; the name SHALL give way first,
+ending in an ellipsis.
+
+#### Scenario: Everything shown at 130%
+- **GIVEN** a 412 dp wide phone at 130% font size, and the chat of an agent in a tab of three panes with a known context window
+- **WHEN** the title bar shows
+- **THEN** Back, the mark, the name (cut with an ellipsis if needed), the map, the gauge, the switch and the overflow button all show whole, none overlapping

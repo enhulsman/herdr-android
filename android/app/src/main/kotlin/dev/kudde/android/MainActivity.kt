@@ -15,11 +15,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import dev.kudde.android.ui.addmachine.AddMachineRoute
 import dev.kudde.android.ui.agents.AgentsHome
 import dev.kudde.android.ui.agents.AgentsRoute
 import dev.kudde.android.ui.flows.MachineFlows
 import dev.kudde.android.ui.flows.Screen
+import dev.kudde.android.ui.flows.SetupScreen
 import dev.kudde.android.ui.hostkey.HostKeyChangedActions
 import dev.kudde.android.ui.hostkey.HostKeyChangedScreen
 import dev.kudde.android.ui.hostkey.TrustDialog
@@ -90,7 +90,7 @@ private fun Root(app: KuddeApp) {
             // AgentsRoute's own BackHandler closes its sheet before this one leaves the app.
             Screen.Agents -> AgentsRoute(app, flows, home)
             Screen.Machines -> MachinesRoute(app, flows, onBack = { flows.back() })
-            Screen.AddMachine -> AddMachineRoute(flows, snapshot)
+            Screen.Setup -> SetupScreen(flows.setupStep, onBack = { flows.back() })
             // onSnapshot returns to Machines once the machine no longer shows a changed key.
             Screen.HostKeyChanged -> hostKeyChange(snapshot, flows.machine)?.let { change ->
                 HostKeyChangedScreen(
@@ -105,7 +105,7 @@ private fun Root(app: KuddeApp) {
                     ),
                 )
             }
-            Screen.PhoneKey -> PhoneKeyRoute(app.keyManager, flows.machine, onBack = { flows.back() })
+            Screen.KeyCommand -> PhoneKeyRoute(app.keyManager, flows.machine, onBack = { flows.back() })
         }
         flows.trustPrompt(snapshot)?.let { prompt ->
             TrustDialog(prompt, flows.error, onTrust = flows::trust, onCancel = flows::cancelTrust)

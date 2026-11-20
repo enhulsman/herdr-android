@@ -6,7 +6,11 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import dev.kudde.android.hub.HubHost
+import dev.kudde.android.ui.addmachine.FormErrors
+import dev.kudde.android.ui.addmachine.MachineInput
 import dev.kudde.android.ui.addmachine.ValidMachine
+import dev.kudde.android.ui.addmachine.derivedMachineName
+import dev.kudde.android.ui.addmachine.validateMachine
 import dev.kudde.android.ui.hostkey.HostKeyPrompt
 import dev.kudde.android.ui.hostkey.hostKeyChange
 import dev.kudde.android.ui.hostkey.hostKeyPrompt
@@ -15,19 +19,20 @@ import uniffi.kudde_mobile.HubException
 import uniffi.kudde_mobile.HubInterface
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
+import uniffi.kudde_mobile.ReachKind
 
 /** The app's screens; switched by state, without a navigation library. */
 enum class Screen {
     /** The start screen: every agent, the ones that need you first (renders 1 and 2). */
     Agents,
     Machines,
-    AddMachine,
+    Setup,
 
     /** A machine presented a different host key: both fingerprints, and only "Forget this machine's key". */
     HostKeyChanged,
 
     /** The restricted authorized_keys line with its Copy button. */
-    PhoneKey,
+    KeyCommand,
 }
 
 /**
@@ -50,18 +55,30 @@ class MachineFlows(private val hubHost: HubHost) {
     var screen by mutableStateOf(Screen.Agents)
         private set
 
-    /** The machine [Screen.HostKeyChanged] or [Screen.PhoneKey] is about (none for the Phone key row). */
+    /** The machine [Screen.HostKeyChanged] or [Screen.Setup] is about (none for the Phone key row). */
     var machine by mutableStateOf<String?>(null)
         private set
 
-    /**
-     * A machine just added from the form, until its setup ends: trusted,
-     * cancelled, or another outcome. Kept while its trust dialog is open, so
-     * a suspension in the background (Paused, then Connecting) brings the
-     * dialog back once the hub reports the unconfirmed key again.
-     */
+    /** Only a submitted step 1 is waiting for its first result. */
     var waitingFor by mutableStateOf<String?>(null)
         private set
+
+    var setupStep by mutableStateOf(1)
+        private set
+    var input by mutableStateOf(MachineInput())
+        private set
+    private var addedThisVisit by mutableStateOf(false)
+    private var reachedThisVisit by mutableStateOf(false)
+    private var setupOrigin = Screen.Agents
+
+    val nameLocked: Boolean
+        get() = current().machines.find { it.name == machine }?.let {
+            it.hostKey != null || it.lastConnectedMs != null
+        } ?: false
+
+    fun changeInput(value: MachineInput) {
+        input = if (nameLocked) value.copy(name = machine.orEmpty()) else value
+    }
 
     /** The machine whose trust dialog is open, over whichever screen is showing. */
     var trusting by mutableStateOf<String?>(null)
@@ -84,9 +101,9 @@ class MachineFlows(private val hubHost: HubHost) {
     /** The Machines screen's seams, wired to these flows. */
     fun actions(base: MachinesActions): MachinesActions = base.copy(
         onHostKey = ::openHostKey,
-        onAddPhoneKey = { name -> show(Screen.PhoneKey, name) },
-        onPhoneKey = { show(Screen.PhoneKey, null) },
-        onAddMachine = { show(Screen.AddMachine, null) },
+        onAddPhoneKey = { name -> openSetup(name, atLeast = 2) },
+        onPhoneKey = { show(Screen.KeyCommand, null) },
+        onAddMachine = ::openAddMachine,
         onRemove = ::askRemove,
         onConfirmRemove = ::remove,
         onCancelRemove = ::cancelRemove,
@@ -101,8 +118,57 @@ class MachineFlows(private val hubHost: HubHost) {
         show(Screen.Agents, null)
     }
 
-    /** The empty Agents home's "Add machine"; back from the form lands on Machines. */
-    fun openAddMachine() = show(Screen.AddMachine, null)
+    /** Start a fresh visit; back from step 1 returns to its caller. */
+    fun openAddMachine() {
+        setupOrigin = screen.takeIf { it == Screen.Machines } ?: Screen.Agents
+        show(Screen.Setup, null)
+        setupStep = 1
+        input = MachineInput()
+        addedThisVisit = false
+        reachedThisVisit = false
+    }
+
+    /** Resume a listed machine. Card desk actions explicitly open step 2. */
+    fun openSetup(name: String, atLeast: Int = 1) {
+        val m = current().machines.find { it.name == name } ?: return
+        setupOrigin = screen.takeIf { it == Screen.Agents } ?: Screen.Machines
+        show(Screen.Setup, name)
+        setupStep = when {
+            m.state is MachineState.Connected -> 3
+            m.hostKey == null && m.state !is MachineState.HostKeyUnconfirmed -> 1
+            else -> 2
+        }.coerceAtLeast(atLeast.coerceIn(1, 2))
+        val name = if (m.hostKey == null && m.lastConnectedMs == null && m.name == derivedMachineName(m.host)) "" else m.name
+        input = MachineInput(name, m.host, m.port.toString(), m.user)
+        addedThisVisit = false
+        reachedThisVisit = setupStep >= 2
+        if (m.state is MachineState.HostKeyMismatch) show(Screen.HostKeyChanged, name)
+    }
+
+    /** The only deliberate backward step; preserves this visit's ownership. */
+    fun changeAddress() {
+        if (screen != Screen.Setup || machine == null) return
+        setupStep = 1
+        trusting = null
+        waitingFor = null
+    }
+
+    fun retry() {
+        call { it.retry() }
+    }
+
+    /** The hub owns grace. Neither deadlines nor the number of snapshots matter. */
+    fun failure(snapshot: HubSnapshot): MachineState? {
+        val m = snapshot.machines.find { it.name == machine } ?: return null
+        return when (val state = m.state) {
+            is MachineState.Unreachable -> if (
+                state.kind == ReachKind.CORE_STARTUP_CLOSED && m.startupRetryPending
+            ) null else state
+            MachineState.Connecting, MachineState.Paused,
+            is MachineState.Connected, is MachineState.HostKeyUnconfirmed -> null
+            else -> state
+        }
+    }
 
     private fun show(next: Screen, about: String?) {
         screen = next
@@ -113,34 +179,51 @@ class MachineFlows(private val hubHost: HubHost) {
         error = null
     }
 
-    /** The card's host-key row: the confirm for a first connection, the comparison for a changed key. */
+    /** The card opens the desk step; comparison is a separate deliberate action. */
     fun openHostKey(name: String) {
         when (current().machines.find { it.name == name }?.state) {
-            is MachineState.HostKeyUnconfirmed -> {
-                error = null
-                trusting = name
-            }
+            is MachineState.HostKeyUnconfirmed -> openSetup(name, atLeast = 2)
             is MachineState.HostKeyMismatch -> show(Screen.HostKeyChanged, name)
             else -> Unit
         }
     }
 
+    fun compareFingerprint() {
+        val name = machine ?: return
+        if (screen != Screen.Setup || setupStep != 2 || hostKeyPrompt(current(), name) == null) return
+        error = null
+        trusting = name
+    }
+
     /** The trust dialog's content, or null when no dialog should show. */
     fun trustPrompt(snapshot: HubSnapshot): HostKeyPrompt? = trusting?.let { hostKeyPrompt(snapshot, it) }
 
-    /**
-     * Follows the hub: opens the confirm for a machine just added (again after
-     * a suspension), closes views whose state moved on.
-     */
+    /** Follow settlements forward, closing dialogs whose keys are no longer presented. */
     fun onSnapshot(snapshot: HubSnapshot) {
-        waitingFor?.let { name ->
-            when (snapshot.machines.find { it.name == name }?.state) {
-                // Shows the key presented now; only Trust confirms it.
-                is MachineState.HostKeyUnconfirmed -> trusting = name
-                // Still on its way, suspended in the background, or not listed in this snapshot yet.
-                null, MachineState.Connecting, MachineState.Paused -> Unit
-                // Unreachable and the like: the machine's card says why.
-                else -> show(Screen.Machines, null)
+        if (screen == Screen.Setup) {
+            snapshot.machines.find { it.name == machine }?.let { m ->
+                when (m.state) {
+                    is MachineState.Connected -> {
+                        setupStep = 3
+                        reachedThisVisit = true
+                        waitingFor = null
+                    }
+                    is MachineState.HostKeyMismatch -> show(Screen.HostKeyChanged, m.name)
+                    is MachineState.HostKeyUnconfirmed -> {
+                        if (setupStep < 2) setupStep = 2
+                        reachedThisVisit = true
+                        waitingFor = null
+                    }
+                    else -> {
+                        // A confirmed pin also proves that the machine was reached,
+                        // including before its first successful core connection.
+                        if (m.hostKey != null) {
+                            if (setupStep < 2) setupStep = 2
+                            reachedThisVisit = true
+                        }
+                        if (m.state != MachineState.Connecting && m.state != MachineState.Paused) waitingFor = null
+                    }
+                }
             }
         }
         trusting?.let { name ->
@@ -157,19 +240,44 @@ class MachineFlows(private val hubHost: HubHost) {
         }
     }
 
-    /** The form passed its checks: add the machine, then wait for its host key. */
+    /** Form seam for the later production screen; own name is never a conflict. */
+    fun submit(): FormErrors {
+        val value = if (nameLocked) input.copy(name = machine.orEmpty()) else input
+        val errors = validateMachine(value, current().machines.map { it.name }.filter { it != machine })
+        errors.valid?.let(::save)
+        return errors
+    }
+
+    /** Only an unpinned, never-connected entry may be replaced to follow a name edit. */
     fun save(valid: ValidMachine) {
-        if (call { it.addMachine(valid.name, valid.host, valid.port, valid.user) }) {
-            waitingFor = valid.name
+        val old = current().machines.find { it.name == machine }
+        val listedName = if (old != null && (old.hostKey != null || old.lastConnectedMs != null)) old.name else valid.name
+        val saved = if (old == null) {
+            call { it.addMachine(listedName, valid.host, valid.port, valid.user) }.also {
+                if (it) addedThisVisit = true
+            }
+        } else if (old.hostKey != null || old.lastConnectedMs != null) {
+            call { it.updateMachine(old.name, valid.host, valid.port, valid.user) }
+        } else {
+            if (!call { it.removeMachine(old.name) }) return
+            // If adding is refused, retain the typed fields and clear the removed
+            // identity so the next submit can retry the add.
+            machine = null
+            call { it.addMachine(valid.name, valid.host, valid.port, valid.user) }
+        }
+        if (saved) {
+            machine = listedName
+            waitingFor = listedName
+            input = MachineInput(if (nameLocked) listedName else input.name, valid.host, valid.port.toString(), valid.user)
         }
     }
 
     /** "Trust and connect": confirms the fingerprint the dialog showed, nothing else. */
     fun trust(prompt: HostKeyPrompt) {
-        if (trusting != prompt.machine) return
+        if (trusting != prompt.machine || trustPrompt(current()) != prompt) return
         if (call { it.confirmHostKey(prompt.machine, prompt.fingerprint) }) {
             trusting = null
-            show(Screen.Machines, null)
+            waitingFor = null
         }
     }
 
@@ -177,7 +285,6 @@ class MachineFlows(private val hubHost: HubHost) {
     fun cancelTrust() {
         trusting = null
         error = null
-        if (screen == Screen.AddMachine) show(Screen.Machines, null)
     }
 
     /** "Forget this machine's key": opens the second confirm; calls nothing. */
@@ -223,28 +330,41 @@ class MachineFlows(private val hubHost: HubHost) {
     }
 
     /** System back: closes a dialog first, then returns to Machines, then to the Agents home; false there. */
-    fun back(): Boolean = when {
-        trusting != null -> {
-            cancelTrust()
-            true
+    fun back(): Boolean {
+        return when {
+            trusting != null -> {
+                cancelTrust()
+                true
+            }
+            confirmingForget -> {
+                cancelForget()
+                true
+            }
+            removing != null -> {
+                cancelRemove()
+                true
+            }
+            screen == Screen.Setup -> {
+                if (setupStep == 1) {
+                    val m = current().machines.find { it.name == machine }
+                    if (addedThisVisit && !reachedThisVisit && m?.hostKey == null && m?.lastConnectedMs == null) {
+                        val name = machine
+                        if (name != null && !call { it.removeMachine(name) }) return true
+                    }
+                    show(setupOrigin, null)
+                } else show(Screen.Machines, null)
+                true
+            }
+            screen == Screen.Machines -> {
+                show(Screen.Agents, null)
+                true
+            }
+            screen != Screen.Agents -> {
+                show(Screen.Machines, null)
+                true
+            }
+            else -> false
         }
-        confirmingForget -> {
-            cancelForget()
-            true
-        }
-        removing != null -> {
-            cancelRemove()
-            true
-        }
-        screen == Screen.Machines -> {
-            show(Screen.Agents, null)
-            true
-        }
-        screen != Screen.Agents -> {
-            show(Screen.Machines, null)
-            true
-        }
-        else -> false
     }
 
     /** Runs a hub call; on failure keeps the reason in [error] and returns false. */
@@ -270,7 +390,13 @@ class MachineFlows(private val hubHost: HubHost) {
     companion object {
         /** Keeps the flow across rotation and process death (the error is not kept). */
         fun saver(hubHost: HubHost): Saver<MachineFlows, Any> = listSaver(
-            save = { listOf(it.screen.name, it.machine, it.waitingFor, it.trusting, it.confirmingForget, it.removing) },
+            save = {
+                listOf(
+                    it.screen.name, it.machine, it.waitingFor, it.trusting, it.confirmingForget, it.removing,
+                    it.setupStep, it.addedThisVisit, it.reachedThisVisit, it.setupOrigin.name,
+                    it.input.name, it.input.host, it.input.port, it.input.user,
+                )
+            },
             restore = { saved ->
                 MachineFlows(hubHost).apply {
                     screen = Screen.valueOf(saved[0] as String)
@@ -279,6 +405,11 @@ class MachineFlows(private val hubHost: HubHost) {
                     trusting = saved[3] as String?
                     confirmingForget = saved[4] as Boolean
                     removing = saved[5] as String?
+                    setupStep = saved[6] as Int
+                    addedThisVisit = saved[7] as Boolean
+                    reachedThisVisit = saved[8] as Boolean
+                    setupOrigin = Screen.valueOf(saved[9] as String)
+                    input = MachineInput(saved[10] as String, saved[11] as String, saved[12] as String, saved[13] as String)
                 }
             },
         )

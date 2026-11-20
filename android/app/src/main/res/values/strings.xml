@@ -321,4 +321,7 @@
     <string name="alerts_test_waiting">Waiting for the test alert</string>
     <string name="alerts_test_received">Test received %1$s</string>
     <string name="alerts_test_missed">No test alert within 30 s · is kudde-push running there?</string>
+    <!-- Proposed first-run wording, awaiting owner sign-off. -->
+    <string name="setup_title">Set up a machine</string>
+    <string name="setup_step">Step %1$d of 3</string>
 </resources>

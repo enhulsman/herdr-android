@@ -49,8 +49,8 @@ private const val USER_MAX = 64
 
 /** Checks every field at once; [taken] are the names already listed. */
 fun validateMachine(input: MachineInput, taken: Collection<String>): FormErrors {
-    val name = input.name.trim()
     val host = input.host.trim()
+    val name = input.name.trim().ifEmpty { derivedMachineName(host) }
     val user = input.user.trim()
     val port = input.port.trim().toIntOrNull()?.takeIf { it in 1..65535 }
 
@@ -80,4 +80,14 @@ fun validateMachine(input: MachineInput, taken: Collection<String>): FormErrors 
         null
     }
     return FormErrors(nameError, hostError, portError, userError, valid)
+}
+
+/** No DNS lookup: IPv6 contains a colon; IPv4 is four decimal octets. */
+fun derivedMachineName(address: String): String {
+    val host = address.trim()
+    val octets = host.split('.')
+    val ipv4 = octets.size == 4 && octets.all { part ->
+        part.isNotEmpty() && part.all { it in '0'..'9' } && part.toIntOrNull()?.let { it in 0..255 } == true
+    }
+    return if (':' in host || ipv4) host else host.substringBefore('.')
 }

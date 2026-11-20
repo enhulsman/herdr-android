@@ -277,7 +277,12 @@ class FakeHub : HubInterface {
         atPhoneSize: Boolean,
         listener: TerminalListener,
     ): TerminalView = error("FakeHub does not open terminals")
-    override fun updateMachine(name: String, host: String, port: UShort, user: String) { calls += "update $name" }
+    val updates = mutableListOf<List<String>>()
+    override fun updateMachine(name: String, host: String, port: UShort, user: String) {
+        refused()
+        calls += "update $name"
+        updates += listOf(name, host, port.toString(), user)
+    }
 
     /** What the next start returns: the new terminal's address. */
     var startAddress = "t9"

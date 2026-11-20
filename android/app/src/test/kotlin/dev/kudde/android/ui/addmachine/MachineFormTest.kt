@@ -35,9 +35,39 @@ class MachineFormTest {
     }
 
     @Test
-    fun theNameIsRequired() {
-        assertEquals(FieldError.NameRequired, errors(ok.copy(name = "")).name)
-        assertEquals(FieldError.NameRequired, errors(ok.copy(name = "   ")).name)
+    fun anEmptyAddressAndNameStillRequireAName() {
+        assertEquals(FieldError.NameRequired, errors(ok.copy(name = "", host = "")).name)
+        assertEquals(FieldError.NameRequired, errors(ok.copy(name = "   ", host = "   ")).name)
+    }
+
+    @Test fun hostnameUsesItsFirstLabel() {
+        assertEquals("workstation", errors(ok.copy(name = "", host = " workstation.example.org ")).valid!!.name)
+    }
+
+    @Test fun ipv4UsesTheWholeAddress() {
+        assertEquals("192.0.2.10", errors(ok.copy(name = "", host = " 192.0.2.10 ")).valid!!.name)
+    }
+
+    @Test fun ipv6UsesTheWholeAddress() {
+        for (host in listOf("2001:db8::10", "::ffff:192.0.2.10")) {
+            assertEquals(host, errors(ok.copy(name = " ", host = " $host ")).valid!!.name)
+        }
+    }
+
+    @Test fun derivedTakenNameIsReportedOnName() {
+        assertEquals(FieldError.NameTaken, errors(ok.copy(name = "", host = "server.example.org")).name)
+    }
+
+    @Test fun derivedLongNameIsReportedOnName() {
+        assertEquals(FieldError.NameTooLong, errors(ok.copy(name = "", host = "x".repeat(65) + ".org")).name)
+    }
+
+    @Test fun derivedEmptyNameIsReportedOnName() {
+        assertEquals(FieldError.NameRequired, errors(ok.copy(name = "", host = ".example.org")).name)
+    }
+
+    @Test fun typedNameWinsOverTheAddress() {
+        assertEquals("desk", errors(ok.copy(name = " desk ")).valid!!.name)
     }
 
     @Test

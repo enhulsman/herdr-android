@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,7 @@ import dev.kudde.android.ui.changes.ChangesRoute
 import dev.kudde.android.ui.chat.ChatRoute
 import dev.kudde.android.ui.chat.rememberChatVisit
 import dev.kudde.android.ui.components.undrawnWhen
+import dev.kudde.android.ui.theme.KuddeTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import uniffi.kudde_mobile.HubSnapshot
@@ -54,7 +56,9 @@ fun TerminalRoute(app: KuddeApp, home: AgentsHome, key: AgentKey) {
     val snapshot by app.hubHost.snapshot.collectAsState()
     val reopen = remember(key) { TerminalReopen() }
     val generation = reopen.generation
-    val session = remember(key, generation) { TerminalSession(key, context.mainExecutor) }
+    val theme = KuddeTheme.colors.terminalTheme()
+    val session = remember(key, generation) { TerminalSession(key, context.mainExecutor, theme) }
+    SideEffect { session.setTheme(theme) }
     val screen = remember(key) { TerminalScreenState(app.terminalZoom[key]) }
     // The chat view (issue 17): over the live terminal, so switching back is instant.
     val chat = rememberChatVisit(app, key)
@@ -69,7 +73,11 @@ fun TerminalRoute(app: KuddeApp, home: AgentsHome, key: AgentKey) {
             // Opened at the phone's size (phone check round 2) unless the chat shows over it;
             // closing lets the desk take its size back.
             val lead = atPhoneSizeOnOpen(switch.chat)
-            app.hubHost.hub?.openTerminal(key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), lead, session.listener)
+            session.open { showingTheme, listener ->
+                app.hubHost.hub?.openTerminal(
+                    key.machine, key.address, size.cols.toUShort(), size.rows.toUShort(), lead, listener, showingTheme,
+                )
+            }
         }
     }
     var phone by remember(key) { mutableStateOf<GridSize?>(null) }

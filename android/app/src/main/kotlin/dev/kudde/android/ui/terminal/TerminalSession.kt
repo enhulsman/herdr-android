@@ -4,12 +4,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toArgb
 import dev.kudde.android.ui.agents.AgentKey
+import dev.kudde.android.ui.theme.KuddeColors
+import dev.kudde.android.ui.theme.ThemeName
+import dev.kudde.android.ui.theme.kuddeColors
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.Executor
 import uniffi.kudde_mobile.Armed
 import uniffi.kudde_mobile.RowKeyTap
 import uniffi.kudde_mobile.TermState
 import uniffi.kudde_mobile.TerminalListener
+import uniffi.kudde_mobile.TerminalTheme
 import uniffi.kudde_mobile.TerminalViewInterface
 
 /**
@@ -21,8 +28,16 @@ import uniffi.kudde_mobile.TerminalViewInterface
  * main thread; after [close] nothing is applied or sent. Tested with a fake
  * terminal (TerminalSessionTest).
  */
-class TerminalSession(val key: AgentKey, private val main: Executor) {
-    val grid = TerminalGrid()
+class TerminalSession(
+    val key: AgentKey,
+    private val main: Executor,
+    initialTheme: TerminalTheme,
+) {
+    constructor(key: AgentKey, main: Executor) : this(key, main, kuddeColors(ThemeName.Graphite).terminalTheme())
+
+    var grid = TerminalGrid()
+        private set
+    private var theme = initialTheme
 
     /** Bumps with every frame applied, so the terminal redraws. */
     var version by mutableIntStateOf(0)
@@ -64,6 +79,29 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
         this.view = view
     }
 
+    /** The defaults travel with open, before the engine can deliver its first frame. */
+    fun open(open: (TerminalTheme, TerminalListener) -> TerminalViewInterface?): TerminalViewInterface? {
+        if (closed) return null
+        return open(theme, listener)?.also(::attach)
+    }
+
+    /** Only changes the local engine; no input, resize or reattach for a theme. */
+    fun setTheme(theme: TerminalTheme) {
+        if (closed || this.theme == theme) return
+        view?.setTheme(theme)
+        this.theme = theme
+        // A cached first paint can already be visible when the mode changes.
+        // Live frames may have defaults set by a program, so leave those alone.
+        if (!painted && !grid.isEmpty &&
+            (grid.defaultFg.toUInt() != theme.fg || grid.defaultBg.toUInt() != theme.bg)
+        ) {
+            grid = TerminalGrid()
+            shape = null
+            damage.markAll()
+            version++
+        }
+    }
+
     private fun applyLive(frame: ByteArray) {
         if (closed) return
         if (applyFrame(frame)) painted = true
@@ -81,6 +119,11 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
     /** The cached last screen, shown only while nothing live has been drawn; true when shown. */
     fun showCached(frame: ByteArray): Boolean {
         if (closed || painted) return false
+        if (frame.size < TerminalGrid.HEADER_LEN) return false
+        val header = ByteBuffer.wrap(frame).order(ByteOrder.LITTLE_ENDIAN)
+        if ((header.getInt(12) and TerminalGrid.RGB).toUInt() != theme.fg ||
+            (header.getInt(16) and TerminalGrid.RGB).toUInt() != theme.bg
+        ) return false
         return applyFrame(frame)
     }
 
@@ -132,6 +175,13 @@ class TerminalSession(val key: AgentKey, private val main: Executor) {
         return if (painted) grid.toFullFrameOrNull() else null
     }
 }
+
+/** UniFFI takes RGB words, without Compose's alpha byte. */
+fun KuddeColors.terminalTheme() = TerminalTheme(
+    fg = (termFg.toArgb() and TerminalGrid.RGB).toUInt(),
+    bg = (bg.toArgb() and TerminalGrid.RGB).toUInt(),
+    ansi = ansi.map { (it.toArgb() and TerminalGrid.RGB).toUInt() },
+)
 
 /** Opened under the chat, the terminal watches at the desk's size (see [TerminalSession.follow]). */
 fun atPhoneSizeOnOpen(chat: Boolean) = !chat

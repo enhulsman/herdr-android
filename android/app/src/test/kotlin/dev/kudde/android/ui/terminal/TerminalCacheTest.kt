@@ -1,6 +1,8 @@
 package dev.kudde.android.ui.terminal
 
 import dev.kudde.android.ui.agents.AgentKey
+import dev.kudde.android.ui.theme.ThemeName
+import dev.kudde.android.ui.theme.kuddeColors
 import java.io.File
 import java.nio.file.Files
 import org.junit.After
@@ -28,6 +30,46 @@ class TerminalCacheTest {
     @After
     fun cleanUp() {
         dir.deleteRecursively()
+    }
+
+    @Test
+    fun aKeptScreenOnlyShowsWhenBothDefaultsMatchTheShowingTheme() {
+        for (name in ThemeName.entries) {
+            val theme = kuddeColors(name).terminalTheme()
+            val session = TerminalSession(docs, java.util.concurrent.Executor { it.run() }, theme)
+            for ((fg, bg) in listOf((theme.fg xor 1u) to theme.bg, theme.fg to (theme.bg xor 1u))) {
+                cache.store(docs, frameOf(4, 2, mapOf(0 to cellsOf("old")), fg = fg.toInt(), bg = bg.toInt()))
+                assertFalse(session.showCached(requireNotNull(cache.load(docs))))
+                assertTrue(session.grid.isEmpty)
+                assertNull(session.shape)
+                assertEquals(0, session.version)
+            }
+            val matching = frameOf(4, 2, mapOf(0 to cellsOf("same")), fg = theme.fg.toInt(), bg = theme.bg.toInt())
+            cache.store(docs, matching)
+            assertTrue(session.showCached(requireNotNull(cache.load(docs))))
+            assertEquals("same", session.grid.text())
+            assertFalse(session.painted)
+            assertArrayEquals(matching, cache.load(docs)) // Filtering never rewrites storage.
+        }
+    }
+
+    @Test
+    fun changingThemeWhileTheKeptScreenShowsClearsItAndRefusesALateLoad() {
+        val session = TerminalSession(docs, java.util.concurrent.Executor { it.run() })
+        assertTrue(session.showCached(frame))
+        session.setTheme(kuddeColors(ThemeName.Paper).terminalTheme())
+        assertTrue(session.grid.isEmpty)
+        assertNull(session.shape)
+        assertFalse(session.showCached(frame))
+        assertFalse(session.painted)
+    }
+
+    @Test
+    fun aMalformedKeptScreenIsNotShown() {
+        val session = TerminalSession(docs, java.util.concurrent.Executor { it.run() })
+        assertFalse(session.showCached(byteArrayOf(1, 2, 3)))
+        assertFalse(session.showCached(frame.copyOf(20)))
+        assertTrue(session.grid.isEmpty)
     }
 
     @Test

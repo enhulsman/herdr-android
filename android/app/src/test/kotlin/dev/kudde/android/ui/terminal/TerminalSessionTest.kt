@@ -1,6 +1,9 @@
 package dev.kudde.android.ui.terminal
 
 import dev.kudde.android.ui.agents.AgentKey
+import dev.kudde.android.ui.theme.Contrast
+import dev.kudde.android.ui.theme.ThemeName
+import dev.kudde.android.ui.theme.kuddeColors
 import java.util.concurrent.Executor
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -27,6 +30,77 @@ class TerminalSessionTest {
 
     private val view = FakeTerminalView()
     private val session = TerminalSession(AgentKey("workstation", "t1"), main).also { it.attach(view) }
+
+    @Test
+    fun opensWithTheShowingTheme() {
+        for (name in ThemeName.entries) {
+            val theme = kuddeColors(name).terminalTheme()
+            val terminal = TerminalSession(AgentKey("workstation", "t2"), main, theme)
+            val opened = FakeTerminalView()
+            assertTrue(terminal.open { supplied, listener ->
+                assertEquals(theme, supplied)
+                assertTrue(terminal.listener === listener)
+                opened
+            } === opened)
+            assertTrue(opened.calls.isEmpty())
+            assertEquals(if (name == ThemeName.Paper) 0x25272cu else 0xd2d4d9u, theme.fg)
+            assertEquals(if (name == ThemeName.Paper) 0xffffffu else 0x17191du, theme.bg)
+            assertEquals(16, theme.ansi.size)
+            assertEquals(if (name == ThemeName.Paper) 0xc62a2au else 0xdc8c95u, theme.ansi[1])
+            val other = kuddeColors(if (name == ThemeName.Paper) ThemeName.Graphite else ThemeName.Paper).terminalTheme()
+            terminal.setTheme(other)
+            assertEquals(listOf(other), opened.themes)
+            assertEquals(listOf("theme"), opened.calls)
+        }
+    }
+
+    @Test
+    fun changingThemeOnlySetsTheEngineAndKeepsTheScrollPosition() {
+        session.listener.onFrame(frameOf(6, 2, mapOf(0 to cellsOf("live")), live = false, total = 100, offset = 58))
+        runMain()
+        val grid = session.grid
+        val paper = kuddeColors(ThemeName.Paper).terminalTheme()
+        session.setTheme(paper)
+        session.setTheme(paper.copy()) // Recomposition with the same colours is silent.
+        assertEquals(listOf("theme"), view.calls)
+        assertEquals(listOf(paper), view.themes)
+        assertTrue(grid === session.grid)
+        assertEquals(58L, session.grid.offset)
+        // Live defaults can belong to a program; only kept frames are filtered.
+        session.listener.onFrame(frameOf(6, 2, mapOf(0 to cellsOf("app")), bg = 0x002b36, live = false, total = 100, offset = 58))
+        runMain()
+        assertEquals(0x002b36, session.grid.defaultBg)
+        assertEquals("app", session.grid.text())
+        assertEquals(58L, session.grid.offset)
+        assertEquals(listOf("theme"), view.calls)
+    }
+
+    @Test
+    fun themeChangedBeforeOpenIsTheOnePassedAtOpen() {
+        val terminal = TerminalSession(AgentKey("workstation", "t2"), main)
+        val paper = kuddeColors(ThemeName.Paper).terminalTheme()
+        terminal.setTheme(paper)
+        terminal.open { supplied, _ ->
+            assertEquals(paper, supplied)
+            FakeTerminalView()
+        }
+    }
+
+    @Test
+    fun aClosedSessionDoesNotSetAThemeOrOpenAgain() {
+        session.close()
+        view.calls.clear()
+        session.setTheme(kuddeColors(ThemeName.Paper).terminalTheme())
+        assertNull(session.open { _, _ -> error("closed session opened") })
+        assertTrue(view.calls.isEmpty())
+    }
+
+    @Test
+    fun higherTextContrastDoesNotChangeTerminalColours() {
+        for (name in ThemeName.entries) {
+            assertEquals(kuddeColors(name).terminalTheme(), kuddeColors(name, Contrast.Aa).terminalTheme())
+        }
+    }
 
     @Test
     fun framesApplyOnTheMainThreadInOrder() {
@@ -185,11 +259,13 @@ class TerminalSessionTest {
 
 class FakeTerminalView : TerminalViewInterface, AutoCloseable {
     val calls = mutableListOf<String>()
+    val themes = mutableListOf<uniffi.kudde_mobile.TerminalTheme>()
     var armedAfterTap = Armed(ctrl = false, alt = false)
 
     override fun armed() = armedAfterTap
     override fun setTheme(theme: uniffi.kudde_mobile.TerminalTheme) {
         calls += "theme"
+        themes += theme
     }
     override fun backspace(): Armed {
         calls += "backspace"

@@ -32,6 +32,7 @@ use tokio::time::Instant;
 
 use crate::link::{DialError, Dialer, Exit, Target};
 use crate::machines::{self, ListError, MachineList};
+use crate::ssh::ReachKind;
 
 pub mod changes;
 pub mod chat;
@@ -62,6 +63,7 @@ pub enum MachineState {
     },
     /// Not reached, or the connection dropped; retrying.
     Unreachable {
+        kind: ReachKind,
         detail: String,
     },
     /// The key needs a fingerprint or device credential; prompt, then retry.
@@ -133,6 +135,9 @@ pub struct MachineView {
     /// then keeps the failure: "retrying").
     #[uniffi(default = None)]
     pub next_retry_ms: Option<u64>,
+    /// One quiet pre-hello close after confirmation is awaiting its retry.
+    #[uniffi(default = false)]
+    pub startup_retry_pending: bool,
     /// This phone's alerts here; None while alerts are off on the phone.
     #[uniffi(default = None)]
     pub alerts: Option<push::AlertsView>,
@@ -299,6 +304,9 @@ struct Live {
     task: Option<AbortHandle>,
     /// When the task's backoff ends, ms since the epoch; only while waiting.
     next_retry_ms: Option<u64>,
+    /// Only the first settlement of an explicitly confirmed epoch may use grace.
+    startup_allowance: bool,
+    startup_retry_pending: bool,
     /// What kudde-push wrote in `kudde-push-status`, as of the last read.
     push_status: Option<push::PushStatusView>,
     /// The spaces and folders a new terminal can go to (this connection's).
@@ -314,6 +322,8 @@ impl Live {
             epoch: 0,
             task: None,
             next_retry_ms: None,
+            startup_allowance: false,
+            startup_retry_pending: false,
             push_status: None,
             places: start::Places::default(),
             starting: false,
@@ -323,6 +333,8 @@ impl Live {
     fn stop(&mut self) {
         self.places = start::Places::default();
         self.epoch = 0;
+        self.startup_allowance = false;
+        self.startup_retry_pending = false;
         self.next_retry_ms = None;
         if let Some(task) = self.task.take() {
             task.abort();
@@ -439,7 +451,12 @@ impl Outcome {
 }
 
 fn unreachable(detail: impl Into<String>) -> MachineState {
+    unreachable_kind(ReachKind::Other, detail)
+}
+
+fn unreachable_kind(kind: ReachKind, detail: impl Into<String>) -> MachineState {
     MachineState::Unreachable {
+        kind,
         detail: detail.into(),
     }
 }
@@ -837,6 +854,11 @@ impl HubCore {
         self.with(|hub, st| {
             hub.set_host_key(st, name, Some(fingerprint.to_owned()))?;
             hub.restart(st, name);
+            if !st.paused
+                && let Some(live) = st.live.get_mut(name)
+            {
+                live.startup_allowance = true;
+            }
             Ok(())
         })
     }
@@ -997,6 +1019,16 @@ impl HubCore {
     ) -> bool {
         self.with(|_, st| match st.live.get_mut(name) {
             Some(live) if live.epoch == epoch => {
+                live.startup_retry_pending = live.startup_allowance
+                    && next_retry_ms.is_some()
+                    && matches!(
+                        state,
+                        MachineState::Unreachable {
+                            kind: ReachKind::CoreStartupClosed,
+                            ..
+                        }
+                    );
+                live.startup_allowance = false;
                 live.state = state;
                 live.next_retry_ms = next_retry_ms;
                 true
@@ -1019,6 +1051,8 @@ impl HubCore {
             };
             live.places.folders = herdr_proto::start::folder_choices(lines.terminals(), None);
             if let Some(state) = connected {
+                live.startup_allowance = false;
+                live.startup_retry_pending = false;
                 live.state = state;
                 live.next_retry_ms = None;
                 if let Some(m) = st.list.get_mut(name) {
@@ -1060,6 +1094,7 @@ fn build_snapshot(st: &State) -> HubSnapshot {
                     port: m.port,
                     user: m.user.clone(),
                     host_key: m.host_key.clone(),
+                    startup_retry_pending: live.is_some_and(|l| l.startup_retry_pending),
                     next_retry_ms: live
                         .and_then(|l| l.next_retry_ms)
                         .filter(|_| state.retrying()),
@@ -1155,14 +1190,15 @@ fn dial_failure(e: DialError, target: &Target) -> Outcome {
         }),
         DialError::Rejected => Outcome::retry(MachineState::KeyRejected),
         DialError::NetworkOff => Outcome::wait(MachineState::NetworkOff),
-        DialError::Failed(detail) => Outcome::retry(unreachable(detail)),
+        DialError::Failed { kind, detail } => Outcome::retry(unreachable_kind(kind, detail)),
     }
 }
 
 /// The command closed its output before answering: why, from how it exited.
 async fn command_ended(exit: tokio::sync::oneshot::Receiver<Exit>) -> Outcome {
     let Ok(Ok(Exit { status, stderr })) = tokio::time::timeout(EXIT_WAIT, exit).await else {
-        return Outcome::retry(unreachable(
+        return Outcome::retry(unreachable_kind(
+            ReachKind::CoreStartupClosed,
             "the connection closed before herdr-core answered",
         ));
     };
@@ -1175,7 +1211,12 @@ async fn command_ended(exit: tokio::sync::oneshot::Receiver<Exit>) -> Outcome {
         (None, Some(code)) => format!("herdr-core exited with status {code}"),
         (None, None) => "the connection closed before herdr-core answered".to_owned(),
     };
-    Outcome::retry(unreachable(detail))
+    let kind = if last.is_none() && status.is_none_or(|code| code == 0) {
+        ReachKind::CoreStartupClosed
+    } else {
+        ReachKind::Other
+    };
+    Outcome::retry(unreachable_kind(kind, detail))
 }
 
 async fn attempt(hub: &Arc<HubCore>, name: &str, epoch: u64, target: Target) -> Outcome {

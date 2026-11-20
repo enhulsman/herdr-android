@@ -18,6 +18,7 @@ import uniffi.kudde_mobile.HubListener
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
+import uniffi.kudde_mobile.ReachKind
 
 // The flows behind the Machines screen's seams (machine-connection spec, "Host
 // keys are confirmed once and then enforced"): Add machine, the first host key
@@ -198,7 +199,7 @@ class MachineFlowsTest {
     fun anOutcomeOtherThanTheHostKeyReturnsToMachines() {
         flows.actions(MachinesActions.Preview).onAddMachine()
         flows.save(workstation)
-        publish(machine("workstation", MachineState.Unreachable("connection refused")))
+        publish(machine("workstation", MachineState.Unreachable(ReachKind.REFUSED, "connection refused")))
         assertEquals(Screen.Machines, flows.screen)
         assertNull(flows.waitingFor)
         assertNull(flows.trusting)
@@ -260,7 +261,7 @@ class MachineFlowsTest {
         flows.save(workstation)
         publish(machine("workstation", unconfirmed))
         publish(machine("workstation", MachineState.Paused))
-        publish(machine("workstation", MachineState.Unreachable("connection refused")))
+        publish(machine("workstation", MachineState.Unreachable(ReachKind.REFUSED, "connection refused")))
         assertEquals(Screen.Machines, flows.screen)
         assertNull(flows.waitingFor)
         assertNull(flows.trusting)

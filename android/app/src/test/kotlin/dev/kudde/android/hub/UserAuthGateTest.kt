@@ -7,6 +7,7 @@ import org.junit.Test
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
+import uniffi.kudde_mobile.ReachKind
 
 // machine-connection spec, "The phone key is hardware-bound and needs the
 // owner" ("Opening from an alert": one prompt, then the connection; "Unlocked
@@ -120,7 +121,7 @@ class UserAuthGateTest {
         gate.onSnapshot(snapshot("workstation" to MachineState.Connecting))
         gate.onSnapshot(snapshot("workstation" to MachineState.Connected("0.1.16")))
         // Half an hour later the link drops and the reconnect needs the owner.
-        gate.onSnapshot(snapshot("workstation" to MachineState.Unreachable("no answer for 45 s")))
+        gate.onSnapshot(snapshot("workstation" to MachineState.Unreachable(ReachKind.NO_ANSWER, "no answer for 45 s")))
         gate.onSnapshot(snapshot("workstation" to MachineState.Connecting))
         gate.onSnapshot(snapshot("workstation" to MachineState.NeedsUserAuth))
         assertEquals(2, host.shown)

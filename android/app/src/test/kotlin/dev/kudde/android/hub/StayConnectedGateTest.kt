@@ -5,6 +5,7 @@ import dev.kudde.android.lifecycle.ForegroundTracker
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import uniffi.kudde_mobile.MachineState
+import uniffi.kudde_mobile.ReachKind
 
 // stay-connected spec, "Reconnecting in the background never prompts" (design
 // D6): with the option on, an unlock or an activity start first retries
@@ -142,7 +143,7 @@ class StayConnectedGateTest {
     @Test
     fun unlockWithOnlyABackoffMachineRetriesOnce() {
         gate.onHost(null)
-        gate.onSnapshot(snapshot("workstation" to MachineState.Unreachable("refused")))
+        gate.onSnapshot(snapshot("workstation" to MachineState.Unreachable(ReachKind.REFUSED, "refused")))
         gate.onUnlocked()
         assertEquals(1, retries)
         // Not a silent retry: a later NeedsUserAuth in the foreground prompts at once.

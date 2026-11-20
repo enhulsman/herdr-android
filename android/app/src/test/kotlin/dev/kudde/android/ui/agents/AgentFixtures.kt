@@ -1,13 +1,14 @@
 package dev.kudde.android.ui.agents
 
 import uniffi.kudde_mobile.AgentAttention
-import uniffi.kudde_mobile.AgentsView
 import uniffi.kudde_mobile.AgentRow
+import uniffi.kudde_mobile.AgentsView
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
 import uniffi.kudde_mobile.OtherTerminal
 import uniffi.kudde_mobile.PlaceNote
+import uniffi.kudde_mobile.ReachKind
 import uniffi.kudde_mobile.StartAgent
 import uniffi.kudde_mobile.StartPlace
 import uniffi.kudde_mobile.StartView
@@ -27,7 +28,7 @@ fun machine(name: String, state: MachineState, lastConnected: Long? = null) =
 
 fun connected(name: String) = machine(name, MachineState.Connected("0.1.15"), lastConnected = 0L)
 
-fun unreachable(name: String, lastConnected: Long) = machine(name, MachineState.Unreachable("connection refused"), lastConnected)
+fun unreachable(name: String, lastConnected: Long) = machine(name, MachineState.Unreachable(ReachKind.REFUSED, "connection refused"), lastConnected)
 
 fun row(
     address: String,

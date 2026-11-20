@@ -13,6 +13,7 @@ import org.robolectric.RuntimeEnvironment
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
+import uniffi.kudde_mobile.ReachKind
 
 // machine-connection spec: "A second machine is off" (unreachable with the
 // time it was last connected), "herdr-core missing", "Older core", "Newer
@@ -57,7 +58,7 @@ class MachineStatusTest {
 
     @Test
     fun unreachableSaysWhenItWasLastConnectedAndThatItRetries() {
-        val c = card(MachineState.Unreachable("connection refused"), lastConnectedMs = NOW - 2 * HOUR)
+        val c = card(MachineState.Unreachable(ReachKind.REFUSED, "connection refused"), lastConnectedMs = NOW - 2 * HOUR)
         assertEquals("Unreachable · last connected 2h ago · retrying", c.statusText)
         assertEquals(StatusMark.Ring, c.mark)
         assertEquals("connection refused", c.detail)
@@ -67,7 +68,7 @@ class MachineStatusTest {
     // Render 7: "Unreachable · last connected 2h ago · retrying in 30 s".
     @Test
     fun unreachableCountsDownToTheNextAttempt() {
-        val c = card(MachineState.Unreachable("connection refused"), NOW - 2 * HOUR, nextRetryMs = NOW + 30_000)
+        val c = card(MachineState.Unreachable(ReachKind.REFUSED, "connection refused"), NOW - 2 * HOUR, nextRetryMs = NOW + 30_000)
         assertEquals("Unreachable · last connected 2h ago · retrying in 30 s", c.statusText)
         assertEquals(Tone.Muted, c.status.last().tone)
     }
@@ -75,7 +76,7 @@ class MachineStatusTest {
     @Test
     fun theCountdownRoundsUpAndEndsInRetrying() {
         fun retry(nextInMs: Long) =
-            card(MachineState.Unreachable("x"), nextRetryMs = NOW + nextInMs).status.last().text
+            card(MachineState.Unreachable(ReachKind.OTHER, "x"), nextRetryMs = NOW + nextInMs).status.last().text
         assertEquals("retrying in 30 s", retry(29_001))
         assertEquals("retrying in 29 s", retry(29_000))
         assertEquals("retrying in 1 s", retry(1))
@@ -87,7 +88,7 @@ class MachineStatusTest {
     @Test
     fun theCountdownTicksWithTheClock() {
         val next = NOW + 30_000
-        fun at(nowMs: Long) = card(MachineState.Unreachable("x"), nextRetryMs = next, nowMs = nowMs).status.last().text
+        fun at(nowMs: Long) = card(MachineState.Unreachable(ReachKind.OTHER, "x"), nextRetryMs = next, nowMs = nowMs).status.last().text
         assertEquals("retrying in 30 s", at(NOW))
         assertEquals("retrying in 20 s", at(NOW + 10_000))
         assertEquals("retrying in 1 s", at(NOW + 29_500))
@@ -103,7 +104,7 @@ class MachineStatusTest {
 
     @Test
     fun theScreenTicksEachSecondOnlyWhileACountdownShows() {
-        val waiting = MachineView("server", "server.example.org", 22u, "me", null, MachineState.Unreachable("x"), null, (NOW + 9_000).toULong())
+        val waiting = MachineView("server", "server.example.org", 22u, "me", null, MachineState.Unreachable(ReachKind.OTHER, "x"), null, (NOW + 9_000).toULong())
         val idle = waiting.copy(state = MachineState.Connected("0.1.16"), nextRetryMs = null)
         val counting = HubSnapshot(listOf(waiting), emptyList(), emptyList(), null)
         val quiet = HubSnapshot(listOf(idle), emptyList(), emptyList(), null)
@@ -117,12 +118,12 @@ class MachineStatusTest {
     // Without a time from the hub (none should come, but the field is optional).
     @Test
     fun unreachableNeverConnectedLeavesOutLastConnected() {
-        assertEquals("Unreachable · retrying", card(MachineState.Unreachable("no route to host")).statusText)
+        assertEquals("Unreachable · retrying", card(MachineState.Unreachable(ReachKind.NO_ROUTE, "no route to host")).statusText)
     }
 
     @Test
     fun lastConnectedReadsInMinutesHoursAndDays() {
-        fun ago(ms: Long) = card(MachineState.Unreachable("x"), lastConnectedMs = NOW - ms).status[1].text
+        fun ago(ms: Long) = card(MachineState.Unreachable(ReachKind.OTHER, "x"), lastConnectedMs = NOW - ms).status[1].text
         assertEquals("last connected just now", ago(20_000))
         assertEquals("last connected 5m ago", ago(5 * MINUTE + 10_000))
         assertEquals("last connected 59m ago", ago(59 * MINUTE))

@@ -14,7 +14,7 @@ use russh::keys::ssh_key::PublicKey;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio::sync::oneshot;
 
-use crate::ssh::{REMOTE_COMMAND, SessionError, SshError, SshSigner, open_session};
+use crate::ssh::{REMOTE_COMMAND, ReachKind, SessionError, SshError, SshSigner, open_session};
 
 /// Connecting and signing in; a host that drops SYNs would otherwise take
 /// minutes to fail.
@@ -70,7 +70,10 @@ pub(crate) enum DialError {
     Rejected,
     /// The OS refused the socket: GrapheneOS's Network permission is off.
     NetworkOff,
-    Failed(String),
+    Failed {
+        kind: ReachKind,
+        detail: String,
+    },
 }
 
 pub(crate) type Dialing = Pin<Box<dyn Future<Output = Result<Link, DialError>> + Send>>;
@@ -92,38 +95,57 @@ impl Dialer for SshDialer {
         Box::pin(async move {
             tokio::time::timeout(DIAL_TIMEOUT, dial(target, key, signer))
                 .await
-                .unwrap_or_else(|_| Err(DialError::Failed("timed out".into())))
+                .unwrap_or_else(|_| Err(dial_timeout()))
         })
     }
 }
 
 fn failed(e: impl std::fmt::Display) -> DialError {
-    DialError::Failed(e.to_string())
+    DialError::Failed {
+        kind: ReachKind::Other,
+        detail: e.to_string(),
+    }
+}
+
+fn dial_timeout() -> DialError {
+    DialError::Failed {
+        kind: ReachKind::NoAnswer,
+        detail: "timed out".into(),
+    }
+}
+
+fn ssh_failure(e: SessionError) -> DialError {
+    match e {
+        SessionError::HostKeyUnconfirmed {
+            presented,
+            algorithm,
+        } => DialError::HostKeyUnconfirmed {
+            presented,
+            algorithm,
+        },
+        SessionError::HostKeyMismatch {
+            presented,
+            algorithm,
+        } => DialError::HostKeyMismatch {
+            presented,
+            algorithm,
+        },
+        SessionError::Ssh(SshError::NeedsUserAuth) => DialError::NeedsUserAuth,
+        SessionError::Ssh(SshError::Rejected) => DialError::Rejected,
+        SessionError::Ssh(SshError::NetworkPermissionOff) => DialError::NetworkOff,
+        SessionError::Ssh(e @ SshError::Connect { kind, .. }) => DialError::Failed {
+            kind,
+            detail: e.to_string(),
+        },
+        SessionError::Ssh(SshError::Timeout) => dial_timeout(),
+        SessionError::Ssh(e) => failed(e),
+    }
 }
 
 async fn dial(t: Target, key: PublicKey, signer: Arc<dyn SshSigner>) -> Result<Link, DialError> {
     let session = open_session(&t.host, t.port, &t.user, key, t.host_key, false, signer)
         .await
-        .map_err(|e| match e {
-            SessionError::HostKeyUnconfirmed {
-                presented,
-                algorithm,
-            } => DialError::HostKeyUnconfirmed {
-                presented,
-                algorithm,
-            },
-            SessionError::HostKeyMismatch {
-                presented,
-                algorithm,
-            } => DialError::HostKeyMismatch {
-                presented,
-                algorithm,
-            },
-            SessionError::Ssh(SshError::NeedsUserAuth) => DialError::NeedsUserAuth,
-            SessionError::Ssh(SshError::Rejected) => DialError::Rejected,
-            SessionError::Ssh(SshError::NetworkPermissionOff) => DialError::NetworkOff,
-            SessionError::Ssh(e) => failed(e),
-        })?;
+        .map_err(ssh_failure)?;
     let channel = session
         .handle
         .channel_open_session()
@@ -175,4 +197,39 @@ async fn pump(mut read: russh::ChannelReadHalf, out: DuplexStream, exit: oneshot
         status,
         stderr: String::from_utf8_lossy(&stderr).into_owned(),
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ssh::ReachKind;
+
+    #[test]
+    fn dial_timeout_and_ssh_kinds_survive_mapping() {
+        assert!(
+            matches!(dial_timeout(), DialError::Failed { kind: ReachKind::NoAnswer, detail } if detail == "timed out")
+        );
+        for kind in [
+            ReachKind::NoAnswer,
+            ReachKind::Refused,
+            ReachKind::NameNotFound,
+            ReachKind::NoRoute,
+            ReachKind::Other,
+        ] {
+            let error = ssh_failure(SessionError::Ssh(SshError::Connect {
+                kind,
+                detail: "reason".into(),
+            }));
+            assert!(
+                matches!(error, DialError::Failed { kind: mapped, detail } if mapped == kind && detail == "connection failed: reason")
+            );
+        }
+        assert!(matches!(
+            ssh_failure(SessionError::Ssh(SshError::Timeout)),
+            DialError::Failed {
+                kind: ReachKind::NoAnswer,
+                ..
+            }
+        ));
+    }
 }

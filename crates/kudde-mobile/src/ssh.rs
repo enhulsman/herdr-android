@@ -65,6 +65,18 @@ pub trait SshSigner: Send + Sync {
     fn sign(&self, data: Vec<u8>) -> Result<Vec<u8>, SignError>;
 }
 
+/// Why a machine could not be reached; diagnostic text is kept separately.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum ReachKind {
+    NoAnswer,
+    Refused,
+    NameNotFound,
+    NoRoute,
+    Other,
+    /// An authenticated command closed quietly before its first hello.
+    CoreStartupClosed,
+}
+
 #[derive(Debug, uniffi::Error)]
 pub enum SshError {
     /// The signer needs the user to authenticate; prompt, then run again.
@@ -85,6 +97,7 @@ pub enum SshError {
     /// The OS refused the socket: on GrapheneOS, the app's Network permission is off.
     NetworkPermissionOff,
     Connect {
+        kind: ReachKind,
         detail: String,
     },
     Timeout,
@@ -101,7 +114,7 @@ impl std::fmt::Display for SshError {
             SshError::Key { detail } => write!(f, "key: {detail}"),
             SshError::Sign { detail } => write!(f, "signing failed: {detail}"),
             SshError::NetworkPermissionOff => f.write_str("Network permission is off"),
-            SshError::Connect { detail } => write!(f, "connection failed: {detail}"),
+            SshError::Connect { detail, .. } => write!(f, "connection failed: {detail}"),
             SshError::Timeout => f.write_str("timed out"),
         }
     }
@@ -232,6 +245,7 @@ pub fn ssh_run_spike(
         .enable_all()
         .build()
         .map_err(|e| SshError::Connect {
+            kind: ReachKind::Other,
             detail: e.to_string(),
         })?;
     runtime.block_on(async {
@@ -287,6 +301,24 @@ fn connect_error_probing(e: russh::Error, refused: impl FnOnce() -> bool) -> Ssh
         }
         russh::Error::IO(_) if refused() => SshError::NetworkPermissionOff,
         _ => SshError::Connect {
+            kind: match &e {
+                russh::Error::IO(io) => match io.kind() {
+                    std::io::ErrorKind::TimedOut => ReachKind::NoAnswer,
+                    std::io::ErrorKind::ConnectionRefused => ReachKind::Refused,
+                    std::io::ErrorKind::HostUnreachable
+                    | std::io::ErrorKind::NetworkUnreachable => ReachKind::NoRoute,
+                    // Tokio's getaddrinfo adapter keeps this prefix on Linux
+                    // and Android; permission denial was checked above.
+                    _ if io
+                        .to_string()
+                        .starts_with("failed to lookup address information:") =>
+                    {
+                        ReachKind::NameNotFound
+                    }
+                    _ => ReachKind::Other,
+                },
+                _ => ReachKind::Other,
+            },
             detail: e.to_string(),
         },
     }
@@ -398,6 +430,7 @@ pub(crate) async fn open_session(
             SignFailure::Sign(SignError::Failed { detail }) => SshError::Sign { detail },
             SignFailure::Key(e) => e,
             SignFailure::Send => SshError::Connect {
+                kind: ReachKind::Other,
                 detail: "the session closed during authentication".into(),
             },
         })?;
@@ -437,6 +470,7 @@ async fn run(
         exec(&mut session.handle, &command)
             .await
             .map_err(|e| SshError::Connect {
+                kind: ReachKind::Other,
                 detail: e.to_string(),
             })?;
     let _ = session
@@ -640,6 +674,49 @@ mod tests {
         ] {
             assert!(matches!(connect_error(e), SshError::Connect { .. }));
         }
+    }
+
+    #[test]
+    fn reach_kinds_from_socket_errors_and_lookup() {
+        use std::io::ErrorKind;
+        for (error, expected) in [
+            (
+                std::io::Error::from(ErrorKind::TimedOut),
+                ReachKind::NoAnswer,
+            ),
+            (
+                std::io::Error::from(ErrorKind::ConnectionRefused),
+                ReachKind::Refused,
+            ),
+            (
+                std::io::Error::from(ErrorKind::HostUnreachable),
+                ReachKind::NoRoute,
+            ),
+            (
+                std::io::Error::from(ErrorKind::NetworkUnreachable),
+                ReachKind::NoRoute,
+            ),
+            (std::io::Error::other("unrecognised"), ReachKind::Other),
+        ] {
+            let mapped = connect_error_probing(russh::Error::IO(error), || false);
+            assert!(matches!(mapped, SshError::Connect { kind, .. } if kind == expected));
+        }
+        assert!(matches!(
+            connect_error_probing(russh::Error::Disconnect, || false),
+            SshError::Connect {
+                kind: ReachKind::Other,
+                ..
+            }
+        ));
+        let lookup =
+            std::net::ToSocketAddrs::to_socket_addrs(&("missing.invalid", 22)).unwrap_err();
+        assert!(matches!(
+            connect_error_probing(russh::Error::IO(lookup), || false),
+            SshError::Connect {
+                kind: ReachKind::NameNotFound,
+                ..
+            }
+        ));
     }
 
     #[test]

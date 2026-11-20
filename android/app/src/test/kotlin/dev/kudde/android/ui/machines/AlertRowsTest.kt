@@ -15,6 +15,7 @@ import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
 import uniffi.kudde_mobile.PushStatusView
+import uniffi.kudde_mobile.ReachKind
 
 // Render 7's alert rows (design/checkpoints/7-machines.png): "Alerts" with
 // "Last accepted by ntfy 14:02 · last push here 14:02", "Mute alerts", "Send
@@ -33,7 +34,7 @@ class AlertRowsTest {
         status: PushStatusView? = null,
     ) = MachineView(
         "workstation", "workstation.example.org", 22u, "me", null, state, null, null,
-        registration?.let { AlertsView(it, status) },
+        alerts = registration?.let { AlertsView(it, status) },
     )
 
     private fun card(
@@ -126,7 +127,7 @@ class AlertRowsTest {
     @Test
     fun anUnreachableMachineShowsOnlyTheLastPush() {
         val c = card(
-            view(MachineState.Unreachable("refused"), status = null),
+            view(MachineState.Unreachable(ReachKind.REFUSED, "refused"), status = null),
             machine = MachineAlerts(lastPushMs = NOW - 60_000),
         )
         assertEquals(AlertsRowUi("Last push here at-60", null), c.alerts)

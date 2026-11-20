@@ -14,6 +14,7 @@ import org.robolectric.RuntimeEnvironment
 import uniffi.kudde_mobile.AgentAttention
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
+import uniffi.kudde_mobile.ReachKind
 
 // The Agents home's rows from a hub snapshot (agent-list spec; task M1.4). The
 // order and the sections come from Rust's attention model: these tests check
@@ -154,7 +155,7 @@ class AgentsModelTest {
                 unreachable("server", lastConnected = NOW - 2 * HOUR),
                 machine("website", MachineState.NeedsUserAuth),
                 machine("api", MachineState.KeyRejected),
-                machine("docs", MachineState.Unreachable("refused"), lastConnected = null),
+                machine("docs", MachineState.Unreachable(ReachKind.REFUSED, "refused"), lastConnected = null),
                 machine("paused", MachineState.Paused),
                 machine("connecting", MachineState.Connecting),
             ),

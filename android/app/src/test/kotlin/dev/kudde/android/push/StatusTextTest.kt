@@ -13,6 +13,7 @@ import uniffi.kudde_mobile.AgentRow
 import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
+import uniffi.kudde_mobile.ReachKind
 
 // stay-connected spec, "The status notification shows counts only": counts
 // from connected machines only ("need you" = needs you + error, "done" =
@@ -124,7 +125,7 @@ class StatusTextTest {
     @Test
     fun doneOnAMachineThatIsDownIsStaleAndNotCounted() {
         val s = hub(
-            listOf("workstation" to CONNECTED, "server" to MachineState.Unreachable("timed out")),
+            listOf("workstation" to CONNECTED, "server" to MachineState.Unreachable(ReachKind.NO_ANSWER, "timed out")),
             agent("workstation", AgentAttention.WORKING),
             agent("server", AgentAttention.DONE),
         )
@@ -139,7 +140,7 @@ class StatusTextTest {
     @Test
     fun agentsOnAMachineThatIsDownAreStaleAndNotCounted() {
         val s = hub(
-            listOf("workstation" to CONNECTED, "server" to MachineState.Unreachable("timed out")),
+            listOf("workstation" to CONNECTED, "server" to MachineState.Unreachable(ReachKind.NO_ANSWER, "timed out")),
             agent("workstation", AgentAttention.WORKING),
             agent("server", AgentAttention.NEEDS_YOU),
             agent("server", AgentAttention.NEEDS_YOU),
@@ -164,7 +165,7 @@ class StatusTextTest {
 
     @Test
     fun noneConnectedAndOneWaitsForTheKey() {
-        val s = hub(listOf("workstation" to MachineState.NeedsUserAuth, "server" to MachineState.Unreachable("x")))
+        val s = hub(listOf("workstation" to MachineState.NeedsUserAuth, "server" to MachineState.Unreachable(ReachKind.OTHER, "x")))
         assertEquals(StatusLine("Disconnected · unlock to reconnect", null), line(s))
     }
 
@@ -172,7 +173,7 @@ class StatusTextTest {
     fun noneConnectedAndRetrying() {
         for (state in listOf(
             MachineState.Connecting,
-            MachineState.Unreachable("refused"),
+            MachineState.Unreachable(ReachKind.REFUSED, "refused"),
             MachineState.KeyRejected,
             MachineState.NotInstalled,
             MachineState.Paused,

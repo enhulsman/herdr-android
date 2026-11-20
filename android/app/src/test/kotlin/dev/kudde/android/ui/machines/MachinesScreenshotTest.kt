@@ -20,6 +20,7 @@ import uniffi.kudde_mobile.HubSnapshot
 import uniffi.kudde_mobile.MachineState
 import uniffi.kudde_mobile.MachineView
 import uniffi.kudde_mobile.PushStatusView
+import uniffi.kudde_mobile.ReachKind
 
 // The Machines screen against render 7 (design/checkpoints/7-machines.png),
 // without alert rows (machines-*) and with them (machines-alerts-*), and the
@@ -37,7 +38,7 @@ class MachinesScreenshotTest {
         machine("workstation", MachineState.Connected("0.1.16")),
         machine(
             "server",
-            MachineState.Unreachable("connection refused"),
+            MachineState.Unreachable(ReachKind.REFUSED, "connection refused"),
             lastConnectedMs = NOW - 2 * HOUR,
             nextRetryMs = NOW + 30_000,
         ),
@@ -56,7 +57,7 @@ class MachinesScreenshotTest {
         ),
         machine(
             "server",
-            MachineState.Unreachable("connection refused"),
+            MachineState.Unreachable(ReachKind.REFUSED, "connection refused"),
             lastConnectedMs = NOW - 2 * HOUR,
             nextRetryMs = NOW + 30_000,
             alerts = AlertsView(AlertsRegistration.REGISTERED, null),
@@ -212,7 +213,7 @@ class MachinesScreenshotTest {
         lastConnectedMs: Long? = null,
         nextRetryMs: Long? = null,
         alerts: AlertsView? = null,
-    ) = MachineView(name, "$name.example.org", 22u, "me", null, state, lastConnectedMs?.toULong(), nextRetryMs?.toULong(), alerts)
+    ) = MachineView(name, "$name.example.org", 22u, "me", null, state, lastConnectedMs?.toULong(), nextRetryMs?.toULong(), alerts = alerts)
 
     /** A time of day on NOW's date, in UTC, as [clock] shows it. */
     private fun at(hour: Int, minute: Int): Long = NOW - NOW % DAY + hour * HOUR + minute * MINUTE

@@ -367,3 +367,62 @@ All Cargo commands used --offline; TMPDIR was under the worktree's target/.
 
 No real logs, phone or live infrastructure were accessed. The coordinator still
 measures real-log wire cost and reruns the two socket tests unrestricted.
+
+
+## 7. Review fixes (007h)
+- [x] 7.1 Verify both review premises and observe the new cache-recheck and
+  later-turn regressions fail before implementation.
+- [x] 7.2 Distinguish confirmed absence from all failed file rechecks internally;
+  preserve the byte-returning bridge and separate file/copy caches.
+- [x] 7.3 Retire unresolved calls at a later turn, preserving placeholders,
+  late-output refusal, same-turn ambiguity and skipped-record revocation.
+- [x] 7.4 Add the two review scenarios without changing positional pairing,
+  dependencies, Kotlin or existing test assertions.
+- [x] 7.5 Run both crate suites, CI clippy, fmt, strict validation and
+  task 4.5's images_check fixture count; record any sandbox socket failures.
+
+### Regression evidence (confidence: high)
+Promise 1: `hub::chat::tests::failed_file_rechecks_never_restore_a_cached_copy`
+first failed by returning cached `copy` bytes after a failed file read.
+It covers uncached/cached fallback after absence, promotion to changed file
+bytes, nonzero exit, timeout, truncation, empty reply, RPC error, partial bytes,
+malformed header, no connection, directory and oversized-file refusal.
+
+Promise 2: `skipped_output_does_not_block_a_later_turn` and
+`missing_output_does_not_block_a_later_turn` first failed with zero pairs
+instead of one. Both run the production tail and compare incremental parsing,
+line-by-line reads and a full retained-history reparse. They assert that the
+old view remains a placeholder and only the new view pairs despite late old
+outputs. `a_later_turn_view_never_belongs_to_an_earlier_call` refuses a
+cross-turn view; `two_open_calls_in_the_same_later_turn_stay_uncertain`
+preserves the same-turn ambiguity rule. `an_unknown_call_turn_stays_uncertain`
+ensures an unknown turn is not treated as a proven earlier turn. Existing tests and pair_image remain
+unchanged.
+
+
+### Check output
+All Cargo builds ran sequentially with `-j 3` and `--offline`; the chat suite
+also set `CARGO_BUILD_JOBS=3` for its existing nested example invocation.
+- `cargo test -j 3 --offline -p kudde-chat`: 163 tests passed, including
+  all 38 image regressions; final doc-test result `0 passed; 0 failed`.
+- `cargo test -j 3 --offline -p kudde-mobile`: `155 passed; 2 failed`.
+  Only `ssh::tests::here_sockets_are_not_refused` and
+  `ssh::tests::other_connect_failures_stay_connection_failures` failed with
+  the anticipated sandbox socket restrictions.
+- Repeating the mobile command with exactly those two tests skipped:
+  `155 passed; 0 failed; 2 filtered out`; restricted-key integration
+  `3 passed; 0 failed`; doc-tests `0 passed; 0 failed`.
+- `cargo clippy -j 3 --offline --locked --all-targets --features kudde-mobile/vt,kudde-mobile/spike -- -D warnings`:
+  `Finished dev profile [unoptimized + debuginfo]`; no warnings.
+- `cargo fmt --check`: exit 0, no output.
+- `openspec validate codex-image-fallback --strict`:
+  `Change 'codex-image-fallback' is valid`.
+- `cargo run -j 3 --offline -p kudde-chat --example images_check -- crates/kudde-chat/tests/fixtures/codex-real-shape.jsonl`:
+  `viewed 3`, `paired 3`, `wire bytes 4505`.
+- `git diff --check`: exit 0. All 33 pre-existing image tests and all 12
+  pre-existing mobile chat unit tests are unchanged, as is `pair_image`.
+
+Morning follow-up: rerun the two socket checks outside the sandbox. The known
+positional-pairing design risk remains outside this card; no Gradle, phone,
+network Git or live infrastructure commands were run. Changes remain unstaged
+and uncommitted.

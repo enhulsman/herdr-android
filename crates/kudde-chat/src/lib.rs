@@ -946,6 +946,9 @@ impl Parser {
             return;
         }
         if kind == "response_item" && p["type"] == "custom_tool_call" {
+            self.retire_image_calls(
+                p["internal_chat_message_metadata_passthrough"]["turn_id"].as_str(),
+            );
             if let Some(id) = p["call_id"].as_str().filter(|s| !s.is_empty()) {
                 let entry = self
                     .codex_calls
@@ -1006,6 +1009,20 @@ impl Parser {
                 }
             }
             _ => {}
+        }
+    }
+
+    // A new turn retires abandoned calls permanently, but keeps their view
+    // bookkeeping so later barriers and duplicate outputs still revoke copies.
+    fn retire_image_calls(&mut self, turn: Option<&str>) {
+        let Some(turn) = turn.filter(|t| !t.is_empty()) else {
+            return;
+        };
+        for call in self.codex_calls.values_mut() {
+            if !call.closed && !call.turn.is_empty() && call.turn != turn {
+                call.closed = true;
+                call.invalid = true;
+            }
         }
     }
 
@@ -1167,6 +1184,7 @@ impl Parser {
                 );
             }
             "ImageView" => {
+                self.retire_image_calls(turn);
                 // A path, or (0.169) a file URL.
                 let raw = item["path"].as_str().unwrap_or("");
                 let path = raw

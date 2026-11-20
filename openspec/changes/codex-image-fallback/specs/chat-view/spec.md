@@ -11,7 +11,8 @@ be fetched SHALL show a placeholder reading "Image not available".
 The readable file SHALL win, including after a deleted file is recreated or
 replaced. File bytes SHALL be cached by path and file time, separately from
 session-bound log-copy bytes. Before serving a cached copy the file SHALL be
-checked again. The existing byte-returning bridge SHALL remain unchanged.
+checked again. Only confirmed file absence SHALL permit the log copy; transport,
+timeout, connection and read failures SHALL return no replacement bytes. The existing byte-returning bridge SHALL remain unchanged.
 
 A Codex custom_tool_call opens a call by payload.call_id and
 payload.internal_chat_message_metadata_passthrough.turn_id. The output
@@ -34,6 +35,10 @@ Raw reference-shaped image_url values SHALL never be trusted. Only references
 produced by the tail may recover copies; the fetched field SHALL belong to
 the selected input_image part. A skipped record SHALL invalidate open and
 already accepted pairings conservatively, including across reads and reparsing.
+At a later nonempty turn identity, unresolved calls from earlier turns SHALL
+be retired permanently: their views SHALL remain placeholders and late outputs
+SHALL never pair them. An ImageView SHALL never belong to another turn.
+Multiple open calls within the same turn SHALL remain uncertain.
 Reads SHALL stay within the existing tail and image byte limits. Call inputs
 SHALL be omitted from retained chunks and chat history after structural JSON
 parsing. The bounded shell response may carry scrubbed call inputs. Only
@@ -130,3 +135,20 @@ uncertainty barrier.
 - **WHEN** an oversized response_item has its payload subtype beyond byte 200,
   either before or after a pairing
 - **THEN** a barrier prevents or revokes the copy across reads and reparsing
+
+#### Scenario: Failed recheck after promotion from copy to file
+- **WHEN** a log copy is cached, the file becomes readable with different bytes,
+  and a later file recheck fails without confirming absence
+- **THEN** the readable file wins before the failure and the failed recheck
+  returns no replacement bytes, preserving the displayed picture
+- **WHEN** the file is confirmed absent
+- **THEN** the cached or freshly fetched log copy is returned
+
+#### Scenario: Skipped or missing output before a later turn
+- **WHEN** a call's output is skipped or missing, and a complete one-image call
+  occurs in a later turn with its file absent
+- **THEN** only the later call pairs, the earlier views remain placeholders,
+  and a late output cannot pair the retired call, across incremental reads
+  and retained-history reparsing
+- **WHEN** two calls remain open in the same turn
+- **THEN** their ImageView remains a placeholder

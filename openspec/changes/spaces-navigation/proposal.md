@@ -2,6 +2,11 @@
 
 ## Plain summary
 
+**Answered (Ezra, 2026-11-20):** 2 to 6 as picked. 1 is the pick for now,
+but a short brainstorm and comparison with Ezra comes first, before task 3.3
+is built. The texts and pictures still wait for approval, so task 1.1 stays
+open.
+
 **Decisions that are yours** (my pick first; every text on screen and every
 new picture waits for your approval, see "Texts" and "New on screen"):
 

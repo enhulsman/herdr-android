@@ -145,6 +145,13 @@ class ChatState {
         refusal = refusalOf(r)
     }
 
+    /** Nothing was sent (blank once cleaned, R1-B): the text goes back, with no error. */
+    fun unchanged(out: Outgoing) {
+        drop(out.pending.id)
+        draft = listOf(out.draft, draft).filter { it.isNotBlank() }.joinToString("\n")
+        attached = out.attached + attached
+    }
+
     /** `terminal.send` took it ([sure]), or may have (no answer in time). */
     fun typed(id: Long, now: Long, sure: Boolean = true) = update(id) { it.typed(now, sure) }
 

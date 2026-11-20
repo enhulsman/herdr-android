@@ -13,6 +13,114 @@ use crate::locate::Lookup;
 use crate::{Item, Key};
 use std::collections::{HashMap, HashSet};
 
+/// Remove non-typeable controls, including CR in CRLF, preserving LF and tab.
+pub fn canonical_text(text: &str) -> String {
+    text.chars()
+        .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
+        .collect()
+}
+
+/// The original composer contents, kept apart from canonical text. Attachment
+/// values belong to the adapter (bytes, handles or identifiers).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Draft<A> {
+    pub text: String,
+    pub attachments: Vec<A>,
+}
+
+impl<A> Draft<A> {
+    /// Prepare before creating pending or doing I/O. A normalized-empty draft
+    /// without pictures stays untouched and produces no action or error.
+    pub fn prepare(&mut self) -> Option<Outgoing<A>> {
+        let text = canonical_text(&self.text);
+        if text.trim().is_empty() && self.attachments.is_empty() {
+            return None;
+        }
+        Some(Outgoing {
+            text,
+            original: Draft {
+                text: std::mem::take(&mut self.text),
+                attachments: std::mem::take(&mut self.attachments),
+            },
+        })
+    }
+}
+
+/// One prepared send: canonical text for all decisions, original draft for a
+/// definitive refusal. An unsure outcome must keep this send pending.
+#[derive(Clone, Debug)]
+pub struct Outgoing<A> {
+    text: String,
+    original: Draft<A>,
+}
+
+impl<A> Outgoing<A> {
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn attachments(&self) -> &[A] {
+        &self.original.attachments
+    }
+
+    pub fn pending(&self, id: u64, rows: &[Row], status: String, now: u64) -> Pending {
+        Pending::from_canonical(
+            id,
+            self.text.clone(),
+            self.attachments().len(),
+            rows,
+            status,
+            now,
+        )
+    }
+
+    /// Paths precede the text, one per image. A final @ word gets the phone's
+    /// extra space only on the wire; all typeable draft whitespace survives.
+    pub fn transport(&self, paths: &[String]) -> String {
+        transport_text(paths, &self.text)
+    }
+
+    /// The core must see the same canonical text as pending, without paths or
+    /// the transport-only @ space.
+    pub fn sent(&self, core: &mut crate::core::ChatCore, now: u64) {
+        core.sent(&self.text, now);
+    }
+
+    /// Only for definitive refusal: the phone's original-before-newer merge.
+    /// The caller removes the refused pending bubble; unsure sends never restore.
+    pub fn restore(self, draft: &mut Draft<A>) {
+        draft.text = [self.original.text, std::mem::take(&mut draft.text)]
+            .into_iter()
+            .filter(|s| !s.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut attachments = self.original.attachments;
+        attachments.append(&mut draft.attachments);
+        draft.attachments = attachments;
+    }
+}
+
+/// Format already-canonical text for transport without changing its pending
+/// identity. Uploaded paths are adapter-supplied, one per attachment.
+pub fn transport_text(paths: &[String], text: &str) -> String {
+    let mut message = paths.join("\n");
+    if !text.is_empty() {
+        if !paths.is_empty() {
+            message.push('\n');
+        }
+        message.push_str(text);
+    }
+    if text.chars().last().is_some_and(|c| !c.is_whitespace())
+        && text
+            .split_whitespace()
+            .next_back()
+            .is_some_and(|s| s.starts_with('@'))
+    {
+        message.push(' ');
+    }
+    message
+}
+
 /// What one check sees of the terminal.
 #[derive(Clone, Debug)]
 pub struct Seen<'a> {
@@ -187,7 +295,8 @@ pub enum PendingState {
 }
 
 /// One outgoing message. The text is the pending bubble's text, without
-/// upload paths or transport-only spaces. Normalization belongs to task 3.3.
+/// upload paths or transport-only spaces. Construct via Outgoing after preparation,
+/// or use `new` to canonicalize raw text before any classification.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pending {
     pub id: u64,
@@ -211,6 +320,17 @@ pub struct Pending {
 
 impl Pending {
     pub fn new(
+        id: u64,
+        text: String,
+        images: usize,
+        rows: &[Row],
+        status: String,
+        now: u64,
+    ) -> Self {
+        Self::from_canonical(id, canonical_text(&text), images, rows, status, now)
+    }
+
+    fn from_canonical(
         id: u64,
         text: String,
         images: usize,

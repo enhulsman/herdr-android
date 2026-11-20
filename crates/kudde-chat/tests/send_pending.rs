@@ -600,3 +600,47 @@ fn backwards_and_equal_clocks_do_not_underflow_or_fire_timers_early() {
     assert!(p.waiting(13000));
     assert_eq!(p.state(40000), PendingState::Sent);
 }
+
+#[test]
+fn canonical_pending_confirms_in_log_and_both_queues() {
+    let p = sent("read\r\nno\x03tes\x1b", &[], "working", 1, 0);
+    assert_eq!(p.text, "read\nnotes");
+    assert!(
+        follow(
+            std::slice::from_ref(&p),
+            &[user(0, "read\nnotes", 1)],
+            "working",
+            100,
+            false
+        )
+        .is_empty()
+    );
+    assert!(p.queued_in(&lines(&["/tmp/a.png\nread\nnotes"])));
+    assert!(p.codex_queued("working", &lines(&["› read", "notes"])));
+}
+
+#[test]
+fn canonical_commands_keep_dialog_waits_and_shell_confirmation() {
+    let p = sent("\x03/usage", &[], "idle", 0, 0);
+    assert!(p.slash());
+    assert_eq!(send::send_refusal(&[p], 3000), Some(send::DIALOG_FIRST));
+    let p = sent("\x1b!echo hi", &[], "idle", 0, 0);
+    assert_eq!(p.command(), Some("echo hi"));
+    assert!(follow(&[p], &[shell(0, &["echo hi"])], "idle", 1000, false).is_empty());
+}
+
+#[test]
+fn canonical_box_matching_keeps_the_once_only_enter_delay() {
+    for (agent, screen) in [
+        (
+            Agent::Claude,
+            lines(&["────", "❯ read", "@notes.md ", "────"]),
+        ),
+        (Agent::Codex, lines(&["› read", "@notes.md "])),
+    ] {
+        let mut p = sent("re\x03ad\r\n@notes.md", &[], "idle", 0, 0);
+        assert!(!p.take_enter(agent, &screen, 1499, true));
+        assert!(p.take_enter(agent, &screen, 1500, true));
+        assert!(!p.take_enter(agent, &screen, 3000, true));
+    }
+}

@@ -134,6 +134,8 @@ pub enum ChatRefusal {
 /// What became of a send, for the chat.
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Enum)]
 pub enum ChatSent {
+    /// Canonical text was blank without pictures: keep the draft, no new error.
+    Unchanged,
     /// The desk typed it.
     Typed,
     /// It may be typed (no answer in time, or the connection went): followed as sent.
@@ -267,9 +269,7 @@ fn chat_row(r: &Row, session: &str) -> ChatRow {
 /// The message text for images put at `paths`: each path on a line of its
 /// own, then the text.
 fn with_images(paths: &[String], text: &str) -> String {
-    let mut lines = paths.to_vec();
-    lines.push(text.to_owned());
-    lines.join("\n").trim().to_owned()
+    send::transport_text(paths, text)
 }
 
 /// The `machine.exec` argv that prints the image behind `key`; a `log:` key
@@ -612,6 +612,13 @@ impl Chat {
     /// images' paths first, one per line: Claude Code attaches a pasted line
     /// that is an image path as the image itself.
     pub fn send_with_images(&self, text: String, images: Vec<ChatUpload>) -> ChatSent {
+        let mut draft = send::Draft {
+            text,
+            attachments: images,
+        };
+        let Some(outgoing) = draft.prepare() else {
+            return ChatSent::Unchanged;
+        };
         let core = self.core.clone();
         core.runtime().block_on(async {
             let no = |refusal: ChatRefusal| ChatSent::Refused { refusal };
@@ -632,7 +639,7 @@ impl Chat {
                 Err(e) => return failed(e),
             };
             let mut lines = Vec::new();
-            for up in images {
+            for up in outgoing.attachments() {
                 let data = base64::engine::general_purpose::STANDARD.encode(&up.data);
                 let put = c
                     .call_timeout(
@@ -651,7 +658,7 @@ impl Chat {
                     }
                 }
             }
-            let message = with_images(&lines, &text);
+            let message = with_images(&lines, outgoing.text());
             // Uploads take time: check again right before typing, and let the
             // core refuse if the status changed since (its `if`).
             let guard = match self.check(&c).await {
@@ -667,10 +674,7 @@ impl Chat {
             }
             match send_outcome(&c.call("terminal.send", params).await) {
                 sent @ (Sent::Typed | Sent::Unsure) => {
-                    self.state
-                        .lock()
-                        .unwrap()
-                        .sent(&message, self.core.chat_now());
+                    outgoing.sent(&mut self.state.lock().unwrap(), self.core.chat_now());
                     *self.sent_to.lock().unwrap() = Some(send::EnterState::new(target, &sent));
                     if sent == Sent::Typed {
                         ChatSent::Typed

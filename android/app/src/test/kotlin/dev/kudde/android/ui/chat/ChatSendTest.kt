@@ -93,6 +93,21 @@ class ChatSendTest {
         }
     }
 
+    /** R1-B: text that is blank once cleaned sends nothing and stays in the box, with no error. */
+    @Test
+    fun anUnchangedSendKeepsTheTextWithoutAnError() {
+        val s = ChatState()
+        s.draft = "\u0007"
+        s.attached = listOf(photo("a.jpg"))
+        val out = s.send(rows, "idle", now = 0)!!
+        s.draft = "Later"
+        s.unchanged(out)
+        assertEquals("\u0007\nLater", s.draft)
+        assertEquals(listOf("a.jpg"), s.attached.map { it.name })
+        assertTrue("nothing was typed: no bubble", s.pending.isEmpty())
+        assertNull(s.refusal)
+    }
+
     @Test
     fun aRefusalKeepsWhatWasTypedMeanwhileToo() {
         val s = ChatState()

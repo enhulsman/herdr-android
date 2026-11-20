@@ -887,3 +887,28 @@ fn command_turn_exemption_uses_saturating_elapsed_time_and_an_exclusive_boundary
         assert_eq!(c.view().health == Health::Ok, exempt);
     }
 }
+
+#[test]
+fn prepared_send_records_canonical_text_without_transport_prefix_or_at_space() {
+    for (raw, expected, slash) in [
+        ("\x03/usage", "/usage", true),
+        ("\x1b!echo hi", "!echo hi", false),
+    ] {
+        let mut draft = crate::send::Draft {
+            text: raw.into(),
+            attachments: vec!["photo"],
+        };
+        let out = draft.prepare().unwrap();
+        let (mut c, _) = opened(&[asked("Hi")], 0);
+        assert_eq!(c.relook_sent, None);
+        assert_eq!(c.command_sent, None);
+        assert_eq!(out.text(), expected);
+        assert!(
+            out.transport(&["/tmp/a.png".into()])
+                .starts_with("/tmp/a.png\n")
+        );
+        out.sent(&mut c, 1000);
+        assert_eq!(c.command_sent, Some(1000));
+        assert_eq!(c.relook_sent, slash.then_some(1000));
+    }
+}

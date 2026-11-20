@@ -174,6 +174,7 @@ fun ChatRoute(visit: ChatVisit, app: KuddeApp, header: TerminalHeader, actions: 
                             is ChatSent.Refused -> state.refused(out, sent.refusal)
                             ChatSent.Typed -> state.typed(out.pending.id, SystemClock.uptimeMillis(), sure = true)
                             ChatSent.Unsure -> state.typed(out.pending.id, SystemClock.uptimeMillis(), sure = false)
+                            ChatSent.Unchanged -> state.unchanged(out)
                         }
                     }
                 }

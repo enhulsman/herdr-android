@@ -1697,3 +1697,27 @@ async fn a_second_endpoint_change_mid_write_leaves_only_the_latest() {
     let list = std::fs::read_to_string(rig.dir.join("machines.json")).unwrap();
     assert!(list.contains(UP_THIRD) && !list.contains(UP_NEW), "{list}");
 }
+
+#[tokio::test]
+async fn blank_chat_send_is_a_noop_even_without_a_connection() {
+    let r = rig("chat-empty");
+    let chat = chat::Chat::new(r.hub.clone(), "missing".into(), "t1".into());
+    tokio::task::spawn_blocking(move || {
+        for text in ["", "\x03\r\n\t", " \x1b"] {
+            assert_eq!(chat.send(text.into()), chat::ChatSent::Unchanged);
+        }
+        // Pictures still take the usual upload path (which refuses offline).
+        assert!(matches!(
+            chat.send_with_images(
+                "\x03".into(),
+                vec![chat::ChatUpload {
+                    name: "a.png".into(),
+                    data: vec![1]
+                }]
+            ),
+            chat::ChatSent::Refused { .. }
+        ));
+    })
+    .await
+    .unwrap();
+}

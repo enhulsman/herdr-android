@@ -1,8 +1,13 @@
 # Codex image fallback
 
-Owner decision: pair equal, nonzero numbers of viewed images and copies by
-position. View completion order pairs with output image-part order, ignoring
-text parts. Validate every copy before pairing any view of the call.
+Owner decision (Ezra, 2026-11-20, kept at 13:08 with the real-log numbers):
+pair equal, nonzero numbers of viewed images and copies by position. View
+completion order pairs with output image-part order, ignoring text parts.
+Validate every copy before pairing any view of the call. On the day's 52 real
+Codex logs, 157 of 167 viewed images recover this way; one image per call
+only would recover almost none. The review's high finding, that two views
+finishing out of order can swap a call's pictures, is accepted as a known
+limit and stated in the spec.
 
 ## Why
 A deleted viewed image can still have a copy in its Codex session log.

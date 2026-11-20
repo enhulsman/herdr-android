@@ -72,7 +72,7 @@ author, tested on a few phones, built on herdr-core 0.1.x.
 
 - An Android phone on Android 12 or newer (arm64).
 - herdr-core 0.1.15 or newer
-  ([herdrdev/kudde-core](https://github.com/herdrdev/kudde-core)) on a Linux
+  ([herdrdev/herdr-core](https://github.com/herdrdev/herdr-core)) on a Linux
   or WSL machine. Install it as the user your agents run under:
   `curl -fsSL https://releases.herdr.dev/core/install.sh | sh`. The `herdr`
   terminal tool is a different program; the app does not need it.

@@ -33,7 +33,7 @@ graphite/paper palettes and does not release new palettes before sign-off.
 - [x] 3.3 Test first (`crates/kudde-mobile/src/hub/tests/term.rs`, with its fake core): a theme given at open and a theme set later show in the next frame's default colours, a reattach into a fresh engine keeps the theme, and no message is written to the link for a theme. Then the `TerminalTheme` record, the `open_terminal` argument, `TerminalView::set_theme` and the channel command. Check: `cargo test --locked --features kudde-mobile/vt,kudde-mobile/spike -p kudde-mobile`
 - [x] 3.4 Tests first (Android, `TerminalSessionTest`, `TerminalCacheTest`): the session opens with the showing theme and sets it again when the theme changes; a kept frame whose default colours differ from the showing theme's is not shown. Then `TerminalSession` and `TerminalRoute`. Check: `./gradlew :app:testDebugUnitTest --tests '*Terminal*'`
 - [x] 3.5 After 3.1–3.4, add a terminal golden in paper (`terminal-watch-paper`), from the existing fixture drawn with paper's defaults; existing goldens unchanged. Check: `./gradlew :app:verifyRoborazziDebug`
-- [ ] 3.6 **[owner]** Sign off the paper terminal golden
+- [x] 3.6 **[owner]** Sign off the paper terminal golden (signed off 2026-11-20, with the light diff rows of d343391)
 
 ## 4. Choosing a theme (after 1.2)
 

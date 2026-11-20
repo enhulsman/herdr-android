@@ -344,20 +344,15 @@ with `ChangesButton` and `ViewSwitch("Chat")`; the chat
   Button, `contentDescription` "Chat" or "Terminal". `ViewSwitch` itself
   stays for the chat's "Show the terminal" buttons in the body, which keep
   their words.
-- **The gauge as a ring.** `Gauge` (`ui/chat/ChatScreen.kt`) is text today:
-  `gaugeLabel` (`ui/chat/ChatState.kt`) gives "42%" when Codex reports a
-  window and the tokens ("223k") otherwise; a tap toggles
+- **The gauge keeps its place.** `Gauge` (`ui/chat/ChatScreen.kt`) is
+  text today: `gaugeLabel` (`ui/chat/ChatState.kt`) gives "42%" when Codex
+  reports a window and the tokens ("223k") otherwise; a tap toggles
   `ChatState.gaugeOpen`, which shows `gaugeDetail` in a strip under the
-  bar. It shows only in the chat; the terminal has none. It becomes a ring
-  of about 18 dp in a 48 dp touch area, drawn on a `Canvas`: the track in
-  the border colour, the used share in the text colour when
-  `gaugePercent` is known. Claude Code's log has no window size
-  (decisions.md, 2026-11-14), so it has tokens only and no share: the
-  ring then draws no fill, and how it says "tokens only" is the render's.
-  A pure function `gaugeSpoken(used, window, percent)` beside `gaugeLabel`
-  gives the spoken value, set as the node's `stateDescription`, with
-  `progressBarRangeInfo` only when the share is known. The tap and the
-  detail strip stay as they are.
+  bar. It shows only in the chat; the terminal has none. This change does
+  not touch it: it only keeps its place in the slot. Its ring and the
+  usage sheet a tap opens are the `usage-gauge` change's (moved there on
+  2026-11-20). Whichever of the two lands second fits into the other's
+  bar and updates the goldens of both.
 - The map (D7) joins the same slot. The menu button is always last; the
   render decides the order of the map, the gauge and the switch, their
   spacing, and how they fit at 412 dp and 130% font.
@@ -375,8 +370,9 @@ with `ChangesButton` and `ViewSwitch("Chat")`; the chat
   names, guards the reader (task 2.1).
 - **The title bar is tight under the chat** (map, gauge, view switch,
   overflow button). D10 frees room: Changes goes into the menu and the
-  switch and gauge become icon-sized. Settled at the render (proposal,
-  "New on screen" 4, 6 to 8).
+  switch becomes icon-sized; the gauge stays text until `usage-gauge`
+  makes it a ring. Settled at the render (proposal,
+  "New on screen" 4, 6 and 7).
 - **A tab of one pane gets no sideways walk.** Accepted with decision 1:
   where today a sideways swipe opens the next agent of the Agents list, it
   now only bounces. Most terminals sit alone in their tab, so this is felt.

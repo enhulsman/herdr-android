@@ -683,36 +683,28 @@ lead to the terminal ("Show the terminal") SHALL keep their words.
 - **WHEN** the person looks at it
 - **THEN** it is still a button with those words
 
-### Requirement: The context gauge is a small ring
-In the chat's title bar, the context indicator SHALL be a small circular
-gauge in place of today's text ("42%", "223k"). When the session's context
-window is known, the ring SHALL be filled to the share of the window used.
-When the window is not known, as for Claude Code, the gauge SHALL NOT draw
-a share it does not know. The gauge SHALL be at least 48 dp to the touch;
-a tap SHALL show and hide the detail line under the title bar as today
-("223k of 475k tokens", "283k tokens used"). Its value SHALL be available
-to a screen reader: "Context, 42% used" when the window is known, "Context,
-223k tokens used" when it is not. When nothing is known about the context,
-the chat SHALL show no gauge, as today. The terminal's title bar SHALL show
-no gauge, as today.
+### Requirement: The title bar keeps a place for the context gauge
+The chat's title bar SHALL keep a place for the context gauge among its
+controls, as it has one today. The gauge's look and what a tap on it does
+SHALL be as the `chat-view` capability describes them ("A context gauge
+shows in the top bar"); they belong to the `usage-gauge` change, not to
+this one. When nothing is known about the context, the place SHALL stay
+empty and the other controls SHALL close up, as today. The terminal's
+title bar SHALL show no gauge, as today.
 
-#### Scenario: A share of a known window
-- **GIVEN** a Codex chat that used 223k of a 475k token window
+#### Scenario: The gauge in its place
+- **GIVEN** the chat of a Codex agent in a tab of three panes, with a token count in its log
 - **WHEN** the title bar shows
-- **THEN** the gauge is a ring filled to 47%, shows no text, and a screen reader reads "Context, 47% used"
+- **THEN** the gauge shows whole beside the map, the view switch and the overflow button, as `chat-view` describes it, and a tap on it does what `chat-view` says
 
-#### Scenario: Tokens without a window
-- **GIVEN** a Claude Code chat that used 223k tokens, whose window is not known
-- **WHEN** the title bar shows
-- **THEN** the gauge draws no share, and a screen reader reads "Context, 223k tokens used"
-
-#### Scenario: The detail on a tap
-- **WHEN** the person taps the gauge
-- **THEN** the line "223k of 475k tokens" shows under the title bar, and a second tap hides it
-
-#### Scenario: Nothing known
+#### Scenario: No token count
 - **GIVEN** a chat whose log has no token count yet
 - **WHEN** the title bar shows
+- **THEN** there is no gauge, and the map, the switch and the overflow button show with no gap between them
+
+#### Scenario: The terminal
+- **GIVEN** the terminal of an agent whose chat shows a gauge
+- **WHEN** the terminal's title bar shows
 - **THEN** there is no gauge
 
 ### Requirement: The title bar fits its controls

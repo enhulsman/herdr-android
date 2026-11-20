@@ -74,11 +74,12 @@ new picture waits for your approval, see "Texts" and "New on screen"):
    Changes moves into a menu behind a three-dot button at the end of the
    title bar, where later options can go too. The Terminal and Chat
    switch shows an icon instead of a word; a screen reader still says
-   "Terminal" or "Chat". The chat's context indicator becomes a small ring,
-   as in the Claude app; a screen reader still hears its value. All three
-   are new pictures: they come in the render round (task 4.1) and wait for
-   your sign-off (4.2). The icons, the ring's look and the menu's texts are
-   not decided here.
+   "Terminal" or "Chat". The title bar keeps a place for the context
+   gauge, whose look and sheet belong to the `usage-gauge` change (moved
+   there the same day: the ring and the usage sheet are their own change,
+   closing #37). Both are new pictures: they come in the render round
+   (task 4.1) and wait for your sign-off (4.2). The icons and the menu's
+   texts are not decided here.
 
 **What changes for you:**
 
@@ -96,8 +97,8 @@ new picture waits for your approval, see "Texts" and "New on screen"):
   your pane marked. A tap on it shows the tab as tiles; a tap on a tile
   opens that pane.
 - The title bar gets quieter: Changes moves into a menu behind three dots,
-  the Terminal and Chat switch becomes an icon, and the chat's context
-  figure becomes a small ring.
+  and the Terminal and Chat switch becomes an icon. The chat's context
+  gauge keeps its place; its new look comes with `usage-gauge`.
 - Swiping past terminals no longer resizes them on the desk: a terminal is
   taken over only once you stay on it for 0.4 seconds, or at once when you
   type, tap or send text there.
@@ -153,8 +154,9 @@ only the spaces' names.
   an attached terminal.
 - The title bar gets four screen-reader actions; a step is announced.
 - A quieter title bar: Changes goes into an overflow menu, the view switch
-  becomes an icon with the same spoken names, and the context indicator a
-  small ring with a spoken value.
+  becomes an icon with the same spoken names, and the title bar keeps a
+  place for the context gauge, whose look and sheet belong to the
+  `usage-gauge` change.
 - A tab overview with tiles, opened from a tab's line and from the title
   bar's map.
 - The `spaces` requirements for the drawer, lenient reading and the tab
@@ -169,7 +171,8 @@ only the spaces' names.
   following it, the Spaces view, tab maps, the sideways walk and its rules,
   what happens when the desk changes or a machine is out of reach, the tab
   overview, the ways without a swipe, and the title bar's controls (the
-  overflow menu, the view switch, the context gauge).
+  overflow menu, the view switch, and the place kept for the context
+  gauge).
 
 ### Modified Capabilities
 - None in `openspec/specs/`. Two requirements of the open change
@@ -198,7 +201,6 @@ only the spaces' names.
 | Title bar: the overflow button, spoken | "More options" |
 | Title bar menu: its item | "Changes" |
 | Title bar: the view switch, spoken | "Chat" (in the terminal) · "Terminal" (in the chat), the words shown today |
-| Spoken: the context gauge | "Context, 47% used" (window known) · "Context, 223k tokens used" (window not known) |
 
 ## New on screen (each needs the owner's sign-off against a render)
 
@@ -223,7 +225,7 @@ makes them, 4.2 is the sign-off).
    other-terminal row.
 4. **The title bar with the map**, as a 48 dp button, in the terminal and
    in the chat, before the overflow button. The chat's bar also holds the
-   gauge and the view switch; the render must show it at 412 dp and at 130%
+   gauge (as today, text, in the place kept for it) and the view switch; the render must show it at 412 dp and at 130%
    font size, and you choose what gives way if it does not fit.
 5. **The tab overview.** A sub-screen with the back bar the Changes screen
    has, titled with the space's name; the space's tabs as a row of tab maps
@@ -233,9 +235,10 @@ makes them, 4.2 is the sign-off).
    and the menu it opens, holding "Changes".
 7. **The view switch as an icon.** A 48 dp icon button in place of the
    "Terminal" / "Chat" pill.
-8. **The context gauge as a ring.** A small ring in place of "42%" or
-   "223k", filled to the share used when the window is known, and showing
-   no share when it is not (Claude Code).
+8. **No new gauge here.** The title bar keeps a place for the context
+   gauge; its ring and its sheet are `usage-gauge`'s pictures. The render
+   here shows the gauge as today, as text, in that place, unless
+   `usage-gauge`'s render is signed off first.
 
 ## Impact
 
@@ -246,23 +249,23 @@ makes them, 4.2 is the sign-off).
   walk), `AgentsRoute.kt` and `AgentsScreen.kt` (the switch),
   `ui/terminal/TerminalScreen.kt` and `TerminalRoute.kt` (map, actions,
   dwell, bounce, the overflow menu), `ui/chat/ChatScreen.kt` (map in the
-  shared bar, the icon switch, the ring gauge), `ui/chat/ChatState.kt`
-  (the gauge's spoken value), `ui/changes/ChangesRoute.kt` (the Changes
-  button leaves the bar).
-- Design: four renders (the title bar render now also shows the menu, the
-  icon switch and the ring), three new icons, eight component entries in
-  `design-tokens.json`, checkpoints, goldens.
+  shared bar, the icon switch, the gauge's place),
+  `ui/changes/ChangesRoute.kt` (the Changes button leaves the bar).
+- Design: four renders (the title bar render now also shows the menu and
+  the icon switch, with the gauge as today in its place), three new icons,
+  seven component entries in `design-tokens.json`, checkpoints, goldens.
 - Specs: `android-client-v1` amended in place (two requirements).
 - Shares files with #28 (wide layout: `AgentsRoute.kt`, `TerminalRoute.kt`)
   and `desktop-chat` (the hub's chat code moves; this change does not touch
-  it). Build them one after the other.
+  it), and the chat's title bar with `usage-gauge` (the ring and the usage
+  sheet). Build them one after the other.
 - No herdr-core feature is needed; the tested range stays as it is.
 - Not in this change: sub-agent peek, live pictures in tiles, renaming or
   closing anything, a swipe on the terminal itself, the wide layout, and
   showing which pane the desk has in focus (the document does not say).
   Until the peek change, a sub-agent's terminal that sits in a pane shows
   as an empty cell in Spaces; the Agents view lists what it lists today.
-- Estimate: 14 to 17 builder runs (the narrowing of the walk, then three
+- Estimate: 13 to 16 builder runs (the narrowing of the walk, then two
   for the title bar and one for its fit) and one design session with the
   owner.
   Confidence: moderate for the Rust and the walk, low for the screens until

@@ -26,6 +26,7 @@ import uniffi.kudde_mobile.Armed
 import uniffi.kudde_mobile.RowKeyTap
 import uniffi.kudde_mobile.TermPhase
 import uniffi.kudde_mobile.TermState
+import uniffi.kudde_mobile.TerminalTheme
 
 // The terminal screen against renders 3, 4, 4b and 5
 // (design/checkpoints/3-terminal-watch.png, 4-terminal-type.png,
@@ -57,11 +58,14 @@ class TerminalScreenshotTest {
         capture("terminal-watch-graphite", session, TerminalScreenState())
     }
 
-    /** The same watching fixture with paper's terminal defaults (theme-pairs, task 3.5). */
+    /**
+     * The same watching fixture in paper (theme-pairs, task 3.5), painted as a
+     * program in light mode paints it: paper's defaults and paper's own entries.
+     */
     @Test
     fun watchingPaper() {
         val theme = kuddeColors(ThemeName.Paper).terminalTheme()
-        val frame = SessionFixture.frame(96, 44, wide = true, bottom = false, fg = theme.fg.toInt(), bg = theme.bg.toInt())
+        val frame = SessionFixture.frame(96, 44, wide = true, bottom = false, palette = SessionFixture.Palette.of(theme))
         val session = session(TermPhase.Watching, frame)
         session.setTheme(theme)
         capture("terminal-watch-paper", session, TerminalScreenState(), dark = false)
@@ -185,17 +189,32 @@ class TerminalScreenshotTest {
 
 /**
  * An invented Claude Code session in the wire format, after design/renders/screens.html
- * (termLines): the desk's colours are graphite's terminal colours.
+ * (termLines). The colours the session sets itself come from [Palette]: graphite's
+ * by default, as the renders; a light theme's for a program running in light mode.
  */
 object SessionFixture {
-    private const val FG = 0xd2d4d9
-    private const val BG = 0x17191d
-    private const val A1 = 0xdc8c95
-    private const val A2 = 0xa6bd91
-    private const val A4 = 0x96b2d7
-    private const val A6 = 0x8cbdc3
-    private const val A8 = 0x818793
-    private const val A15 = 0xf0f0f2
+    /** The default colours and the ANSI entries the invented session paints with. */
+    data class Palette(
+        val fg: Int,
+        val bg: Int,
+        val a1: Int,
+        val a2: Int,
+        val a4: Int,
+        val a6: Int,
+        val a8: Int,
+        val a15: Int,
+    ) {
+        companion object {
+            val GRAPHITE = Palette(0xd2d4d9, 0x17191d, 0xdc8c95, 0xa6bd91, 0x96b2d7, 0x8cbdc3, 0x818793, 0xf0f0f2)
+
+            /** The session as a program in light mode paints it: the theme's own entries. */
+            fun of(theme: TerminalTheme) = Palette(
+                theme.fg.toInt(), theme.bg.toInt(), theme.ansi[1].toInt(), theme.ansi[2].toInt(),
+                theme.ansi[4].toInt(), theme.ansi[6].toInt(), theme.ansi[8].toInt(), theme.ansi[15].toInt(),
+            )
+        }
+    }
+
     private const val BOLD = 1
 
     private data class Seg(val text: String, val fg: Int? = null, val bold: Boolean = false)
@@ -204,18 +223,23 @@ object SessionFixture {
 
     private fun line(vararg segs: Seg, bg: Int? = null) = Line(segs.toList(), bg)
     private fun t(text: String, fg: Int? = null, bold: Boolean = false) = Seg(text, fg, bold)
-    private val dot = t("●", A15, bold = true)
 
-    /** [bg] mixed [p] into the terminal background, as the renders' diff lines. */
-    private fun mix(color: Int, p: Float): Int {
+    /** [color] mixed [p] into the terminal background [bg], as the renders' diff lines. */
+    private fun mix(bg: Int, color: Int, p: Float): Int {
         fun ch(c: Int, shift: Int) = (c shr shift) and 0xFF
-        fun m(shift: Int) = (ch(BG, shift) + (ch(color, shift) - ch(BG, shift)) * p).toInt().coerceIn(0, 255)
+        fun m(shift: Int) = (ch(bg, shift) + (ch(color, shift) - ch(bg, shift)) * p).toInt().coerceIn(0, 255)
         return (m(16) shl 16) or (m(8) shl 8) or m(0)
     }
 
-    private fun lines(cols: Int, wide: Boolean): List<Line> {
-        val add = mix(A2, 0.16f)
-        val del = mix(A1, 0.16f)
+    private fun lines(cols: Int, wide: Boolean, p: Palette): List<Line> {
+        val A1 = p.a1
+        val A2 = p.a2
+        val A4 = p.a4
+        val A6 = p.a6
+        val A8 = p.a8
+        val dot = t("●", p.a15, bold = true)
+        val add = mix(p.bg, A2, 0.16f)
+        val del = mix(p.bg, A1, 0.16f)
         val head = buildList {
             if (wide) {
                 add(line(t(">", A8), t(" fix the docs nav so the current page is marked, then push")))
@@ -284,10 +308,9 @@ object SessionFixture {
         wide: Boolean,
         bottom: Boolean,
         live: Boolean = true,
-        fg: Int = FG,
-        bg: Int = BG,
+        palette: Palette = Palette.GRAPHITE,
     ): ByteArray {
-        var all = lines(cols, wide)
+        var all = lines(cols, wide, palette)
         if (all.size > rows) all = all.takeLast(rows)
         val first = if (bottom) rows - all.size else 0
         val content = all.withIndex().associate { (i, l) ->
@@ -301,7 +324,7 @@ object SessionFixture {
             (first + i) to cells.take(cols)
         }
         return frameOf(
-            cols, rows, content, cursorShown = false, fg = fg, bg = bg,
+            cols, rows, content, cursorShown = false, fg = palette.fg, bg = palette.bg,
             live = live, total = rows + if (live) 0 else 120, offset = if (live) 0 else 60,
         )
     }

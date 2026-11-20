@@ -18,8 +18,14 @@
 //! replaced by `"@<line>:<k>"`: the byte offset of its line and its index among
 //! that line's base64 fields, which [`crate::image::LOG_SCRIPT`] fetches.
 //!
-//! Of Codex's `token_count` records only the last of a read is kept (printed
-//! after the other lines, with its own offset): the gauge needs no more.
+//! Codex image output records are kept, with data-URL `image_url` fields
+//! replaced by the same references (including small copies), so call-local
+//! pairing never transfers the image bytes in a tail response.
+//!
+//! [`parse_chunk`] classifies JSON structurally, reduces Codex call records to
+//! payload identities, drops irrelevant response records and retains only the
+//! last token count. The bounded wire response includes scrubbed call inputs;
+//! those inputs are omitted before history or the chat parser sees the chunk.
 //!
 //! A whole record longer than [`READ_MAX`] can never fit a read: it is
 //! skipped by its offset and length (no `skip` line for a record the chat
@@ -46,11 +52,48 @@ n=$((e - o))
 if [ "$n" -le 0 ]; then echo "from $o"; echo "next $o"; exit 0; fi
 HC_TAIL_F=$f; export HC_TAIL_F
 tail -c +$((o + 1)) "$f" | head -c "$n" | LC_ALL=C awk -v start="$o" -v skip="$skip" -v total="$n" -v size="$s" -v nl="$nl" -v max="$max" -v omax=8000000 '
-function hidden(h,   h1) {
-  if (index(h, "{\"type\":\"api-request") == 1) return 1
-  h1 = substr(h, 1, 100)
-  if (index(h1, "\"type\":\"response_item\"") || index(h1, "\"type\":\"world_state\"") || index(h1, "\"type\":\"token_usage_record\"")) return 1
-  return index(h, "\"type\":\"event_msg\"") && index(h, "\"payload\":{\"type\":\"token_count\"")
+# A prefix is not enough to classify a Codex response as irrelevant.
+# Only the anchored request family is known not to participate in pairing.
+function hidden(h) {
+  return index(h, "{\"type\":\"api-request") == 1
+}
+# Decode ASCII escapes in keys before deciding whether a value is an image URL.
+function keytext(s,   out,i,c,h,a,b) {
+  out = ""
+  for (i=1; i<=length(s); i++) {
+    c=substr(s,i,1)
+    if (c == "\\" && substr(s,i+1,3) == "u00") {
+      h=tolower(substr(s,i+4,2)); a=index("0123456789abcdef",substr(h,1,1))-1; b=index("0123456789abcdef",substr(h,2,1))-1
+      if (a>=0 && b>=0) { out=out sprintf("%c",a*16+b); i+=5; continue }
+    }
+    if (c == "\\") { i++; c=substr(s,i,1) }
+    out=out c
+  }
+  return out
+}
+function scrub(s,   i,j,k,c,value,key,out,last) {
+  last=1; key=""; out=""
+  for (i=1; i<=length(s); i++) {
+    c=substr(s,i,1)
+    if (c == "{" || c == "[") key=""
+    if (c != "\"") continue
+    k=i
+    for (i++; i<=length(s); i++) {
+      c=substr(s,i,1)
+      if (c == "\\") i++
+      else if (c == "\"") break
+    }
+    value=substr(s,k+1,i-k-1)
+    j=i+1; while (substr(s,j,1) ~ /[ \t\r\n]/) j++
+    if (substr(s,j,1) == ":") key=keytext(value)
+    else {
+      if (key == "image_url" && value !~ /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+\/=]+$/) {
+        out=out substr(s,last,k-last) "\"\""; last=i+1
+      }
+      key=""
+    }
+  }
+  return out substr(s,last)
 }
 BEGIN { from = -1 }
 {
@@ -61,23 +104,18 @@ BEGIN { from = -1 }
   if (skip && NR == 1) next
   if (from < 0) from = at
   if (index($0, "{\"type\":\"api-request") == 1) next
-  head = substr($0, 1, 100)
-  if (index(head, "\"type\":\"response_item\"") || index(head, "\"type\":\"world_state\"") || index(head, "\"type\":\"token_usage_record\"")) next
-  head = substr($0, 1, 200)
-  if (index(head, "\"type\":\"event_msg\"") && index(head, "\"payload\":{\"type\":\"token_count\"")) {
-    if (outb + length($0) + 22 > omax) { used -= len; exit }
-    tc = at " " $0; next
-  }
-  line = $0; out = ""; k = 0
-  while (match(line, /"(data|base64)":"[A-Za-z0-9+\/=]+"/)) {
-    key = substr(line, RSTART + 1, 4) == "data" ? "data" : "base64"
-    if (RLENGTH > 300) out = out substr(line, 1, RSTART - 1) "\"" key "\":\"@" at ":" k "\""
+  # Raw log references have no provenance, including escaped keys and values.
+  line = (index($0, "image_url") || index($0, "\\u")) ? scrub($0) : $0
+  out = ""; k = 0
+  while (match(line, /"(data|base64)":"[A-Za-z0-9+\/=]+"|"image_url":"data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+\/=]+"/)) {
+    key = substr(line, RSTART + 1, 9) == "image_url" ? "image_url" : (substr(line, RSTART + 1, 4) == "data" ? "data" : "base64")
+    if (RLENGTH > 300 || key == "image_url") out = out substr(line, 1, RSTART - 1) "\"" key "\":\"@" at ":" k "\""
     else out = out substr(line, 1, RSTART + RLENGTH - 1)
     line = substr(line, RSTART + RLENGTH); k++
   }
   p = at " " out line
   # What is printed stays under what exec keeps: offsets make it longer than what was read.
-  if (outb + length(p) + 1 + length(tc) > omax) {
+  if (outb + length(p) + 1 > omax) {
     if (outb == 0) { print "skip " at " " len; outb = 1; exit }
     used -= len; exit
   }
@@ -99,7 +137,6 @@ END {
       used += whole
     }
   }
-  if (tc != "") print tc
   if (from < 0) from = start + used
   print "from " from; print "next " (start + used)
 }'
@@ -107,7 +144,7 @@ END {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Chunk {
-    /// The kept lines, each ending in a newline, without their offsets.
+    /// The kept lines after structural filtering and call reduction, without offsets.
     pub text: String,
     /// Where each line of [`Chunk::text`] starts in the file, in its order.
     pub offsets: Vec<u64>,
@@ -124,6 +161,7 @@ pub fn parse_chunk(out: &str) -> Option<Chunk> {
     let size = lines.next()?.strip_prefix("size ")?.trim().parse().ok()?;
     let (mut text, mut offsets, mut skipped, mut from, mut next) =
         (String::new(), Vec::new(), None, None, None);
+    let mut token_count = None;
     for l in lines {
         if let Some(r) = l.strip_prefix("from ") {
             from = Some(r.trim().parse().ok()?);
@@ -134,10 +172,46 @@ pub fn parse_chunk(out: &str) -> Option<Chunk> {
             skipped = Some((at.parse().ok()?, len.parse().ok()?));
         } else {
             let (at, line) = l.split_once(' ')?;
-            offsets.push(at.parse().ok()?);
-            text.push_str(line);
+            let at = at.parse().ok()?;
+            // Classify complete JSON by paths, never by text inside tool input.
+            // The remote shell only bounds and scrubs records; it cannot safely
+            // infer object ownership with substring searches.
+            let record = serde_json::from_str::<serde_json::Value>(line).ok();
+            let mut header = None;
+            if let Some(v) = &record {
+                let kind = v["type"].as_str().unwrap_or("");
+                let p = &v["payload"];
+                match kind {
+                    "response_item" if p["type"] == "custom_tool_call" => {
+                        header = Some(serde_json::json!({
+                            "type": "response_item",
+                            "payload": {
+                                "type": "custom_tool_call",
+                                "call_id": p["call_id"],
+                                "internal_chat_message_metadata_passthrough": {
+                                    "turn_id": p["internal_chat_message_metadata_passthrough"]["turn_id"]
+                                }
+                            }
+                        }).to_string());
+                    }
+                    "response_item" if p["type"] != "custom_tool_call_output" => continue,
+                    "world_state" | "token_usage_record" => continue,
+                    "event_msg" if p["type"] == "token_count" => {
+                        token_count = Some((at, line));
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+            offsets.push(at);
+            text.push_str(header.as_deref().unwrap_or(line));
             text.push('\n');
         }
+    }
+    if let Some((at, line)) = token_count {
+        offsets.push(at);
+        text.push_str(line);
+        text.push('\n');
     }
     Some(Chunk {
         text,
@@ -147,4 +221,16 @@ pub fn parse_chunk(out: &str) -> Option<Chunk> {
         next: next?,
         size,
     })
+}
+
+/// Retain uncertainty as a parser record, including when held history is reparsed.
+/// Kept separate from the filtered chunk so raw reads need no synthetic rows.
+pub fn with_barrier(mut chunk: Chunk) -> Chunk {
+    if let Some((at, _)) = chunk.skipped {
+        chunk.offsets.push(at);
+        chunk
+            .text
+            .push_str("{\"type\":\"kudde_skipped\",\"payload\":{}}\n");
+    }
+    chunk
 }

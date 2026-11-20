@@ -102,6 +102,11 @@ class MachineFlows(private val hubHost: HubHost) {
     fun actions(base: MachinesActions): MachinesActions = base.copy(
         onHostKey = ::openHostKey,
         onAddPhoneKey = { name -> openSetup(name, atLeast = 2) },
+        onContinueSetup = { name -> openSetup(name) },
+        onChangeAddress = { name ->
+            openSetup(name)
+            changeAddress()
+        },
         onPhoneKey = { show(Screen.KeyCommand, null) },
         onAddMachine = ::openAddMachine,
         onRemove = ::askRemove,

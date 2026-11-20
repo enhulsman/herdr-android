@@ -243,6 +243,53 @@ class MachineStatusTest {
         assertEquals("Without keys", ui.exportDetail)
     }
 
+    // first-run 3.4: proposed text is shared by the setup model and card.
+    private fun reachCase(kind: ReachKind, reason: String, recovery: String?) {
+        val state = MachineState.Unreachable(kind, "diagnostic")
+        val m = MachineView("workstation", "workstation.example.org", 22u, "dev", null, state, null)
+        val expected = ReachText(reason, recovery)
+        assertEquals(expected, reachText(m, res))
+        assertEquals(expected, setupReachText(m, res))
+        val c = machinesUi(HubSnapshot(listOf(m), emptyList(), emptyList(), null), null, NOW, res).machines.single()
+        assertEquals(expected, c.reach)
+        assertEquals(CardLink.ChangeAddress, c.link?.kind)
+        assertEquals("Change the address", c.link?.label)
+    }
+
+    @Test fun noAnswerText() = reachCase(ReachKind.NO_ANSWER,
+        "No answer from workstation.example.org.",
+        "Check that the phone is on the same Wi-Fi or VPN as the machine, and that the address is right.")
+    @Test fun refusedText() = reachCase(ReachKind.REFUSED,
+        "workstation.example.org answered, but nothing listens on port 22.",
+        "Check that the OpenSSH server is running there, and the port.")
+    @Test fun nameNotFoundText() = reachCase(ReachKind.NAME_NOT_FOUND,
+        "The phone cannot find a machine called workstation.example.org.",
+        "Check the spelling. With a VPN such as Tailscale, check that it is on, on this phone.")
+    @Test fun noRouteText() = reachCase(ReachKind.NO_ROUTE,
+        "This network has no way to workstation.example.org.",
+        "Join the same Wi-Fi as the machine, or turn the VPN on.")
+    @Test fun otherText() = reachCase(ReachKind.OTHER,
+        "Could not connect to workstation.example.org: diagnostic", null)
+    @Test fun startupClosedTextAfterGrace() = reachCase(ReachKind.CORE_STARTUP_CLOSED,
+        "Could not connect to workstation.example.org: diagnostic", null)
+    @Test fun startupGraceOnlyHidesTheSetupFailure() {
+        val m = MachineView("workstation", "workstation.example.org", 22u, "dev", null,
+            MachineState.Unreachable(ReachKind.CORE_STARTUP_CLOSED, "closed"), null, startupRetryPending = true)
+        assertNull(setupReachText(m, res))
+        assertTrue(reachText(m, res) != null)
+        for (kind in ReachKind.entries.filter { it != ReachKind.CORE_STARTUP_CLOSED }) {
+            assertEquals(reachText(m.copy(state = MachineState.Unreachable(kind, "closed")), res),
+                setupReachText(m.copy(state = MachineState.Unreachable(kind, "closed")), res))
+        }
+    }
+
+    @Test fun missingAndOldCoreCardsOfferContinueSetup() {
+        for (state in listOf(MachineState.NotInstalled, MachineState.TooOld("0.1", "0.2"))) {
+            assertEquals(CardLink.ContinueSetup, card(state).link?.kind)
+            assertEquals("Continue setup", card(state).link?.label)
+        }
+    }
+
     private companion object {
         const val NOW = 1_800_000_000_000L
         const val MINUTE = 60_000L

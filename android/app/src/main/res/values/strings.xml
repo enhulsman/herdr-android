@@ -324,4 +324,24 @@
     <!-- Proposed first-run wording, awaiting owner sign-off. -->
     <string name="setup_title">Set up a machine</string>
     <string name="setup_step">Step %1$d of 3</string>
+    <!-- Proposed first-run texts; owner approval is still pending (section 1.1). -->
+    <string name="setup_reach_no_answer">No answer from %1$s.</string>
+    <string name="setup_reach_no_answer_help">Check that the phone is on the same Wi-Fi or VPN as the machine, and that the address is right.</string>
+    <string name="setup_reach_refused">%1$s answered, but nothing listens on port %2$d.</string>
+    <string name="setup_reach_refused_help">Check that the OpenSSH server is running there, and the port.</string>
+    <string name="setup_reach_name_not_found">The phone cannot find a machine called %1$s.</string>
+    <string name="setup_reach_name_not_found_help">Check the spelling. With a VPN such as Tailscale, check that it is on, on this phone.</string>
+    <string name="setup_reach_no_route">This network has no way to %1$s.</string>
+    <string name="setup_reach_no_route_help">Join the same Wi-Fi as the machine, or turn the VPN on.</string>
+    <string name="setup_reach_other">Could not connect to %1$s: %2$s</string>
+    <string name="setup_change_address">Change the address</string>
+    <string name="setup_continue">Continue setup</string>
+    <string name="setup_finish_notice">%1$s · finish setup</string>
+    <string name="setup_unfinished_title">%1$s is not connected yet</string>
+    <string name="setup_unfinished_detail">Its setup is not finished.</string>
+    <string name="setup_new_terminal">New terminal</string>
+    <string name="setup_no_lock_title">Set a screen lock first</string>
+    <string name="setup_no_lock_detail">kudde keeps its SSH key in the phone\'s secure hardware. Android allows that only on a phone with a PIN, pattern or password.</string>
+    <string name="setup_no_lock_action">Set a screen lock</string>
+    <string name="setup_command_title">kudde setup command</string>
 </resources>

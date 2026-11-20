@@ -256,6 +256,78 @@ class AgentsModelTest {
         assertNull(agentSheet(ui, AgentKey("workstation", "gone"), res))
     }
 
+    @Test fun noMachinesIsTheWelcome() {
+        assertEquals(AgentsEmpty.NoMachines, ui(snapshot(emptyList(), emptyList())).empty)
+    }
+    @Test fun noLockWinsOverStartFailureAndWelcome() {
+        val u = agentsUi(snapshot(emptyList(), emptyList()), NOW, res, ::utc,
+            startError = "key store failed", isDeviceSecure = false)
+        assertEquals(AgentsEmpty.NoScreenLock, u.empty)
+        assertNull(u.startError)
+        assertEquals("Set a screen lock first", u.emptyTitle)
+        assertEquals("kudde keeps its SSH key in the phone's secure hardware. Android allows that only on a phone with a PIN, pattern or password.", u.emptyDetail)
+        assertEquals("Set a screen lock", u.emptyAction)
+    }
+    @Test fun startFailureWithLockStaysAStartFailure() {
+        val u = agentsUi(snapshot(emptyList(), emptyList()), NOW, res, ::utc,
+            startError = "key store failed", isDeviceSecure = true)
+        assertEquals(AgentsEmpty.StartFailed, u.empty)
+        assertEquals("key store failed", u.startError)
+    }
+    @Test fun unfinishedEmptyNamesTheMachineAndItsStep() {
+        val m = machine("workstation", MachineState.HostKeyUnconfirmed("SHA256:a", "ED25519"))
+        val u = ui(snapshot(listOf(m), emptyList()))
+        assertEquals(AgentsEmpty.Unfinished, u.empty)
+        assertEquals("workstation", u.unfinished?.machine)
+        assertEquals(2, u.unfinished?.step)
+        assertEquals("workstation is not connected yet", u.emptyTitle)
+        assertEquals("Its setup is not finished.", u.emptyDetail)
+        assertEquals("Continue setup", u.emptyAction)
+    }
+    @Test fun connectedEmptyOffersNewTerminal() {
+        val u = ui(snapshot(listOf(connected("workstation")), emptyList()))
+        assertEquals(AgentsEmpty.NoAgents, u.empty)
+        assertEquals("New terminal", u.emptyAction)
+    }
+    private fun waiting(state: MachineState, last: Long? = NOW) {
+        val u = ui(snapshot(listOf(machine("workstation", state, last)), emptyList()))
+        assertEquals("workstation · finish setup", u.setupNotices.single().text)
+        assertEquals("workstation", u.setupNotices.single().machine)
+    }
+    @Test fun unconfirmedGetsSetupNotice() = waiting(MachineState.HostKeyUnconfirmed("SHA256:a", "ED25519"))
+    @Test fun rejectedGetsSetupNotice() = waiting(MachineState.KeyRejected)
+    @Test fun missingGetsSetupNotice() = waiting(MachineState.NotInstalled)
+    @Test fun oldCoreGetsSetupNotice() = waiting(MachineState.TooOld("0.1", "0.2"))
+    @Test fun neverConnectedPausedGetsSetupNotice() = waiting(MachineState.Paused, null)
+    @Test fun neverConnectedAuthGetsSetupNotice() = waiting(MachineState.NeedsUserAuth, null)
+    @Test fun neverConnectedNetworkOffGetsSetupNotice() = waiting(MachineState.NetworkOff, null)
+    @Test fun neverConnectedAppTooOldGetsSetupNotice() = waiting(MachineState.AppTooOld, null)
+    @Test fun neverConnectedMismatchGetsSetupNotice() = waiting(MachineState.HostKeyMismatch("SHA256:a", "SHA256:b", "ED25519"), null)
+    @Test fun neverConnectedUnreachableGetsSetupNotice() = waiting(MachineState.Unreachable(ReachKind.NO_ANSWER, "timeout"), null)
+    @Test fun connectedHasNoSetupNotice() {
+        assertTrue(ui(snapshot(listOf(connected("server")), emptyList())).setupNotices.isEmpty())
+    }
+    @Test fun connectingHasNoSetupNotice() {
+        assertTrue(ui(snapshot(listOf(machine("workstation", MachineState.Connecting)), emptyList())).setupNotices.isEmpty())
+    }
+    @Test fun aPreviouslyConnectedAwayMachineIsNotUnfinished() {
+        val u = ui(snapshot(listOf(unreachable("workstation", NOW)), emptyList()))
+        assertTrue(u.setupNotices.isEmpty())
+        assertNull(u.unfinished)
+        assertEquals("unreachable · last connected just now", u.notices.single().text)
+    }
+    @Test fun wrongAddressResumesAtStepOne() {
+        val m = machine("workstation", MachineState.Unreachable(ReachKind.NO_ANSWER, "timeout")).copy(hostKey = null)
+        assertEquals(1, ui(snapshot(listOf(m), emptyList())).unfinished?.step)
+    }
+    @Test fun setupNoticeRemainsAboveAnotherMachinesAgents() {
+        val u = ui(snapshot(listOf(connected("server"), machine("workstation", MachineState.KeyRejected)),
+            listOf(row("t1", AgentAttention.IDLE, machine = "server"))))
+        assertNull(u.empty)
+        assertEquals("workstation · finish setup", u.setupNotices.single().text)
+        assertEquals("server", u.idle.single().key.machine)
+    }
+
     private companion object {
         const val NOW = 1_800_000_000_000L // 2027-01-15 08:00 UTC
         const val MINUTE = 60_000L

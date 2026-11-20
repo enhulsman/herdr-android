@@ -142,6 +142,9 @@ fun AgentsScreen(
                 when (ui.empty) {
                     AgentsEmpty.NoMachines -> item(key = "empty") { NoMachines(actions.onAddMachine) }
                     AgentsEmpty.NoAgents -> item(key = "empty") { NoAgents() }
+                    AgentsEmpty.NoScreenLock, AgentsEmpty.Unfinished -> item(key = "empty") {
+                        BasicText(ui.emptyTitle.orEmpty(), style = KuddeType.body.copy(color = c.muted))
+                    }
                     AgentsEmpty.StartFailed -> item(key = "empty") { StartFailed(ui.startError.orEmpty(), actions.onRetry) }
                     null -> Unit
                 }

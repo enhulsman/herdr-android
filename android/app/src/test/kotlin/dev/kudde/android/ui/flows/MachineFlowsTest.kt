@@ -52,6 +52,23 @@ class MachineFlowsTest {
     private val unconfirmed = MachineState.HostKeyUnconfirmed(PRESENTED, "ED25519")
     private val changed = MachineState.HostKeyMismatch(TRUSTED, PRESENTED, "ED25519")
 
+    @Test fun cardChangeAddressOpensFilledStepOne() {
+        publish(machine("workstation", MachineState.Unreachable(ReachKind.NO_ANSWER, "timeout")).copy(hostKey = TRUSTED))
+        flows.actions(MachinesActions.Preview).onChangeAddress("workstation")
+        assertEquals(Screen.Setup, flows.screen)
+        assertEquals(1, flows.setupStep)
+        assertEquals("workstation.example.org", flows.input.host)
+        assertEquals("dev", flows.input.user)
+        assertEquals("22", flows.input.port)
+    }
+
+    @Test fun cardContinueSetupUsesTheMachinesStep() {
+        publish(machine("workstation", MachineState.NotInstalled).copy(hostKey = TRUSTED))
+        flows.actions(MachinesActions.Preview).onContinueSetup("workstation")
+        assertEquals(Screen.Setup, flows.screen)
+        assertEquals(2, flows.setupStep)
+    }
+
     @Test
     fun addUsesSetup() {
         flows.actions(MachinesActions.Preview).onAddMachine()

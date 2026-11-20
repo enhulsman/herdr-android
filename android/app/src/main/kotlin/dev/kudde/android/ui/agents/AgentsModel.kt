@@ -67,6 +67,8 @@ data class OtherRowUi(
 data class NoticeUi(val machine: String, val text: String)
 
 enum class AgentsEmpty {
+    NoScreenLock,
+    Unfinished,
     /** No machines listed: point to adding one. */
     NoMachines,
 
@@ -75,6 +77,21 @@ enum class AgentsEmpty {
 
     /** The hub could not start (HubHost.startError), so nothing can connect. */
     StartFailed,
+}
+
+/** Navigation data for section 4's setup notice and empty-state action. */
+data class UnfinishedSetup(val machine: String, val step: Int)
+
+/** A connected machine is finished; waiting setup states can recur after a past connection. */
+fun unfinishedSetup(m: MachineView): UnfinishedSetup? {
+    if (m.state is MachineState.Connected || m.state == MachineState.Connecting) return null
+    val waitsForSetup = when (m.state) {
+        is MachineState.HostKeyUnconfirmed, MachineState.KeyRejected, MachineState.NotInstalled,
+        is MachineState.TooOld -> true
+        else -> m.lastConnectedMs == null
+    }
+    if (!waitsForSetup) return null
+    return UnfinishedSetup(m.name, if (m.hostKey == null && m.state !is MachineState.HostKeyUnconfirmed) 1 else 2)
 }
 
 @Immutable
@@ -92,6 +109,12 @@ data class AgentsUi(
     val storageNotice: String?,
     /** Why the hub could not start, as the Machines screen shows it; with [AgentsEmpty.StartFailed]. */
     val startError: String? = null,
+    /** Proposed setup presentation, separate from the existing production notice rows. */
+    val setupNotices: List<NoticeUi> = emptyList(),
+    val unfinished: UnfinishedSetup? = null,
+    val emptyTitle: String? = null,
+    val emptyDetail: String? = null,
+    val emptyAction: String? = null,
 )
 
 /**
@@ -104,6 +127,7 @@ fun agentsUi(
     res: Resources,
     time: (Long) -> String,
     startError: String? = null,
+    isDeviceSecure: Boolean = true,
 ): AgentsUi {
     val machines = snapshot.machines.associateBy { it.name }
     fun asOf(machine: String): String? {
@@ -114,6 +138,15 @@ fun agentsUi(
     val rows = snapshot.agents.map { agentRow(it, asOf(it.machine), res) }
     val others = snapshot.others.map { otherRow(it, asOf(it.machine), res) }
     val notices = snapshot.machines.mapNotNull { notice(it, nowMs, res) }
+    val unfinished = snapshot.machines.mapNotNull(::unfinishedSetup)
+    val empty = when {
+        !isDeviceSecure -> AgentsEmpty.NoScreenLock
+        startError != null -> AgentsEmpty.StartFailed
+        snapshot.machines.isEmpty() -> AgentsEmpty.NoMachines
+        rows.isEmpty() && unfinished.isNotEmpty() -> AgentsEmpty.Unfinished
+        rows.isEmpty() -> AgentsEmpty.NoAgents
+        else -> null
+    }
     return AgentsUi(
         notices = notices,
         needsYou = rows.filter { it.attention == AgentAttention.NEEDS_YOU || it.attention == AgentAttention.ERROR },
@@ -122,14 +155,27 @@ fun agentsUi(
         idle = rows.filter { it.attention == AgentAttention.IDLE },
         others = others,
         machinesBadge = snapshot.machines.any { waits(it.state) },
-        empty = when {
-            startError != null -> AgentsEmpty.StartFailed
-            snapshot.machines.isEmpty() -> AgentsEmpty.NoMachines
-            rows.isEmpty() -> AgentsEmpty.NoAgents
+        empty = empty,
+        storageNotice = snapshot.notice,
+        startError = startError.takeIf { isDeviceSecure },
+        setupNotices = unfinished.map { NoticeUi(it.machine, res.getString(R.string.setup_finish_notice, it.machine)) },
+        unfinished = unfinished.firstOrNull(),
+        emptyTitle = when (empty) {
+            AgentsEmpty.NoScreenLock -> res.getString(R.string.setup_no_lock_title)
+            AgentsEmpty.Unfinished -> res.getString(R.string.setup_unfinished_title, unfinished.first().machine)
             else -> null
         },
-        storageNotice = snapshot.notice,
-        startError = startError,
+        emptyDetail = when (empty) {
+            AgentsEmpty.NoScreenLock -> res.getString(R.string.setup_no_lock_detail)
+            AgentsEmpty.Unfinished -> res.getString(R.string.setup_unfinished_detail)
+            else -> null
+        },
+        emptyAction = when (empty) {
+            AgentsEmpty.NoScreenLock -> res.getString(R.string.setup_no_lock_action)
+            AgentsEmpty.Unfinished -> res.getString(R.string.setup_continue)
+            AgentsEmpty.NoAgents -> if (snapshot.machines.any { it.state is MachineState.Connected }) res.getString(R.string.setup_new_terminal) else null
+            else -> null
+        },
     )
 }
 

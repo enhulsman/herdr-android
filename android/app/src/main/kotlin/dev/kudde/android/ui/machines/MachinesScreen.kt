@@ -92,6 +92,8 @@ data class MachinesActions(
     val onCancelRemove: () -> Unit = {},
     /** "Network permission is off": this app's page in Android settings (MachinesRoute). */
     val onOpenSettings: () -> Unit = {},
+    val onChangeAddress: (String) -> Unit = {},
+    val onContinueSetup: (String) -> Unit = {},
     /** The Alerts row's button: turn alerts on, try again, or allow notifications (MachinesRoute). */
     val onAlerts: (AlertsButton) -> Unit = {},
     /** "Mute alerts", by machine name, to the new state. */
@@ -267,6 +269,8 @@ private fun MachineCard(machine: MachineCardUi, actions: MachinesActions) {
                 when (link.kind) {
                     CardLink.CheckHostKey, CardLink.CompareHostKeys -> actions.onHostKey(machine.name)
                     CardLink.AddPhoneKey -> actions.onAddPhoneKey(machine.name)
+                    CardLink.ChangeAddress -> actions.onChangeAddress(machine.name)
+                    CardLink.ContinueSetup -> actions.onContinueSetup(machine.name)
                 }
             }
         }

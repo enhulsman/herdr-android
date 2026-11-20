@@ -29,7 +29,7 @@ enum class StatusMark { Connected, Ring }
 enum class CardButton { Unlock, TryAgain, OpenSettings }
 
 /** A row under the head that leads to a flow (5d builds the flows). */
-enum class CardLink { CheckHostKey, CompareHostKeys, AddPhoneKey }
+enum class CardLink { CheckHostKey, CompareHostKeys, AddPhoneKey, ChangeAddress, ContinueSetup }
 
 data class CardLinkUi(val kind: CardLink, val label: String, val detail: String?)
 
@@ -65,6 +65,8 @@ data class MachineCardUi(
     val detail: String?,
     val button: CardButton?,
     val link: CardLinkUi?,
+    /** Proposed first-run failure block; section 4 replaces the legacy status/detail presentation. */
+    val reach: ReachText? = null,
     /** Null: no alert rows (alerts unknown, as in screens before M3). */
     val alerts: AlertsRowUi? = null,
     /** The "Mute alerts" toggle's state; null hides the row. */
@@ -158,6 +160,7 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
             add(s(R.string.status_core_version, st.version))
         }
         is MachineState.Unreachable -> {
+            link = CardLinkUi(CardLink.ChangeAddress, res.getString(R.string.setup_change_address), null)
             detail = st.detail.takeIf { it.isNotBlank() }
             buildList {
                 add(s(R.string.status_unreachable))
@@ -181,8 +184,12 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
             link(CardLink.AddPhoneKey, R.string.link_add_phone_key, R.string.link_add_phone_key_detail)
             listOf(s(R.string.status_key_rejected), retrying)
         }
-        MachineState.NotInstalled -> listOf(s(R.string.status_not_installed), retrying)
+        MachineState.NotInstalled -> {
+            link = CardLinkUi(CardLink.ContinueSetup, res.getString(R.string.setup_continue), null)
+            listOf(s(R.string.status_not_installed), retrying)
+        }
         is MachineState.TooOld -> {
+            link = CardLinkUi(CardLink.ContinueSetup, res.getString(R.string.setup_continue), null)
             detail = res.getString(R.string.status_too_old_detail, st.need)
             button = CardButton.TryAgain
             listOf(s(R.string.status_too_old, st.have))
@@ -200,6 +207,7 @@ private fun machineCard(m: MachineView, nowMs: Long, res: Resources): MachineCar
     }
     return MachineCardUi(
         name = m.name,
+        reach = reachText(m, res),
         mark = if (m.state is MachineState.Connected) StatusMark.Connected else StatusMark.Ring,
         status = status,
         separator = res.getString(R.string.status_separator),

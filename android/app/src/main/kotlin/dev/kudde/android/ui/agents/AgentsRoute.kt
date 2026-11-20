@@ -1,5 +1,6 @@
 package dev.kudde.android.ui.agents
 
+import android.app.KeyguardManager
 import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
@@ -9,10 +10,13 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.platform.LocalContext
 import dev.kudde.android.KuddeApp
 import dev.kudde.android.ui.components.rememberWallClock
 import dev.kudde.android.ui.flows.MachineFlows
+import dev.kudde.android.ui.setup.HomeDeviceSecurity
 import dev.kudde.android.ui.terminal.TerminalRoute
 import java.time.Instant
 import java.time.ZoneId
@@ -33,12 +37,17 @@ fun AgentsRoute(app: KuddeApp, flows: MachineFlows, home: AgentsHome) {
     val clock = rememberWallClock()
     val minute by remember(clock) { derivedStateOf { clock.value / 60_000 } }
     val context = LocalContext.current
+    val deviceSecurity = remember(context) {
+        HomeDeviceSecurity { context.getSystemService(KeyguardManager::class.java).isDeviceSecure }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { deviceSecurity.onReturn() }
+    val secure = deviceSecurity.secure
     val res = context.resources
     val is24 = DateFormat.is24HourFormat(context)
     val time = remember(is24) { timeFormat(is24) }
     // Read without subscribing: the route follows [minute], not every tick.
-    val ui = remember(snapshot, startError, minute, res, time) {
-        agentsUi(snapshot, Snapshot.withoutReadObservation { clock.value }, res, time, startError)
+    val ui = remember(snapshot, startError, minute, res, time, secure) {
+        agentsUi(snapshot, Snapshot.withoutReadObservation { clock.value }, res, time, startError, isDeviceSecure = secure)
     }
     val spin = remember(context) {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f

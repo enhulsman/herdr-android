@@ -154,6 +154,62 @@ pub fn authorized_keys_line(spki_der: Vec<u8>, comment: String) -> Result<String
     ))
 }
 
+// Proposed D3 wording, kept together for the owner's text review.
+const SETUP_STOPPED: &str = "Setup stopped: ~/.ssh and authorized_keys must be owned by you and must not be links or other file types.";
+const SETUP_FAILED: &str = "Setup failed: could not create, secure or write ~/.ssh/authorized_keys. Check your account permissions and disk space, then try again.";
+
+/// A POSIX shell command that installs the restricted phone key, then optionally
+/// prints the presented host key's fingerprint. `None` installs only the key.
+#[uniffi::export]
+pub fn setup_command(
+    spki: Vec<u8>,
+    comment: String,
+    host_key_algorithm: Option<String>,
+) -> Result<String, SshError> {
+    let line = authorized_keys_line(spki, comment)?;
+    let mut delimiter = "KUDDE_KEY".to_owned();
+    while line.lines().any(|part| part == delimiter) {
+        delimiter.push('_');
+    }
+    let mut command = format!(
+        r#"(
+  umask 077
+  if [ -L "$HOME/.ssh" ] ||
+     {{ [ -e "$HOME/.ssh" ] && {{ [ ! -d "$HOME/.ssh" ] ||
+       [ -z "$(find "$HOME/.ssh" -prune -user "$(id -u)" -print)" ]; }}; }} ||
+     [ -L "$HOME/.ssh/authorized_keys" ] ||
+     {{ [ -e "$HOME/.ssh/authorized_keys" ] && {{ [ ! -f "$HOME/.ssh/authorized_keys" ] ||
+       [ -z "$(find "$HOME/.ssh/authorized_keys" -prune -user "$(id -u)" -print)" ]; }}; }}
+  then
+    printf '%s\n' '{SETUP_STOPPED}' >&2
+    exit 1
+  fi
+  if ! {{ mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh" &&
+         touch "$HOME/.ssh/authorized_keys" && chmod 600 "$HOME/.ssh/authorized_keys" &&
+         cat >> "$HOME/.ssh/authorized_keys" <<'{delimiter}'
+
+{line}
+{delimiter}
+  }}; then
+    printf '%s\n' '{SETUP_FAILED}' >&2
+    exit 1
+  fi
+"#
+    );
+    if let Some(algorithm) = host_key_algorithm {
+        command.push_str("  ");
+        command.push_str(match algorithm.as_str() {
+            "ED25519" => "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+            "ECDSA" => "ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub",
+            "RSA" => "ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub",
+            _ => "for key_file in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf \"$key_file\" || exit 1; done",
+        });
+        command.push('\n');
+    }
+    command.push(')');
+    Ok(command)
+}
+
 /// Connects, authenticates with `signer`, runs one command and returns what it
 /// printed (the spike's whole SSH path). `host_key_fingerprint` pins the
 /// machine; `None` accepts any key and reports it, as a first connect would.
@@ -628,6 +684,145 @@ mod tests {
             )
         );
         assert!(!line.contains('\n'));
+    }
+
+    fn setup_for(comment: &str, algorithm: Option<&str>) -> String {
+        setup_command(
+            spki(&test_key(1)),
+            comment.into(),
+            algorithm.map(str::to_owned),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn setup_command_contains_the_exact_authorized_keys_line() {
+        for comment in ["kudde", "phone 'quoted' \"double\" $HOME `id` \\ tail"] {
+            let command = setup_for(comment, Some("ED25519"));
+            let (_, heredoc) = command.split_once("<<'KUDDE_KEY'\n\n").unwrap();
+            let (line, _) = heredoc.split_once("\nKUDDE_KEY\n").unwrap();
+            assert_eq!(
+                line,
+                authorized_keys_line(spki(&test_key(1)), comment.into()).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn setup_command_selects_the_host_key_before_the_closing_subshell() {
+        for (algorithm, invocation) in [
+            (
+                "ED25519",
+                "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+            ),
+            ("ECDSA", "ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub"),
+            ("RSA", "ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub"),
+            (
+                "OTHER",
+                "for key_file in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf \"$key_file\" || exit 1; done",
+            ),
+            (
+                "",
+                "for key_file in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf \"$key_file\" || exit 1; done",
+            ),
+            (
+                "RSA; exit 0",
+                "for key_file in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf \"$key_file\" || exit 1; done",
+            ),
+        ] {
+            assert!(
+                setup_for("kudde", Some(algorithm)).ends_with(&format!("  {invocation}\n)")),
+                "{algorithm}"
+            );
+        }
+        let phone = setup_for("kudde", None);
+        assert!(!phone.contains("ssh-keygen"));
+        assert!(!phone.contains("/etc/ssh/"));
+        assert!(phone.ends_with("  fi\n)"));
+    }
+
+    #[test]
+    fn setup_command_delimiter_cannot_terminate_the_key_line() {
+        for comment in ["kudde", "KUDDE_KEY", "'KUDDE_KEY'", "KUDDE_KEY_1 )"] {
+            let command = setup_for(comment, None);
+            let (_, heredoc) = command.split_once("<<'").unwrap();
+            let (delimiter, body) = heredoc.split_once("'\n").unwrap();
+            let mut lines = body.lines();
+            assert_eq!(lines.next(), Some(""));
+            let line = lines.next().unwrap();
+            assert_ne!(line, delimiter);
+            assert_eq!(lines.next(), Some(delimiter));
+            assert_eq!(lines.next(), Some("  }; then"));
+        }
+    }
+
+    #[test]
+    fn setup_command_refuses_empty_cr_and_lf_comments_and_invalid_spki() {
+        for comment in ["", "cr\r", "two\nlines", "\nKUDDE_KEY\n)\n"] {
+            assert!(
+                setup_command(spki(&test_key(1)), comment.into(), None).is_err(),
+                "{comment:?}"
+            );
+        }
+        assert!(setup_command(vec![0x30, 0x00], "kudde".into(), None).is_err());
+    }
+
+    #[test]
+    fn setup_command_matches_design_d3_byte_for_byte() {
+        let design = include_str!("../../../openspec/changes/first-run-walkthrough/design.md");
+        let d3 = design.split("### D3.").nth(1).unwrap();
+        let template = d3
+            .split("```sh\n")
+            .nth(1)
+            .unwrap()
+            .split("\n```")
+            .next()
+            .unwrap();
+        let line = authorized_keys_line(spki(&test_key(1)), "kudde".into()).unwrap();
+        let expected = template.replace(
+            "restrict,command=\"sh -c '…'\" ecdsa-sha2-nistp256 AAAA… kudde",
+            &line,
+        );
+        assert_eq!(setup_for("kudde", Some("ED25519")), expected);
+    }
+
+    #[test]
+    fn setup_command_preflight_precedes_modification() {
+        let command = setup_for("kudde", None);
+        let (preflight, _) = command.split_once("  if ! { mkdir").unwrap();
+        assert!(preflight.starts_with("(\n  umask 077\n"));
+        for (path, kind) in [("$HOME/.ssh", "d"), ("$HOME/.ssh/authorized_keys", "f")] {
+            assert!(preflight.contains(&format!("[ -L \"{path}\" ]")));
+            assert!(preflight.contains(&format!("[ -e \"{path}\" ]")));
+            assert!(preflight.contains(&format!("[ ! -{kind} \"{path}\" ]")));
+            assert!(preflight.contains(&format!(
+                "[ -z \"$(find \"{path}\" -prune -user \"$(id -u)\" -print)\" ]"
+            )));
+        }
+        assert!(preflight.ends_with(" >&2\n    exit 1\n  fi\n"));
+    }
+
+    #[test]
+    fn setup_command_secures_before_append_and_checks_failure() {
+        let command = setup_for("kudde", Some("ED25519"));
+        assert!(command.contains(concat!(
+            "  if ! { mkdir -p \"$HOME/.ssh\" && chmod 700 \"$HOME/.ssh\" &&\n",
+            "         touch \"$HOME/.ssh/authorized_keys\" && chmod 600 \"$HOME/.ssh/authorized_keys\" &&\n",
+            "         cat >> \"$HOME/.ssh/authorized_keys\" <<'KUDDE_KEY'\n\n"
+        )));
+        let (_, failure) = command.split_once("\nKUDDE_KEY\n  }; then\n").unwrap();
+        assert!(failure.starts_with("    printf '%s\\n' 'Setup failed:"));
+        assert!(failure.contains(" >&2\n    exit 1\n  fi\n  ssh-keygen"));
+    }
+
+    #[test]
+    fn setup_command_variants_have_identical_installation_blocks() {
+        let phone = setup_for("kudde", None);
+        for algorithm in ["ED25519", "ECDSA", "RSA", "OTHER"] {
+            let machine = setup_for("kudde", Some(algorithm));
+            let (installation, _) = machine.rsplit_once("  fi\n").unwrap();
+            assert_eq!(phone, format!("{installation}  fi\n)"));
+        }
     }
 
     #[test]

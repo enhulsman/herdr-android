@@ -14,7 +14,7 @@ mod vt;
 #[cfg(feature = "spike")]
 pub use ssh::ssh_run_spike;
 pub use ssh::{
-    REMOTE_COMMAND, SignError, SshError, SshRun, SshSigner, authorized_keys_line,
+    REMOTE_COMMAND, SignError, SshError, SshRun, SshSigner, authorized_keys_line, setup_command,
     ssh_public_key_line,
 };
 

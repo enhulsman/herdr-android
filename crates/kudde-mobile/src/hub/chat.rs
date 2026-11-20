@@ -865,9 +865,15 @@ impl Chat {
     }
 
     async fn fetch_image(&self, key: &str) -> Option<Vec<u8>> {
+        self.fetch_image_checked(key).await.ok().flatten()
+    }
+
+    // Ok(None) is reserved for a positively confirmed absent file. Every
+    // failed or indeterminate recheck must preserve the picture on the phone.
+    async fn fetch_image_checked(&self, key: &str) -> Result<Option<Vec<u8>>, ()> {
         let b64 = base64::engine::general_purpose::STANDARD;
         if let Some(data) = key.strip_prefix("inline:") {
-            return b64.decode(data).ok();
+            return b64.decode(data).map(Some).map_err(|_| ());
         }
         let log = {
             let st = self.state.lock().unwrap();
@@ -879,31 +885,36 @@ impl Chat {
             session.zip(path)
         };
         if key.starts_with("copy:") {
-            let (file, copy) = image_sources(key, log.as_ref().map(|(s, _)| s.as_str()))?;
-            if let Some(bytes) = Box::pin(self.fetch_image(&file)).await {
-                return Some(bytes);
+            let (file, copy) =
+                image_sources(key, log.as_ref().map(|(s, _)| s.as_str())).ok_or(())?;
+            if let Some(bytes) = Box::pin(self.fetch_image_checked(&file)).await? {
+                return Ok(Some(bytes));
             }
             if let Some(bytes) = self.images.lock().unwrap().get(&copy).cloned() {
-                return Some(bytes);
+                return Ok(Some(bytes));
             }
-            let bytes = Box::pin(self.fetch_image(&copy)).await?;
+            let bytes = Box::pin(self.fetch_image_checked(&copy)).await?.ok_or(())?;
             let mut cache = self.images.lock().unwrap();
             if cache.values().map(Vec::len).sum::<usize>() + bytes.len() > IMAGE_CACHE {
                 cache.clear();
             }
             cache.insert(copy, bytes.clone());
-            return Some(bytes);
+            return Ok(Some(bytes));
         }
         let file = file_path(key);
         let held = file
             .map(|p| held_time(&self.files.lock().unwrap(), p))
             .unwrap_or_default();
-        let argv = image_argv(
+        let mut argv = image_argv(
             key,
             log.as_ref().map(|(s, p)| (s.as_str(), p.as_str())),
             &held,
-        )?;
-        let c = self.core.live_conn(&self.machine)?.client;
+        )
+        .ok_or(())?;
+        if file.is_some() {
+            argv.as_array_mut().ok_or(())?.push(json!("checked"));
+        }
+        let c = self.core.live_conn(&self.machine).ok_or(())?.client;
         let got = c
             .call_timeout(
                 "machine.exec",
@@ -911,20 +922,41 @@ impl Chat {
                 Duration::from_secs(40),
             )
             .await
-            .ok()?;
-        if got["truncated"] == true {
-            return None;
+            .map_err(|_| ())?;
+        if got["truncated"] == true
+            || got["timed_out"] == true
+            || got.get("code").is_some_and(|code| code.as_i64() != Some(0))
+        {
+            return Err(());
         }
-        let out = b64.decode(got["stdout"].as_str()?).ok()?;
+        let out = b64
+            .decode(got["stdout"].as_str().ok_or(())?)
+            .map_err(|_| ())?;
         match file {
             Some(path) => {
                 let mut files = self.files.lock().unwrap();
+                if out == b"missing\n" {
+                    files.remove(path);
+                    return Ok(None);
+                }
+                let reply = image::file_reply(&out).ok_or(())?;
+                let (mtime, size) = reply.0.split_once(' ').ok_or(())?;
+                mtime.parse::<i64>().map_err(|_| ())?;
+                let size = size.trim().parse::<usize>().map_err(|_| ())?;
+                if size == 0
+                    || size as u64 > image::FILE_MAX
+                    || reply.1.as_ref().is_some_and(|bytes| bytes.len() != size)
+                {
+                    return Err(());
+                }
                 if files.values().map(|(_, b)| b.len()).sum::<usize>() > IMAGE_CACHE {
                     files.clear();
                 }
-                file_image(&mut files, path, image::file_reply(&out))
+                file_image(&mut files, path, Some(reply))
+                    .map(Some)
+                    .ok_or(())
             }
-            None => image::decode(&out),
+            None => image::decode(&out).map(Some).ok_or(()),
         }
     }
 }
@@ -1062,6 +1094,155 @@ mod tests {
                 .unwrap(),
             b"copy"
         );
+        hub.shutdown();
+    }
+
+    #[test]
+    fn failed_file_rechecks_never_restore_a_cached_copy() {
+        use herdr_proto::wire;
+        use tokio::io::AsyncWriteExt;
+        struct NoDial;
+        impl crate::link::Dialer for NoDial {
+            fn dial(&self, _: crate::link::Target) -> crate::link::Dialing {
+                Box::pin(async { Err(crate::link::DialError::Rejected) })
+            }
+        }
+        let dir = std::env::current_dir()
+            .unwrap()
+            .join("../../target/mobile-image-failed-recheck-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("website.png");
+        let _ = std::fs::remove_file(&file);
+        let log = dir.join("invented.jsonl");
+        std::fs::write(&log, "{\"type\":\"response_item\",\"payload\":{\"type\":\"custom_tool_call_output\",\"output\":[{\"type\":\"input_image\",\"image_url\":\"data:image/png;base64,Y29weQ==\"}]}}\n").unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let failure = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let hub;
+        {
+            let _enter = rt.enter();
+            hub = HubCore::start(dir.clone(), Arc::new(NoDial));
+            let (app, remote) = tokio::io::duplex(65536);
+            let (r, w) = tokio::io::split(app);
+            let client = Client::start(r, w);
+            let mut live = super::super::Live::paused();
+            live.epoch = 1;
+            hub.state
+                .lock()
+                .unwrap()
+                .live
+                .insert("workstation".into(), live);
+            let conn = super::super::Conn {
+                epoch: 1,
+                client,
+                sizes: tokio::sync::watch::channel(Arc::new(HashMap::new())).1,
+            };
+            hub.conns.lock().unwrap().insert(
+                "workstation".into(),
+                tokio::sync::watch::channel(Some(conn)).0,
+            );
+            let failure = failure.clone();
+            rt.spawn(async move {
+                let (mut r, mut w) = tokio::io::split(remote);
+                while let Ok(Some(frame)) = wire::read_frame(&mut r).await {
+                    if frame.channel != 0 || frame.kind != wire::DATA { continue; }
+                    let req: Value = serde_json::from_slice(&frame.payload).unwrap();
+                    assert_eq!(req["method"], "machine.exec");
+                    let args: Vec<_> = req["params"]["argv"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+                    let mode = failure.load(std::sync::atomic::Ordering::SeqCst);
+                    let result = match mode {
+                        1 => Some(json!({"stdout":"", "code":1, "truncated":false})),
+                        2 => Some(json!({"stdout":"", "code":null, "timed_out":true, "truncated":false})),
+                        3 => Some(json!({"stdout":"", "code":0, "truncated":true})),
+                        4 => Some(json!({"stdout":"", "code":0, "truncated":false})),
+                        6 => Some(json!({"stdout":base64::engine::general_purpose::STANDARD.encode(b"123 10\npartial"), "code":0, "truncated":false})),
+                        7 => Some(json!({"stdout":base64::engine::general_purpose::STANDARD.encode(b"missing\n"), "code":null, "timed_out":true, "truncated":false})),
+                        8 => Some(json!({"stdout":base64::engine::general_purpose::STANDARD.encode(b"bad-header\n"), "code":0, "truncated":false})),
+                        5 => {
+                            let reply = json!({"jsonrpc":"2.0","id":req["id"],"error":{"code":-32000,"message":"read failed"}});
+                            w.write_all(&wire::encode(0, wire::DATA, reply.to_string().as_bytes())).await.unwrap();
+                            continue;
+                        }
+                        _ => None,
+                    };
+                    if let Some(result) = result {
+                        let reply = json!({"jsonrpc":"2.0","id":req["id"],"result":result});
+                        w.write_all(&wire::encode(0, wire::DATA, reply.to_string().as_bytes())).await.unwrap();
+                        continue;
+                    }
+                    let out = std::process::Command::new(args[0]).args(&args[1..]).output().unwrap();
+                    let reply = json!({"jsonrpc":"2.0","id":req["id"],"result":{"stdout":base64::engine::general_purpose::STANDARD.encode(out.stdout),"code":out.status.code(),"timed_out":false,"truncated":false}});
+                    if w.write_all(&wire::encode(0, wire::DATA, reply.to_string().as_bytes())).await.is_err() { break; }
+                }
+            });
+        }
+        let chat = Chat::new(hub.clone(), "workstation".into(), "t1".into());
+        chat.state.lock().unwrap().take_lookup(
+            &Term {
+                agent: Some(Agent::Codex),
+                ..Default::default()
+            },
+            Some(Lookup::Found {
+                path: log.to_str().unwrap().into(),
+                session: "session-a".into(),
+            }),
+            Instant::now(),
+        );
+        let key = chat_images(
+            &[Image::FileWithFallback {
+                path: file.to_str().unwrap().into(),
+                line: 1,
+                copy: Box::new(Image::InLog {
+                    line: 0,
+                    n: 0,
+                    media_type: String::new(),
+                }),
+            }],
+            "session-a",
+        )[0]
+        .key
+        .clone();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"copy");
+        std::fs::write(&file, b"file").unwrap();
+        assert_eq!(
+            chat.image(key.clone()).unwrap(),
+            b"file",
+            "recreated file wins over a cached copy"
+        );
+        std::fs::write(&file, b"new-file").unwrap();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"new-file");
+        std::fs::remove_file(&file).unwrap();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"copy");
+        assert!(!chat.images.lock().unwrap().contains_key(&key));
+        assert_eq!(
+            chat.images
+                .lock()
+                .unwrap()
+                .get("log:session-a:0:0")
+                .unwrap(),
+            b"copy"
+        );
+        std::fs::write(&file, b"current-file").unwrap();
+        assert_eq!(chat.image(key.clone()).unwrap(), b"current-file");
+        for mode in 1..=8 {
+            failure.store(mode, std::sync::atomic::Ordering::SeqCst);
+            assert_eq!(chat.image(key.clone()), None, "failed recheck mode {mode}");
+        }
+        failure.store(0, std::sync::atomic::Ordering::SeqCst);
+        // A non-file and an oversized file are read failures, not absence.
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir(&file).unwrap();
+        assert_eq!(chat.image(key.clone()), None, "directory is not absent");
+        std::fs::remove_dir(&file).unwrap();
+        std::fs::write(&file, vec![0; image::FILE_MAX as usize + 1]).unwrap();
+        assert_eq!(chat.image(key.clone()), None, "oversized is not absent");
+        std::fs::remove_file(&file).unwrap();
+        assert_eq!(
+            chat.image(key.clone()).unwrap(),
+            b"copy",
+            "confirmed absent"
+        );
+        hub.conns.lock().unwrap().remove("workstation");
+        assert_eq!(chat.image(key), None, "no connection is not absence");
         hub.shutdown();
     }
 

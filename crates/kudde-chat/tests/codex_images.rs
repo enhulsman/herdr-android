@@ -116,6 +116,28 @@ fn check_bytes(name: &str, mut records: Vec<Value>, expected: usize, bytes: &[&[
             .count(),
         expected
     );
+    if name == "same-turn-after-skip" || name == "unknown-call-turn" {
+        assert_eq!(parser.image_counts().get("multiple open calls"), Some(&1));
+    }
+    if name.starts_with("later-turn-") {
+        assert!(
+            matches!(
+                images.as_slice(),
+                [Image::File { .. }, Image::FileWithFallback { .. }]
+            ),
+            "the abandoned view stays a placeholder and only the later view pairs"
+        );
+        let mut incremental = Parser::new(Agent::Codex);
+        for (line, offset) in held_text.split_inclusive('\n').zip(&held_offsets) {
+            incremental.feed_lines(line, &[*offset]);
+        }
+        assert_eq!(
+            incremental.items(),
+            replay.items(),
+            "line-by-line reads match full reparse"
+        );
+        assert_eq!(incremental.image_counts(), replay.image_counts());
+    }
     for (position, i) in images.into_iter().enumerate() {
         if let Image::FileWithFallback { copy, .. } = i {
             let Image::InLog { line, n, .. } = copy.as_ref() else {
@@ -630,4 +652,92 @@ fn review_claude_nested_call_type_is_preserved() {
     actual.feed_lines(&chunk.text, &chunk.offsets);
     assert_eq!(actual.items(), expected.items());
     assert_eq!(chunk.text, text);
+}
+
+fn in_turn(mut record: Value, turn: &str) -> Value {
+    if record["type"] == "event_msg" {
+        record["payload"]["turn_id"] = json!(turn);
+    } else {
+        record["payload"]["internal_chat_message_metadata_passthrough"]["turn_id"] = json!(turn);
+    }
+    record
+}
+
+#[test]
+fn skipped_output_does_not_block_a_later_turn() {
+    check(
+        "later-turn-after-skip",
+        vec![
+            call("call-a"),
+            view(),
+            oversized(),
+            in_turn(call("call-b"), "turn-b"),
+            in_turn(view(), "turn-b"),
+            in_turn(output("call-b", 1), "turn-b"),
+            // A late output must never resurrect the abandoned call's view.
+            output("call-a", 1),
+        ],
+        1,
+    );
+}
+
+#[test]
+fn missing_output_does_not_block_a_later_turn() {
+    check(
+        "later-turn-after-missing",
+        vec![
+            call("call-a"),
+            view(),
+            in_turn(call("call-b"), "turn-b"),
+            in_turn(view(), "turn-b"),
+            in_turn(output("call-b", 1), "turn-b"),
+            output("call-a", 1),
+        ],
+        1,
+    );
+}
+
+#[test]
+fn a_later_turn_view_never_belongs_to_an_earlier_call() {
+    check(
+        "no-cross-turn-view",
+        vec![
+            call("call-a"),
+            in_turn(view(), "turn-b"),
+            output("call-a", 1),
+        ],
+        0,
+    );
+}
+
+#[test]
+fn two_open_calls_in_the_same_later_turn_stay_uncertain() {
+    check(
+        "same-turn-after-skip",
+        vec![
+            call("call-a"),
+            view(),
+            oversized(),
+            in_turn(call("call-b"), "turn-b"),
+            in_turn(call("call-c"), "turn-b"),
+            in_turn(view(), "turn-b"),
+            in_turn(output("call-b", 1), "turn-b"),
+            in_turn(output("call-c", 1), "turn-b"),
+        ],
+        0,
+    );
+}
+
+#[test]
+fn an_unknown_call_turn_stays_uncertain() {
+    check(
+        "unknown-call-turn",
+        vec![
+            in_turn(call("call-a"), ""),
+            in_turn(call("call-b"), "turn-b"),
+            in_turn(view(), "turn-b"),
+            in_turn(output("call-b", 1), "turn-b"),
+        ],
+        0,
+    );
 }

@@ -2,7 +2,7 @@
 //! images as base64 inside its log; the tail script empties them and leaves
 //! `"@<line>:<k>"`, and [`LOG_SCRIPT`] prints that one field. Codex records an
 //! image it viewed as a file path; [`FILE_SCRIPT`] prints the file. A paired
-//! data-URL copy uses [`LOG_SCRIPT`] if that file cannot be read. Log reads
+//! data-URL copy uses [`LOG_SCRIPT`] only if that file is confirmed absent. Log reads
 //! stay within [`crate::tail::READ_MAX`].
 //! Both run through `machine.exec` (POSIX sh, tail, head, awk, wc, cat), whose
 //! output is capped at 8 MB.
@@ -52,11 +52,26 @@ pub const FILE_MAX: u64 = 8_000_000;
 /// second and size) on a line, then its bytes unless that time is `held`;
 /// nothing when it is gone, not a plain file, or over [`FILE_MAX`]. Codex
 /// reuses a screenshot's path, so an image is held by path and time.
+/// With a third argument `checked`, confirmed absence prints `missing`;
+/// all other failures exit unsuccessfully. The default keeps the legacy reply.
 pub const FILE_SCRIPT: &str = r#"f=$1; held=$2
-[ -f "$f" ] && [ -r "$f" ] || exit 0
-s=$(wc -c < "$f" | tr -d ' ')
-[ "$s" -le 8000000 ] || exit 0
-t="$(stat -c %Y "$f") $s"
+if [ "$3" = checked ]; then
+  # Only ENOENT proves absence. Permission and other stat failures do not.
+  if info=$(LC_ALL=C stat -L -c %Y -- "$f" 2>&1); then
+    [ -f "$f" ] && [ -r "$f" ] || exit 1
+  else
+    case "$info" in
+      *": No such file or directory") printf 'missing\n'; exit 0 ;;
+      *) exit 1 ;;
+    esac
+  fi
+else
+  [ -f "$f" ] && [ -r "$f" ] || exit 0
+  info=$(stat -c %Y -- "$f") || exit 1
+fi
+s=$(wc -c < "$f") || exit 1
+[ "$s" -le 8000000 ] || exit 1
+t="$info $s"
 printf '%s\n' "$t"
 [ "$t" = "$held" ] || cat "$f"
 "#;

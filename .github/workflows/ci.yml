@@ -1,11 +1,16 @@
 name: CI
 
-# Every pull request; main only changes through a pull request (repository
-# ruleset), and the ruleset requires the ci-ok job below. A change that touches
-# only docs, specs or designs skips the heavy jobs, which GitHub counts as
-# passed. Run it by hand from the Actions tab for a full run on any branch.
+# Pull requests run only the areas their changed paths touch
+# (scripts/ci-changes.sh); main only changes through a pull request
+# (repository ruleset), which requires the ci-ok job below. A push to main, the
+# weekly run (new cargo-deny advisories, a new herdr-core) and a run started by
+# hand from the Actions tab run every area.
 on:
   pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -13,7 +18,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -25,37 +30,55 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Code or not: docs, specs, designs, research and Markdown alone skip the rest.
+  # Which areas run: rust, core, android, push, site. Every area outside a pull
+  # request, or when the diff against its base cannot be computed.
   changes:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      code: ${{ steps.diff.outputs.code }}
+      rust: ${{ steps.route.outputs.rust }}
+      core: ${{ steps.route.outputs.core }}
+      android: ${{ steps.route.outputs.android }}
+      push: ${{ steps.route.outputs.push }}
+      site: ${{ steps.route.outputs.site }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - id: diff
+      - run: scripts/test-ci-changes.sh
+      - id: route
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [ "$EVENT" != pull_request ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          changed="$(git diff --name-only "$BASE...HEAD")"
-          echo "$changed"
-          if echo "$changed" | grep -v -E '^(docs|openspec|design|research|canvas)/|\.md$' | grep -q .; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
+          every_area() { printf '%s=true\n' rust core android push site; }
+          if [[ $EVENT != pull_request ]]; then
+            echo "$EVENT: every area runs"
+            areas=$(every_area)
+          elif changed=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE...HEAD"); then
+            printf 'Changed paths:\n%s\n\n' "$changed"
+            areas=$(printf '%s\n' "$changed" | scripts/ci-changes.sh)
+            {
+              echo "<details><summary>Changed paths</summary>"
+              echo
+              echo '```'
+              printf '%s\n' "$changed"
+              echo '```'
+              echo "</details>"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::no diff against the base $BASE: every area runs"
+            areas=$(every_area)
           fi
+          echo "$areas"
+          echo "$areas" >> "$GITHUB_OUTPUT"
+          { echo '```'; echo "$areas"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   rust:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -99,14 +122,14 @@ jobs:
   # Scratch-core and sshd tests against the oldest supported and the latest core.
   core:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.core == 'true'
     uses: ./.github/workflows/core-tests.yml
     with:
       cache: true
 
   android:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -145,12 +168,10 @@ jobs:
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest :app:verifyRoborazziDebug :app:assembleDebug
 
-  # The one check the main ruleset requires: green when every job above passed
-  # or was skipped for a docs-only change, red when any failed or was cancelled.
   # The release builds kudde-push for aarch64 on an arm runner: prove it builds.
   push-aarch64:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.push == 'true'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -167,9 +188,18 @@ jobs:
       - name: kudde-push for Linux aarch64
         run: cargo build -p kudde-push --release --locked --target aarch64-unknown-linux-gnu
 
+  # The website's build and browser checks.
+  site:
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    uses: ./.github/workflows/site-tests.yml
+
+  # The one check the main ruleset requires: green when every job above passed
+  # or was skipped because the change does not touch its area, red when any
+  # failed or was cancelled.
   ci-ok:
     if: always()
-    needs: [changes, rust, core, android, push-aarch64]
+    needs: [changes, rust, core, android, push-aarch64, site]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

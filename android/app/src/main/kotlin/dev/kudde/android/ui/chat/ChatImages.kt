@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
+import android.os.SystemClock
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,8 +64,13 @@ import dev.kudde.android.ui.theme.KuddeType
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import uniffi.kudde_mobile.ChatImage
 import uniffi.kudde_mobile.Chat
 
@@ -76,6 +83,7 @@ import uniffi.kudde_mobile.Chat
 interface ChatImageSource {
     fun cached(key: String): ImageBitmap?
     suspend fun load(key: String): ImageBitmap?
+    suspend fun revalidate(key: String, force: Boolean): ImageBitmap? = load(key)
 }
 
 /** A photo the person attached, ready to send. */
@@ -113,15 +121,22 @@ internal sealed interface Load {
  * reading back) went on showing the old one while a tap opened the new one.
  */
 @Composable
-internal fun rememberLoad(source: ChatImageSource, key: String): Load {
-    val state = remember(key) {
+internal fun rememberLoad(source: ChatImageSource, key: String, force: Boolean = false): Load {
+    val state = remember(source, key) {
         mutableStateOf(if (key == "missing") Load.Missing else source.cached(key)?.let { Load.Loaded(it) } ?: Load.Loading)
     }
-    LaunchedEffect(key) {
-        if (state.value != Load.Loading) return@LaunchedEffect
-        state.value = source.load(key)?.let { Load.Loaded(it) } ?: Load.Missing
+    LaunchedEffect(source, key, force) {
+        if (key.startsWith("copy:")) {
+            val image = source.revalidate(key, force)
+            if (image != null) state.value = Load.Loaded(image)
+            else if (state.value == Load.Loading) state.value = Load.Missing
+        } else if (state.value == Load.Loading) {
+            state.value = source.load(key)?.let { Load.Loaded(it) } ?: Load.Missing
+        }
     }
-    return state.value
+    // Reading the shared observable entry also updates a mounted thumbnail
+    // when the viewer discovers a newer file for this key.
+    return if (key.startsWith("copy:")) source.cached(key)?.let { Load.Loaded(it) } ?: state.value else state.value
 }
 
 /** A row of thumbnails; a tap opens one full screen. */
@@ -199,7 +214,7 @@ fun ImageViewer(key: String, keys: List<String>, source: ChatImageSource, onShow
             },
         contentAlignment = Alignment.Center,
     ) {
-        when (val load = rememberLoad(source, key)) {
+        when (val load = rememberLoad(source, key, force = true)) {
             is Load.Loaded -> Image(
                 load.image, contentDescription = "Image",
                 contentScale = ContentScale.Fit,
@@ -238,15 +253,66 @@ fun AttachedRow(attached: List<Attachment>, onRemove: (Attachment) -> Unit) {
 }
 
 /** Images from the desk, decoded to at most 2048 px and kept by size. */
-class DeskImages(private val chat: Chat?) : ChatImageSource {
-    private val cache = object : LruCache<String, ImageBitmap>(64 * 1024 * 1024) {
-        override fun sizeOf(key: String, value: ImageBitmap) = value.asAndroidBitmap().byteCount
+class DeskImages internal constructor(
+    private val fetch: (String) -> ByteArray?,
+    private val now: () -> Long = { SystemClock.elapsedRealtime() },
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : ChatImageSource {
+    constructor(chat: Chat?) : this(fetch = { key -> chat?.image(key) })
+
+    private class Entry(val picture: MutableState<ImageBitmap?>, var digest: ByteArray?, var checked: Long) {
+        var image by picture
+        // Fixed for this cache insertion: mutating the shared picture must not
+        // change the size subtracted by LruCache when replacing an old entry.
+        val byteCount = image?.asAndroidBitmap()?.byteCount ?: 0
     }
 
-    override fun cached(key: String): ImageBitmap? = cache.get(key)
+    private val cache = object : LruCache<String, Entry>(64 * 1024 * 1024) {
+        // Include metadata, including failed checks without a decoded picture.
+        override fun sizeOf(key: String, value: Entry) =
+            128 + key.length * 2 + value.byteCount
+    }
+    private val loading = Mutex()
 
-    override suspend fun load(key: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        cache.get(key) ?: chat?.image(key)?.let { decodeSampled(it, 2048) }?.also { cache.put(key, it) }
+    override fun cached(key: String): ImageBitmap? = cache.get(key)?.image
+
+    override suspend fun load(key: String): ImageBitmap? =
+        if (key.startsWith("copy:")) revalidate(key, false)
+        else withContext(dispatcher) {
+            cache.get(key)?.image ?: fetch(key)?.let { decodeSampled(it, 2048) }?.also {
+                cache.put(key, Entry(mutableStateOf(it), null, 0))
+            }
+        }
+
+    override suspend fun revalidate(key: String, force: Boolean): ImageBitmap? {
+        if (!key.startsWith("copy:")) return load(key)
+        return withContext(dispatcher) {
+            loading.withLock {
+                val held = cache.get(key)
+                val time = now()
+                if (!force && held != null && time - held.checked < 30_000L) return@withLock held.image
+                val entry = held ?: Entry(mutableStateOf(null), null, time)
+                entry.checked = time
+                try {
+                    val bytes = fetch(key)
+                    if (bytes != null) {
+                        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+                        if (entry.digest?.contentEquals(digest) != true) {
+                            decodeSampled(bytes, 2048)?.let {
+                                entry.image = it
+                                entry.digest = digest
+                            }
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A failed recheck must not replace a picture already shown.
+                }
+                cache.put(key, Entry(entry.picture, entry.digest, entry.checked))
+                entry.image
+            }
+        }
     }
 }
 

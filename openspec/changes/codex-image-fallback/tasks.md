@@ -179,14 +179,9 @@ rates on real logs. The coordinator's later real-log check remains outstanding.
   irrelevance, including response_item with its subtype beyond byte 200.
 - [x] 3.4 Run all existing Claude fixtures and crate suites, CI clippy, fmt,
   strict validation and the real-shape counts example.
-- [ ] 3.5 **Next card — Kotlin cache revalidation (review finding 2):**
-  `android/app/src/main/kotlin/dev/kudde/android/ui/chat/ChatImages.kt:246-249`
-  reuses decoded bitmaps without Chat.image(); `ChatImages.kt:116-123`
-  (rememberLoad) retains loaded state under an unchanged key. Revalidate
-  file-backed keys before decoded-copy reuse and refresh retained state.
-  Add an Android integration regression: load a fallback, recreate the file,
-  then reopen the viewer/remount the thumbnail and require the current file.
-  This Rust-only card does not fix that phone behavior.
+- [x] 3.5 **Kotlin cache revalidation (review finding 2):**
+  Recheck `copy:` thumbnails every 30 seconds on remount; viewer opens always recheck, retaining displayed pixels on failure.
+  Share observable decoded pixels across thumbnail/viewer; add fake-byte, injectable-clock Android regressions (not run here; coordinator checks pending).
 
 ### Reproduction evidence (confidence: high)
 Tests in `crates/kudde-chat/tests/codex_images.rs` run the production shell,

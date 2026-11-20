@@ -14,6 +14,8 @@ import dev.kudde.android.ui.agents.connected
 import dev.kudde.android.ui.agents.row
 import dev.kudde.android.ui.agents.snapshot
 import dev.kudde.android.ui.theme.KuddeTheme
+import dev.kudde.android.ui.theme.ThemeName
+import dev.kudde.android.ui.theme.kuddeColors
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RuntimeEnvironment
@@ -53,6 +55,16 @@ class TerminalScreenshotTest {
     fun watchingGraphite() {
         val session = session(TermPhase.Watching, SessionFixture.frame(96, 44, wide = true, bottom = false))
         capture("terminal-watch-graphite", session, TerminalScreenState())
+    }
+
+    /** The same watching fixture with paper's terminal defaults (theme-pairs, task 3.5). */
+    @Test
+    fun watchingPaper() {
+        val theme = kuddeColors(ThemeName.Paper).terminalTheme()
+        val frame = SessionFixture.frame(96, 44, wide = true, bottom = false, fg = theme.fg.toInt(), bg = theme.bg.toInt())
+        val session = session(TermPhase.Watching, frame)
+        session.setTheme(theme)
+        capture("terminal-watch-paper", session, TerminalScreenState(), dark = false)
     }
 
     /** Render 13: the Changes button before the view switch (changes-view, task 4.3). */
@@ -147,11 +159,12 @@ class TerminalScreenshotTest {
         composeFocus: Boolean = true,
         chat: (() -> Unit)? = null,
         changes: (() -> Unit)? = null,
+        dark: Boolean = true,
     ) {
         val ui = terminalUi(hub, key, res)
         val actions = TerminalActions(onBack = {}, onOpen = {}, onSwipe = { false }, onPhoneGrid = {})
         captureRoboImage("src/test/snapshots/$name.png") {
-            KuddeTheme(dark = true) {
+            KuddeTheme(dark = dark) {
                 Column {
                     Box(Modifier.fillMaxWidth().weight(1f)) {
                         TerminalScreen(ui, session, screen, actions, TerminalInputHandle.None, composeFocus = composeFocus, onChat = chat, onChanges = changes)
@@ -265,7 +278,15 @@ object SessionFixture {
      * The session on a [cols] x [rows] grid: from the top, or its last rows at
      * the [bottom] of the screen (after Claude Code redraws at a new size).
      */
-    fun frame(cols: Int, rows: Int, wide: Boolean, bottom: Boolean, live: Boolean = true): ByteArray {
+    fun frame(
+        cols: Int,
+        rows: Int,
+        wide: Boolean,
+        bottom: Boolean,
+        live: Boolean = true,
+        fg: Int = FG,
+        bg: Int = BG,
+    ): ByteArray {
         var all = lines(cols, wide)
         if (all.size > rows) all = all.takeLast(rows)
         val first = if (bottom) rows - all.size else 0
@@ -280,7 +301,7 @@ object SessionFixture {
             (first + i) to cells.take(cols)
         }
         return frameOf(
-            cols, rows, content, cursorShown = false, fg = FG, bg = BG,
+            cols, rows, content, cursorShown = false, fg = fg, bg = bg,
             live = live, total = rows + if (live) 0 else 120, offset = if (live) 0 else 60,
         )
     }

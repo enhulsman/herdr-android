@@ -128,10 +128,10 @@ transport and ignored in matching. Keep the original draft and attachments
 separately for a definitive refusal, using the phone's existing merge with
 anything typed meanwhile.
 
-**Owner pick R1-B (proposed):** text that becomes blank after normalization,
-with no attachments, leaves the original draft in the box, creates no
-pending bubble and dispatches nothing. An attachment-only message keeps the
-phone's existing path. Alternative: show a new refusal for blank text.
+**R1-B, answered (Ezra, 2026-11-20):** text that becomes blank after
+normalization, with no attachments, leaves the original draft in the box,
+creates no pending bubble and dispatches nothing, with no new error. An
+attachment-only message keeps the phone's existing path.
 
 The shared send module owns pure screen checks, Claude queue-text matching,
 Codex screen-queue detection, slash/dialog waits and per-message second-Enter
@@ -330,17 +330,17 @@ paragraphs, list items, fenced code, tables and quotes, with Compose inline
 styling. The earlier text of decision 6 and D3 named a splitter that does
 not exist (scrutiny round 2, N1).
 
-**Owner pick N1 (proposed):** the phone keeps `markdownBlocks` unchanged;
+**N1, answered (Ezra, 2026-11-20):** the phone keeps `markdownBlocks` unchanged;
 the desk gets a small JavaScript function, `fences(text)`, that splits prose
 from fenced code by the phone's fence rule (a fence may start after leading
 whitespace; an unclosed fence runs to the end), with the fence cases of
 `ChatRowsTest` copied as its tests. Prose goes to `TextView.markdown`; code
 is drawn as monospace blocks on `theme().raised`; tables show as monospace
-text in this change. Alternative: port the whole parser to Rust and have
-the phone call it. Under decision 7 that gives the desk nothing (it would
-still need a JavaScript copy) and puts the phone's goldens at risk in the
-phone release. Confidence: high that the alternative costs more; the pick
-leaves two Markdown readers that could disagree on a fence.
+text in this change. Porting the whole parser to Rust was turned down:
+under decision 7 it gives the desk nothing (it would still need a
+JavaScript copy) and puts the phone's goldens at risk in the phone release.
+The cost of this choice: two Markdown readers that could disagree on a
+fence.
 
 ### D9. A waiting agent sends you to the terminal
 While the agent's status is `blocked`, or it reports no status, the reply box

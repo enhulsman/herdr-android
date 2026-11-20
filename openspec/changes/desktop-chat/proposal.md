@@ -44,16 +44,16 @@ review; decision 7 settled 2026-11-20 after the spike):
    reader support in the pane (gpui-kit exposes no semantics yet), and the
    ideas in the research brief.
 
+**Answered (Ezra, 2026-11-20):**
+- **N1: the phone keeps its Markdown reader; the desk gets a small function
+  that only separates code blocks.** Decision 6 had named a "code-block
+  splitter" to move into Rust, but the phone has none: it has a full
+  Markdown reader (headings, lists, tables, quotes, code), which stays.
+- **R1-B: blank input stays in the box.** If removing stray control
+  characters leaves no text or pictures, nothing is sent, without a new
+  error.
+
 **Open for you:**
-- **Pick: the phone keeps its Markdown reader; the desk gets a small
-  function that only separates code blocks (N1).** Decision 6 also named a
-  "code-block splitter" to move into Rust, but the phone has none: it has a
-  full Markdown reader (headings, lists, tables, quotes, code). Moving that
-  to Rust would not help the desk, which needs a JavaScript copy either way,
-  and would put the phone's screenshots at risk in its release. Or move it
-  anyway?
-- **Pick: keep blank input in the box (R1-B).** If removing stray control
-  characters leaves no text or pictures, send nothing, without a new error?
 - **After the send probe (R1-G), only if it comes up:** if herdr does not
   tell the desk why it refused a message (for example, the agent just
   started working), should desk replies wait until herdr-core says so, which

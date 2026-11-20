@@ -188,6 +188,9 @@ class FakeTerminalView : TerminalViewInterface, AutoCloseable {
     var armedAfterTap = Armed(ctrl = false, alt = false)
 
     override fun armed() = armedAfterTap
+    override fun setTheme(theme: uniffi.kudde_mobile.TerminalTheme) {
+        calls += "theme"
+    }
     override fun backspace(): Armed {
         calls += "backspace"
         return armedAfterTap

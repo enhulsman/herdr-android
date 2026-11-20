@@ -34,6 +34,8 @@ struct Screen {
     seen: mpsc::UnboundedReceiver<Seen>,
     rows: HashMap<u16, String>,
     flags: u8,
+    colors: (u32, u32),
+    offset: u32,
     states: Vec<TermState>,
     /// States before this index were matched already.
     consumed: usize,
@@ -52,6 +54,8 @@ impl Screen {
         let cols = usize::from(u16_at(f, 0));
         let count = u16_at(f, 10);
         self.flags = f[8];
+        self.colors = (u32_at(f, 12), u32_at(f, 16));
+        self.offset = u32_at(f, 24);
         if f[8] & 1 != 0 {
             self.rows.clear();
         }
@@ -187,6 +191,10 @@ fn open(rig: &Rig) -> Open {
 
 /// `lead`: open at the phone's size, as the app does since round 2.
 fn open_with(rig: &Rig, lead: bool) -> Open {
+    open_themed(rig, lead, None)
+}
+
+fn open_themed(rig: &Rig, lead: bool, theme: Option<(u32, u32, Vec<u32>)>) -> Open {
     let (tx, rx) = mpsc::unbounded_channel();
     let cmds = term::spawn(
         &rig.hub,
@@ -196,12 +204,15 @@ fn open_with(rig: &Rig, lead: bool) -> Open {
         lead,
         Arc::new(Sink(tx)),
         Arc::default(),
+        theme.map(|(fg, bg, ansi)| crate::TerminalTheme { fg, bg, ansi }),
     );
     Open {
         screen: Screen {
             seen: rx,
             rows: HashMap::new(),
             flags: 0,
+            colors: (0, 0),
+            offset: 0,
             states: Vec::new(),
             consumed: 0,
             reports: Vec::new(),
@@ -767,4 +778,89 @@ async fn opening_at_the_phones_size_attaches_actively_and_the_desk_can_take_it_b
     o.screen
         .until_state(|s| s.phase == TermPhase::Watching)
         .await;
+}
+
+fn theme_fixture(name: &str) -> (u32, u32, Vec<u32>) {
+    let tokens: Value =
+        serde_json::from_str(include_str!("../../../../../design-tokens.json")).unwrap();
+    let t = &tokens["colors"]["themes"][name];
+    let rgb =
+        |v: &Value| u32::from_str_radix(v.as_str().unwrap().trim_start_matches('#'), 16).unwrap();
+    (
+        rgb(&t["termFg"]),
+        rgb(&t["bg"]),
+        t["ansi"].as_array().unwrap().iter().map(rgb).collect(),
+    )
+}
+
+fn change_theme(o: &Open, (fg, bg, ansi): (u32, u32, Vec<u32>)) {
+    o.cmds
+        .send(Cmd::Theme(crate::TerminalTheme { fg, bg, ansi }))
+        .unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn theme_at_open_and_after_reattach_is_in_the_first_frame() {
+    let mut rig = rig("term-theme-open");
+    rig.add_trusted(WS, WS_KEY);
+    rig.hub.resume();
+    let mut core = rig.core().await;
+    core.connect("0.1.15", vec![sized("t3", 80, 24)]).await;
+    rig.until_state(WS, connected).await;
+    let mut o = open_themed(&rig, false, Some(theme_fixture("paper")));
+    let params = core.attach(5, (80, 24)).await;
+    assert!(params.get("display").is_none_or(Value::is_null));
+    core.get((80, 24)).await;
+    core.send(5, wire::DATA, b"paper").await;
+    o.screen.until_text("paper").await;
+    assert_eq!(o.screen.colors, (0x25272c, 0xffffff));
+    core.event(1, "size", "t3", json!({"cols": 120, "rows": 40}))
+        .await;
+    let close = core.frame().await;
+    assert_eq!((close.channel, close.kind), (5, wire::CLOSE));
+    let params = core.attach(7, (120, 40)).await;
+    assert!(params.get("display").is_none_or(Value::is_null));
+    core.get((120, 40)).await;
+    core.send(7, wire::DATA, b"fresh").await;
+    o.screen.until_text("fresh").await;
+    assert_eq!(o.screen.colors, (0x25272c, 0xffffff));
+}
+
+#[tokio::test(start_paused = true)]
+async fn theme_change_redraws_locally_at_the_same_offset_without_link_traffic() {
+    let (rig, mut core, mut o) = watching("term-theme-change").await;
+    let mut history = b"line\r\n".repeat(80);
+    history.extend_from_slice(b"history-ready");
+    core.send(5, wire::DATA, &history).await;
+    o.screen.until_text("history-ready").await;
+    o.cmds.send(Cmd::Scroll(-40)).unwrap();
+    while o.screen.flags & crate::vt::FLAG_LIVE != 0 {
+        assert!(o.screen.pump().await);
+    }
+    let offset = o.screen.offset;
+    let changed = tokio::time::Instant::now();
+    change_theme(&o, theme_fixture("paper"));
+    while o.screen.colors != (0x25272c, 0xffffff) {
+        assert!(o.screen.pump().await, "theme never reached a frame");
+    }
+    assert!(changed.elapsed() <= Duration::from_secs(1));
+    assert_eq!(o.screen.offset, offset);
+    assert_ne!(o.screen.flags & crate::vt::FLAG_FULL, 0);
+    let marker = tokio::spawn({
+        let hub = rig.hub.clone();
+        async move {
+            let conn = hub.connection(WS).borrow().clone().unwrap();
+            conn.client.call("test.marker", json!({})).await
+        }
+    });
+    let f = core.frame().await;
+    assert_eq!(
+        (f.channel, f.kind),
+        (0, wire::DATA),
+        "theme wrote to the link"
+    );
+    let req: Value = serde_json::from_slice(&f.payload).unwrap();
+    assert_eq!(req["method"], "test.marker", "theme wrote to the link");
+    core.reply_to(&req, json!({})).await;
+    marker.await.unwrap().unwrap();
 }

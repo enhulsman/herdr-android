@@ -158,6 +158,69 @@ impl Terminal {
         Ok(t)
     }
 
+    /// Changes engine defaults, preserving program OSC overrides and the viewport.
+    pub fn set_theme(&mut self, fg: u32, bg: u32, ansi: &[u32]) -> Result<(), Failure> {
+        self.set_theme_with(fg, bg, ansi, |terminal, option, value| unsafe {
+            ffi::ghostty_terminal_set(terminal, option, value)
+        })
+    }
+
+    // A narrow call seam lets tests reject palette allocation while all other
+    // operations still go through the real engine.
+    fn set_theme_with(
+        &mut self,
+        fg: u32,
+        bg: u32,
+        ansi: &[u32],
+        mut set: impl FnMut(ffi::Terminal, i32, *const c_void) -> ffi::GhosttyResult,
+    ) -> Result<(), Failure> {
+        if ansi.len() != 16 {
+            return Err(Failure {
+                call: "Terminal::set_theme (ansi must have 16 entries)",
+                code: -2,
+            });
+        }
+        let rgb = |word: u32| ffi::ColorRgb {
+            r: (word >> 16) as u8,
+            g: (word >> 8) as u8,
+            b: word as u8,
+        };
+        let mut palette = [ffi::ColorRgb::default(); 256];
+        // Read defaults, not effective colours: OSC overrides belong to the program.
+        check("ghostty_terminal_get (default palette)", unsafe {
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::GHOSTTY_TERMINAL_DATA_COLOR_PALETTE_DEFAULT,
+                palette.as_mut_ptr().cast(),
+            )
+        })?;
+        for (slot, color) in palette.iter_mut().zip(ansi) {
+            *slot = rgb(*color);
+        }
+        let foreground = rgb(fg);
+        let background = rgb(bg);
+        // At the pinned engine version, only the palette setter allocates.
+        // It allocates before mutation; the following RGB setters cannot fail.
+        for (option, value) in [
+            (ffi::GHOSTTY_TERMINAL_OPT_COLOR_PALETTE, palette.as_ptr()),
+            (
+                ffi::GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND,
+                &foreground as *const ffi::ColorRgb,
+            ),
+            (
+                ffi::GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND,
+                &background as *const ffi::ColorRgb,
+            ),
+        ] {
+            check(
+                "ghostty_terminal_set",
+                set(self.terminal, option, value.cast()),
+            )?;
+        }
+        self.force_full = true;
+        Ok(())
+    }
+
     /// Feeds program output to the terminal. Any split of the stream is fine.
     pub fn write(&mut self, bytes: &[u8]) {
         unsafe { ffi::ghostty_terminal_vt_write(self.terminal, bytes.as_ptr(), bytes.len()) }
@@ -627,6 +690,153 @@ mod tests {
 
     fn cp(cell: &[u8; CELL_LEN]) -> u32 {
         u32_at(cell, 0)
+    }
+
+    fn palette(name: &str) -> (u32, u32, Vec<u32>) {
+        let tokens: serde_json::Value =
+            serde_json::from_str(include_str!("../../../../design-tokens.json")).unwrap();
+        let theme = &tokens["colors"]["themes"][name];
+        let rgb = |v: &serde_json::Value| {
+            u32::from_str_radix(v.as_str().unwrap().trim_start_matches('#'), 16).unwrap()
+        };
+        (
+            rgb(&theme["termFg"]),
+            rgb(&theme["bg"]),
+            theme["ansi"].as_array().unwrap().iter().map(rgb).collect(),
+        )
+    }
+
+    #[test]
+    fn rejected_theme_preserves_all_defaults_and_the_retained_theme() {
+        let mut t = Terminal::new(8, 2).unwrap();
+        let (fg, bg, ansi) = palette("graphite");
+        let original = crate::TerminalTheme { fg, bg, ansi };
+        t.set_theme(original.fg, original.bg, &original.ansi)
+            .unwrap();
+        let before = parse(&t.frame().unwrap());
+        let read_palette = |t: &Terminal| {
+            let mut colors = [ffi::ColorRgb::default(); 256];
+            check("default palette", unsafe {
+                ffi::ghostty_terminal_get(
+                    t.terminal,
+                    ffi::GHOSTTY_TERMINAL_DATA_COLOR_PALETTE_DEFAULT,
+                    colors.as_mut_ptr().cast(),
+                )
+            })
+            .unwrap();
+            colors
+        };
+        let before_palette = read_palette(&t);
+        let mut retained = Some(original.clone());
+        let mut dirty = false;
+        let (fg, bg, ansi) = palette("paper");
+        let mut calls = Vec::new();
+        let result = crate::term::update_theme(
+            &mut retained,
+            &mut dirty,
+            crate::TerminalTheme { fg, bg, ansi },
+            |theme| {
+                t.set_theme_with(
+                    theme.fg,
+                    theme.bg,
+                    &theme.ansi,
+                    |terminal, option, value| {
+                        calls.push(option);
+                        if option == ffi::GHOSTTY_TERMINAL_OPT_COLOR_PALETTE {
+                            -1
+                        } else {
+                            unsafe { ffi::ghostty_terminal_set(terminal, option, value) }
+                        }
+                    },
+                )
+            },
+        );
+        // Check engine defaults before the caller result: the old order really
+        // mutates the engine, rather than merely returning a different error.
+        let after = parse(&t.frame().unwrap());
+        assert_eq!((after.fg, after.bg), (before.fg, before.bg));
+        assert_eq!(read_palette(&t), before_palette);
+        assert_eq!(retained, Some(original));
+        assert!(!dirty);
+        assert_eq!(after.flags & FLAG_FULL, 0);
+        assert_eq!(calls, [ffi::GHOSTTY_TERMINAL_OPT_COLOR_PALETTE]);
+        assert_eq!(
+            result,
+            Err(Failure {
+                call: "ghostty_terminal_set",
+                code: -1
+            })
+        );
+    }
+
+    #[test]
+    fn theme_defaults_and_ansi_follow_both_approved_palettes() {
+        let mut t = Terminal::new(8, 2).unwrap();
+        t.write(b"\x1b[31mR\x1b[34mB\x1b[0m");
+        for name in ["paper", "graphite"] {
+            let (fg, bg, ansi) = palette(name);
+            t.set_theme(fg, bg, &ansi).unwrap();
+            let f = parse(&t.frame().unwrap());
+            assert_eq!((f.fg, f.bg), (fg, bg));
+            assert_eq!(u32_at(&f.rows_sent[0].1[0], 4), COLOR_SET | ansi[1]);
+            assert_eq!(u32_at(&f.rows_sent[0].1[1], 4), COLOR_SET | ansi[4]);
+        }
+    }
+
+    #[test]
+    fn theme_preserves_extended_and_truecolor_and_program_overrides() {
+        let mut t = Terminal::new(8, 2).unwrap();
+        t.write(b"\x1b[38;5;208mA\x1b[38;2;255;136;0mB\x1b[0m");
+        let before = parse(&t.frame().unwrap());
+        t.write(b"\x1b]11;#002b36\x07\x1b]10;#abcdef\x07\x1b]4;1;#123456\x07\r\x1b[31mR");
+        let (fg, bg, ansi) = palette("paper");
+        t.set_theme(fg, bg, &ansi).unwrap();
+        t.scroll_to_live();
+        let f = parse(&t.frame().unwrap());
+        assert_eq!((f.fg, f.bg), (0xabcdef, 0x002b36));
+        assert_eq!(u32_at(&f.rows_sent[0].1[0], 4), COLOR_SET | 0x123456);
+        assert_eq!(
+            u32_at(&f.rows_sent[0].1[1], 4),
+            u32_at(&before.rows_sent[0].1[1], 4)
+        );
+        t.write(b"\x1b]110\x07\x1b]111\x07\x1b]104;1\x07\r\x1b[31mR\x1b[38;5;208mA\x1b[38;2;255;136;0mB");
+        let f = parse(&t.frame().unwrap());
+        assert_eq!((f.fg, f.bg), (fg, bg));
+        assert_eq!(u32_at(&f.rows_sent[0].1[0], 4), COLOR_SET | ansi[1]);
+        assert_eq!(
+            u32_at(&f.rows_sent[0].1[1], 4),
+            u32_at(&before.rows_sent[0].1[0], 4)
+        );
+        assert_eq!(u32_at(&f.rows_sent[0].1[2], 4), COLOR_SET | 0xff8800);
+    }
+
+    #[test]
+    fn theme_forces_full_frame_without_moving_scrollback() {
+        let mut t = Terminal::new(8, 3).unwrap();
+        for _ in 0..80 {
+            t.write(b"line\r\n");
+        }
+        t.scroll(-40);
+        let before = parse(&t.frame().unwrap());
+        assert_eq!(parse(&t.frame().unwrap()).flags & FLAG_FULL, 0);
+        let (fg, bg, ansi) = palette("graphite");
+        t.set_theme(fg, bg, &ansi).unwrap();
+        let f = parse(&t.frame().unwrap());
+        assert_ne!(f.flags & FLAG_FULL, 0);
+        assert_eq!(f.rows_sent.len(), 3);
+        assert_eq!((f.offset, f.total), (before.offset, before.total));
+        assert_eq!(f.flags & FLAG_LIVE, 0);
+    }
+
+    #[test]
+    fn theme_rejects_every_non_sixteen_palette_before_changing_defaults() {
+        let mut t = Terminal::new(8, 2).unwrap();
+        let before = parse(&t.frame().unwrap());
+        for len in [0, 1, 15, 17, 256] {
+            assert!(t.set_theme(0x25272c, 0xffffff, &vec![0; len]).is_err());
+            let f = parse(&t.frame().unwrap());
+            assert_eq!((f.fg, f.bg), (before.fg, before.bg));
+        }
     }
 
     #[test]

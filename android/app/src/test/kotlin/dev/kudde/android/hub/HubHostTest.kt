@@ -276,6 +276,7 @@ class FakeHub : HubInterface {
         phoneRows: UShort,
         atPhoneSize: Boolean,
         listener: TerminalListener,
+        theme: uniffi.kudde_mobile.TerminalTheme?,
     ): TerminalView = error("FakeHub does not open terminals")
     override fun updateMachine(name: String, host: String, port: UShort, user: String) { calls += "update $name" }
 

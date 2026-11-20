@@ -62,6 +62,25 @@ impl From<vt::Failure> for VtError {
     }
 }
 
+/// Local engine defaults; the first sixteen ANSI palette entries only.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct TerminalTheme {
+    pub fg: u32,
+    pub bg: u32,
+    pub ansi: Vec<u32>,
+}
+
+impl TerminalTheme {
+    fn validate(&self) -> Result<(), VtError> {
+        if self.ansi.len() != 16 {
+            return Err(VtError::Engine {
+                detail: "terminal theme ansi must have 16 entries".into(),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// A libghostty-vt terminal for the device smoke test (task M0.5): feed it
 /// output, read frames in the format documented in `vt/mod.rs`.
 #[derive(uniffi::Object)]
@@ -329,6 +348,8 @@ impl Hub {
     /// Opens a terminal, at the phone's size when `at_phone_size` (the app,
     /// since phone check round 2), else to watch; `phone_cols` x `phone_rows`
     /// is the phone's own grid. The listener hears frames and states.
+    #[uniffi::method(default(theme = None))]
+    #[allow(clippy::too_many_arguments)] // Keep the new optional argument last for bindings.
     pub fn open_terminal(
         &self,
         machine: String,
@@ -337,54 +358,69 @@ impl Hub {
         phone_rows: u16,
         at_phone_size: bool,
         listener: Arc<dyn TerminalListener>,
-    ) -> Arc<TerminalView> {
-        #[cfg(feature = "vt")]
-        {
-            let (tx, rx) = std::sync::mpsc::channel::<SinkItem>();
-            // One thread per open terminal keeps the listener's calls in order.
-            let spawned = std::thread::Builder::new()
-                .name("kudde-term".into())
-                .spawn(move || {
-                    while let Ok(item) = rx.recv() {
-                        match item {
-                            SinkItem::Frame(f) => listener.on_frame(f),
-                            SinkItem::State(s) => listener.on_state(s),
-                            SinkItem::Interrupt(r) => listener.on_interrupt(r),
-                        }
-                    }
+        theme: Option<TerminalTheme>,
+    ) -> Result<Arc<TerminalView>, VtError> {
+        if let Some(theme) = &theme {
+            theme.validate()?;
+        }
+        Ok({
+            #[cfg(feature = "vt")]
+            {
+                let (tx, rx) = std::sync::mpsc::channel::<SinkItem>();
+                // One thread per open terminal keeps the listener's calls in order.
+                let spawned =
+                    std::thread::Builder::new()
+                        .name("kudde-term".into())
+                        .spawn(move || {
+                            while let Ok(item) = rx.recv() {
+                                match item {
+                                    SinkItem::Frame(f) => listener.on_frame(f),
+                                    SinkItem::State(s) => listener.on_state(s),
+                                    SinkItem::Interrupt(r) => listener.on_interrupt(r),
+                                }
+                            }
+                        });
+                let bracketed = Arc::<std::sync::atomic::AtomicBool>::default();
+                let cmds = spawned.ok().map(|_| {
+                    term::spawn(
+                        &self.core,
+                        &machine,
+                        &address,
+                        (phone_cols, phone_rows),
+                        at_phone_size,
+                        Arc::new(ListenerSink(tx)),
+                        bracketed.clone(),
+                        theme,
+                    )
                 });
-            let bracketed = Arc::<std::sync::atomic::AtomicBool>::default();
-            let cmds = spawned.ok().map(|_| {
-                term::spawn(
-                    &self.core,
-                    &machine,
-                    &address,
-                    (phone_cols, phone_rows),
+                Arc::new(TerminalView {
+                    cmds: Mutex::new(cmds),
+                    bracketed,
+                    keys: Mutex::new(keys_row::KeysRow::default()),
+                })
+            }
+            #[cfg(not(feature = "vt"))]
+            {
+                let _ = (
+                    machine,
+                    address,
+                    phone_cols,
+                    phone_rows,
                     at_phone_size,
-                    Arc::new(ListenerSink(tx)),
-                    bracketed.clone(),
-                )
-            });
-            Arc::new(TerminalView {
-                cmds: Mutex::new(cmds),
-                bracketed,
-                keys: Mutex::new(keys_row::KeysRow::default()),
-            })
-        }
-        #[cfg(not(feature = "vt"))]
-        {
-            let _ = (machine, address, phone_cols, phone_rows, at_phone_size);
-            listener.on_state(TermState {
-                phase: TermPhase::Failed {
-                    detail: VtError::Unavailable.to_string(),
-                },
-                cols: 0,
-                rows: 0,
-            });
-            Arc::new(TerminalView {
-                keys: Mutex::new(keys_row::KeysRow::default()),
-            })
-        }
+                    theme,
+                );
+                listener.on_state(TermState {
+                    phase: TermPhase::Failed {
+                        detail: VtError::Unavailable.to_string(),
+                    },
+                    cols: 0,
+                    rows: 0,
+                });
+                Arc::new(TerminalView {
+                    keys: Mutex::new(keys_row::KeysRow::default()),
+                })
+            }
+        })
     }
 }
 
@@ -532,6 +568,21 @@ impl TerminalView {
 
 #[uniffi::export]
 impl TerminalView {
+    /// Updates local engine colours without writing to the connection.
+    pub fn set_theme(&self, theme: TerminalTheme) -> Result<(), VtError> {
+        theme.validate()?;
+        #[cfg(feature = "vt")]
+        {
+            self.send(term::Cmd::Theme(theme));
+            Ok(())
+        }
+        #[cfg(not(feature = "vt"))]
+        {
+            let _ = theme;
+            Err(VtError::Unavailable)
+        }
+    }
+
     /// A keys-row tap; returns the modifiers now held (the row shows them).
     pub fn tap(&self, key: RowKeyTap) -> Armed {
         use keys_row::RowKey;

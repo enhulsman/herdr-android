@@ -379,3 +379,7 @@ unsafe extern "C" {
     #[allow(dead_code, reason = "used by the layout test")]
     pub fn ghostty_type_json() -> *const c_char;
 }
+
+#[path = "theme_ffi.rs"]
+mod theme;
+pub use theme::*;

@@ -38,6 +38,8 @@ const RETRY: Duration = Duration::from_secs(3);
 /// What the screen asks of the open terminal.
 #[derive(Debug)]
 pub(crate) enum Cmd {
+    /// Engine defaults, applied locally and retained across reattachments.
+    Theme(crate::TerminalTheme),
     /// A key press, typed or from the keys row, with its modifiers.
     Key(Key, Mods),
     /// Compose text, pasted without Enter.
@@ -60,6 +62,19 @@ pub(crate) enum Cmd {
     Interrupt,
 }
 
+/// Shared command seam: retain a theme only when the engine accepted it.
+pub(crate) fn update_theme(
+    retained: &mut Option<crate::TerminalTheme>,
+    dirty: &mut bool,
+    theme: crate::TerminalTheme,
+    apply: impl FnOnce(&crate::TerminalTheme) -> Result<(), vt::Failure>,
+) -> Result<(), vt::Failure> {
+    apply(&theme)?;
+    *retained = Some(theme);
+    *dirty = true;
+    Ok(())
+}
+
 /// Where frames, states and interrupt reports go, in order, from the task.
 pub(crate) trait TermSink: Send + Sync + 'static {
     fn frame(&self, bytes: Vec<u8>);
@@ -69,6 +84,7 @@ pub(crate) trait TermSink: Send + Sync + 'static {
 
 /// Opens `address` on `machine`. The terminal stays open until the returned
 /// sender is dropped.
+#[allow(clippy::too_many_arguments)] // One task owns the terminal and its local theme.
 pub(crate) fn spawn(
     hub: &Arc<HubCore>,
     machine: &str,
@@ -77,6 +93,7 @@ pub(crate) fn spawn(
     lead: bool,
     sink: Arc<dyn TermSink>,
     bracketed: Arc<AtomicBool>,
+    theme: Option<crate::TerminalTheme>,
 ) -> mpsc::UnboundedSender<Cmd> {
     let (tx, rx) = mpsc::unbounded_channel();
     let task = Task {
@@ -89,6 +106,7 @@ pub(crate) fn spawn(
         sink,
         bracketed,
         size: (0, 0),
+        theme,
     };
     hub.runtime().spawn(task.run());
     tx
@@ -105,6 +123,7 @@ enum Over {
 }
 
 struct Task {
+    theme: Option<crate::TerminalTheme>,
     hub: Arc<HubCore>,
     conns: watch::Receiver<Option<Conn>>,
     address: String,
@@ -190,8 +209,9 @@ impl Task {
                 }
                 cmd = self.cmds.recv() => match cmd {
                     None => return None,
-                    // Without a connection only the phone's size is worth keeping.
+                    // Keep local size and theme choices while the connection is absent.
                     Some(Cmd::PhoneSize(c, r)) if c > 0 && r > 0 => self.phone = (c, r),
+                    Some(Cmd::Theme(theme)) => self.theme = Some(theme),
                     Some(_) => {}
                 },
             }
@@ -215,6 +235,7 @@ impl Task {
                 cmd = self.cmds.recv() => match cmd {
                     None => return false,
                     Some(Cmd::PhoneSize(c, r)) if c > 0 && r > 0 => self.phone = (c, r),
+                    Some(Cmd::Theme(theme)) => self.theme = Some(theme),
                     Some(_) => {}
                 },
             }
@@ -252,7 +273,18 @@ impl Task {
     fn fresh_vt(&mut self, attached: &Attached) -> Option<vt::Terminal> {
         self.bracketed.store(false, Ordering::Relaxed);
         match vt::Terminal::new(attached.cols, attached.rows) {
-            Ok(t) => {
+            Ok(mut t) => {
+                if let Some(theme) = &self.theme
+                    && let Err(e) = t.set_theme(theme.fg, theme.bg, &theme.ansi)
+                {
+                    self.state(
+                        TermPhase::Failed {
+                            detail: e.to_string(),
+                        },
+                        None,
+                    );
+                    return None;
+                }
                 let phase = match attached.mode {
                     Mode::Watching => TermPhase::Watching,
                     Mode::Typing => TermPhase::Typing,
@@ -346,6 +378,16 @@ impl Task {
                 cmd = self.cmds.recv() => {
                     let Some(cmd) = cmd else { return Over::Closed };
                     match cmd {
+                        Cmd::Theme(theme) => {
+                            if let Err(e) = update_theme(&mut self.theme, &mut dirty, theme, |theme| {
+                                vt.set_theme(theme.fg, theme.bg, &theme.ansi)
+                            }) {
+                                // The palette failed before any defaults changed: keep
+                                // showing and retaining the previous theme, including on
+                                // reattach. Leave an existing pending redraw intact.
+                                self.hub.note(&format!("terminal theme unchanged: {e}"));
+                            }
+                        }
                         Cmd::Key(key, mods) => {
                             let bytes = vt.encode_key(key, mods);
                             if let Err(over) = self.input(&mut viewer, &mut vt, &mut dirty, &bytes).await {

@@ -4,11 +4,12 @@
 The desk chat SHALL read agents on Linux and macOS machines. While a machine is still
 connecting, the pane SHALL wait without a message. For a machine herdr
 cannot reach, it SHALL read "Can't reach <machine>; retrying" and try again
-once the machine is back. For an agent on Windows itself it SHALL
-read "kudde's chat can read agents on Linux and macOS. This agent runs on Windows
-itself; agents in WSL work." For another unsupported system it SHALL read
-"kudde's chat can read agents on Linux and macOS. This machine is not
-supported." Each SHALL offer "Open terminal". An
+once the machine is back. For an agent confirmed to run on Windows itself
+it SHALL read "kudde's chat can read agents on Linux and macOS. This agent
+runs on Windows itself; agents in WSL work." For another unsupported
+system, or when its shell cannot start and Windows is not established, it
+SHALL read "kudde's chat can read agents on Linux and macOS. This machine is
+not supported." Each SHALL offer "Open terminal". An
 unreachable machine SHALL never be named as unsupported.
 
 #### Scenario: An agent on Windows itself

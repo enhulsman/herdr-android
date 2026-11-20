@@ -27,30 +27,36 @@ fold.
 - **WHEN** Ezra moves through the pane with Tab and presses Enter on a folded tool row
 - **THEN** focus reaches the reply box and the buttons, and the row opens
 
-### Requirement: The desk shares the phone's chat core
+### Requirement: The desk follows the phone's chat rules
 The desk SHALL find, read and show a conversation, and decide how and
-whether to send, with the same core as the phone: the lookup results and
+whether to send, by the same rules as the phone: the lookup results and
 their rules, bounded reading from the end, the health guard, row identity,
-Codex commands kept in their turn, code blocks, the send checks, the guards
-and the pending states, as `chat-view` states them. Given the same inputs,
-the desk's rows and send decisions SHALL equal the phone's. Nothing SHALL be
-installed on the agent's machine or the desk beyond the mod folder.
+Codex commands kept in their turn, the send checks, the guards and the
+pending states, as `chat-view` states them. The desk carries its own
+JavaScript copy of these rules. Given the same inputs, the desk's rows, row
+keys, lookup results and send decisions SHALL equal those of the phone's
+Rust code exactly. Nothing SHALL be installed on the agent's machine or the
+desk beyond the mod folder.
 
 #### Scenario: The same log on both
-- **WHEN** a chat-view fixture is replayed through the desk's converted core and through the phone's
+- **WHEN** a chat-view fixture is replayed through the desk's reader and through the phone's core
 - **THEN** both give the same rows with the same keys
 
+#### Scenario: The same log read in pieces
+- **WHEN** the desk reads a fixture in slices or at split points, including inside a multi-byte character
+- **THEN** it gives the same rows with the same keys as the phone's core reading it whole
+
 #### Scenario: The same pending states on both
-- **WHEN** a sent message never reaches the log, through the desk's converted core and through the phone's
+- **WHEN** a sent message never reaches the log, through the desk's send rules and through the phone's
 - **THEN** both read "Not in the conversation yet" 30 seconds after sending
 
 #### Scenario: Two agents in one folder
 - **WHEN** two Claude Code agents run in the same folder in two terminals and both chats are open
 - **THEN** each pane shows its own conversation
 
-#### Scenario: A failure inside the core
-- **WHEN** the converted core fails while reading one chat, with a second chat open
-- **THEN** both panes recover from a fresh lookup and show their conversations again
+#### Scenario: A failure inside the reader
+- **WHEN** the desk's reader fails while reading one chat, with a second chat open
+- **THEN** the first pane recovers from a fresh lookup and shows its conversation again, and the second keeps showing its own
 
 ### Requirement: New answers appear without a click
 Each pane SHALL do one read at a time and drop a reply older than the

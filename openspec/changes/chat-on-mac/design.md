@@ -56,14 +56,22 @@ Both changes validate and complete review before desktop-chat section 7;
 archive desktop-chat then chat-on-mac after the joint release. This keeps
 Mac agents in v1 without a completion cycle.
 
-**Text approval R1-E (pending):** after Mac integration, use "kudde's chat
-can read agents on Linux and macOS. This agent runs on Windows itself;
-agents in WSL work." Pick: approve that text, which names both supported
-systems. This is wording approval, not a choice to keep an inaccurate notice.
-Before editing the Mac override, recopy desktop-chat's final requirement so
-pane wording approved there cannot be overwritten by this older draft.
-For a different unsupported system use "kudde's chat can read agents on
-Linux and macOS. This machine is not supported." Show both texts for approval.
+**Texts approved (R1-E, Ezra, 2026-11-20):** after Mac integration, an
+agent on Windows itself reads "kudde's chat can read agents on Linux and
+macOS. This agent runs on Windows itself; agents in WSL work.", and any
+other unsupported system "kudde's chat can read agents on Linux and macOS.
+This machine is not supported." Before editing the Mac override, recopy
+desktop-chat's final requirement so pane wording approved there cannot be
+overwritten by this older draft.
+
+### D6. The desk's copy follows
+The desk runs a JavaScript copy of the chat rules (`desktop-chat`, D10).
+The Darwin branch of the scripts reaches it unchanged: the parity suite
+holds the desk's script texts byte-equal to the Rust constants. The changes
+to `locate::decide` and `claude()` (D2) are made in the desk's
+`lookup.js` in the same pull request, and recorded Darwin script outputs
+(full-path `comm`, each `etime` form, ambiguous open files, two agents in
+one folder) join the parity suite.
 
 ## Testing
 

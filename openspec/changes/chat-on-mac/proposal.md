@@ -7,11 +7,12 @@ change, split from `desktop-chat` after the council review; the gallery
 release of the desk chat waits for it. One fact must be
 checked first (below).
 
-**Open for you (from the R1 review):**
-- **Pick: approve this notice (R1-E).** "kudde's chat can read agents on Linux
-  and macOS. This agent runs on Windows itself; agents in WSL work."
-  For other unsupported systems: "kudde's chat can read agents on Linux and
-  macOS. This machine is not supported." Approve these texts?
+**Approved (Ezra, 2026-11-20), the notices for agents the chat cannot read
+(R1-E):**
+- On Windows itself: "kudde's chat can read agents on Linux and macOS. This
+  agent runs on Windows itself; agents in WSL work."
+- On any other unsupported system: "kudde's chat can read agents on Linux and
+  macOS. This machine is not supported."
 
 Sends to Mac agents now check open files twice with `lsof`, so a reply may
 be noticeably slower; task 1.2 measures the added time. Confidence: moderate
@@ -51,7 +52,8 @@ gallery's audience runs agents on a Mac.
 
 ### Modified Capabilities
 - `chat-view`: the lookup works on macOS, and the switch shows for agents on
-  a Mac.
+  a Mac. The send checks name the fresh open-file check (no phone behaviour
+  change on Linux).
 - `desktop-chat`: Mac agents are supported. Its delta is drafted against
   the pending desktop requirements and integrated after desktop-chat tasks
   3.6 and sections 4–5 pass, before the joint gallery release; archival is
@@ -61,5 +63,9 @@ gallery's audience runs agents on a Mac.
 
 - `kudde-chat`: `locate.rs`, `image.rs`, `tail.rs` scripts and
   `locate::decide`; new `Probe` fields.
+- The desk's JavaScript copy (`desktop-chat`, decision 7): the lookup
+  decision changes land in `desk/kudde/chat/lookup.js` too, with Darwin
+  cases in the parity suite. The scripts reach the desk unchanged, as the
+  suite holds the desk's script texts equal to the Rust ones.
 - Testing needs Ezra's MacBook with herdr-core running.
 - Estimate: 2-3 sessions. Confidence: low.

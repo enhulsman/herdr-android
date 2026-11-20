@@ -33,6 +33,9 @@ use tokio::time::Instant;
 use crate::link::{DialError, Dialer, Exit, Target};
 use crate::machines::{self, ListError, MachineList};
 
+mod desk;
+pub use desk::*;
+
 pub mod changes;
 pub mod chat;
 pub(crate) mod chat_core;
@@ -139,6 +142,9 @@ pub struct MachineView {
     /// What the "New" sheet offers here; None unless connected and the layout was read.
     #[uniffi(default = None)]
     pub start: Option<start::StartView>,
+    /// Last desk read in this run, retained across connection loss.
+    #[uniffi(default = None)]
+    pub desk: Option<DeskView>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
@@ -303,6 +309,7 @@ struct Live {
     push_status: Option<push::PushStatusView>,
     /// The spaces and folders a new terminal can go to (this connection's).
     places: start::Places,
+    terminals: Vec<Value>,
     /// A start from the sheet is waiting for its answer.
     starting: bool,
 }
@@ -316,12 +323,14 @@ impl Live {
             next_retry_ms: None,
             push_status: None,
             places: start::Places::default(),
+            terminals: Vec::new(),
             starting: false,
         }
     }
 
     fn stop(&mut self) {
         self.places = start::Places::default();
+        self.terminals.clear();
         self.epoch = 0;
         self.next_retry_ms = None;
         if let Some(task) = self.task.take() {
@@ -345,6 +354,7 @@ struct State {
     push: Option<push::PushRegistration>,
     /// Each machine's installed-agents check, kept while the app runs.
     checks: HashMap<String, start::CheckState>,
+    desks: HashMap<String, desk::HeldDesk>,
 }
 
 pub(crate) struct HubCore {
@@ -576,6 +586,7 @@ impl HubCore {
             list_frozen: frozen,
             push: None,
             checks: HashMap::new(),
+            desks: HashMap::new(),
         };
         let snapshot = build_snapshot(&state);
         Arc::new(HubCore {
@@ -646,6 +657,13 @@ impl HubCore {
             .map_err(|e| HubError::Storage {
                 detail: format!("Could not save the machine list: {e}."),
             })?;
+        st.desks.retain(|name, _| {
+            next.get(name)
+                .zip(st.list.get(name))
+                .is_some_and(|(new, old)| {
+                    new.host == old.host && new.port == old.port && new.user == old.user
+                })
+        });
         st.list = next;
         Ok(())
     }
@@ -1018,6 +1036,10 @@ impl HubCore {
                 return false;
             };
             live.places.folders = herdr_proto::start::folder_choices(lines.terminals(), None);
+            live.terminals = lines.terminals().to_vec();
+            if let Some(held) = st.desks.get_mut(name) {
+                held.reseat(lines.terminals());
+            }
             if let Some(state) = connected {
                 live.state = state;
                 live.next_retry_ms = None;
@@ -1055,6 +1077,7 @@ fn build_snapshot(st: &State) -> HubSnapshot {
                 let live = st.live.get(&m.name);
                 let state = live.map_or(MachineState::Paused, |l| l.state.clone());
                 MachineView {
+                    desk: st.desks.get(&m.name).map(|held| held.seated.clone()),
                     name: m.name.clone(),
                     host: m.host.clone(),
                     port: m.port,

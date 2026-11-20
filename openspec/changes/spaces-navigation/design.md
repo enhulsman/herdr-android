@@ -99,8 +99,10 @@ last.
 - `State` (`hub/mod.rs:333`) gains `desks: HashMap<String, HeldDesk>`,
   keyed by machine, beside `checks`:
   `HeldDesk { version: u64, read: Result<Desk, DeskNote>, seated: DeskView }`.
-  It is not saved to disk. `remove_machine` (`:812`) and a rename drop the
-  entry.
+  It is not saved to disk. `remove_machine` (`:812`), a rename, and a change
+  of host, port or user drop the entry and its version: another server's
+  version numbers start over. The document is parsed outside the hub's lock;
+  the epoch and version are checked again before the result is published.
 - `read_layout` keeps setting `places.spaces` exactly as today, and also
   takes `got["version"]` (a `u64`; `DocGetResult` in
   `research/hc.openrpc-0.1.15.json`) and `desk(&got["value"])`. It replaces

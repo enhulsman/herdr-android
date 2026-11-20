@@ -176,17 +176,48 @@ fn words() -> Vec<&'static str> {
 
 /// Reads the desk's layout for the sheet's spaces.
 pub(crate) async fn read_layout(hub: Arc<HubCore>, name: String, epoch: u64, client: Client) {
-    let spaces = match client.call("doc.get", json!({"name": LAYOUT_DOC})).await {
-        Ok(got) => layout::spaces(&got["value"]),
+    read_layout_with(hub, name, epoch, client, layout::desk).await;
+}
+
+/// Keep parsing separate from publication so neither the tree walk nor its
+/// deduplication blocks other machines. The parser argument lets tests change
+/// the epoch/version during parsing without depending on thread scheduling.
+pub(super) async fn read_layout_with(
+    hub: Arc<HubCore>,
+    name: String,
+    epoch: u64,
+    client: Client,
+    parse: impl FnOnce(&serde_json::Value) -> Result<layout::Desk, layout::DeskNote>,
+) {
+    let (spaces, read) = match client.call("doc.get", json!({"name": LAYOUT_DOC})).await {
+        Ok(got) => {
+            let spaces = layout::spaces(&got["value"]);
+            let version = got["version"].as_u64().unwrap_or(0);
+            let read = parse(&got["value"]);
+            (spaces, Some((version, read)))
+        }
         Err(CallError::Lost) => return,
         Err(e) => {
             hub.note(&format!("{name}: reading {LAYOUT_DOC}: {e}"));
-            Vec::new()
+            (Vec::new(), None)
         }
     };
     hub.with(|_, st| {
-        if let Some(live) = st.live.get_mut(&name).filter(|l| l.epoch == epoch) {
-            live.places.spaces = Some(spaces);
+        let Some(live) = st.live.get_mut(&name).filter(|l| l.epoch == epoch) else {
+            return;
+        };
+        // The start sheet retains its existing behavior even for a late read.
+        live.places.spaces = Some(spaces);
+        if let Some((version, read)) = read
+            && st
+                .desks
+                .get(&name)
+                .is_none_or(|held| version >= held.version)
+        {
+            st.desks.insert(
+                name,
+                super::desk::HeldDesk::new(version, read, &live.terminals),
+            );
         }
     });
 }

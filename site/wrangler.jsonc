@@ -10,5 +10,11 @@
     "not_found_handling": "404-page"
   },
   // a Custom Domain: Cloudflare creates the DNS record and certificate on deploy
-  "routes": [{ "pattern": "kudde.dev", "custom_domain": true }]
+  "routes": [{ "pattern": "kudde.dev", "custom_domain": true }],
+  // branch builds run `wrangler preview`, which needs this block (empty: the
+  // site has no bindings); routes target production only, so a preview never
+  // serves kudde.dev
+  "previews": {},
+  // previews get a workers.dev Preview URL (noindex), set on the next deploy
+  "preview_urls": true
 }

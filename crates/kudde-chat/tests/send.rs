@@ -167,3 +167,92 @@ fn a_shell_in_front_is_an_exited_agent_and_gets_nothing() {
     );
     assert_eq!(send::check_again(&target(), &shell), Err(Refusal::Exited));
 }
+
+#[test]
+fn outcomes_distinguish_acknowledgement_uncertainty_and_definitive_refusal() {
+    use send::{SendError, Sent, send_outcome};
+    assert_eq!(send_outcome(Ok(())), Sent::Typed);
+    assert_eq!(send_outcome(Err(SendError::OutcomeUnknown)), Sent::Unsure);
+    assert_eq!(send_outcome(Err(SendError::Lost)), Sent::Unsure);
+    assert_eq!(
+        send_outcome(Err(SendError::Refused("status is working".into()))),
+        Sent::Refused("status is working".into())
+    );
+}
+
+#[test]
+fn a_second_enter_is_a_guarded_space_send_against_the_original_target() {
+    let l = found(SESSION);
+    let target = target();
+    for (status, guard) in [
+        ("idle", Some("idle")),
+        ("working", Some("working")),
+        ("done", None),
+    ] {
+        let action = send::enter_again(Some(&target), &seen(status, &l)).unwrap();
+        assert_eq!(action.text, " ", "never bare keys or an empty paste");
+        assert_eq!(action.guard, guard);
+    }
+    assert!(send::enter_again(None, &seen("idle", &l)).is_none());
+    assert!(send::enter_again(Some(&target), &seen("blocked", &l)).is_none());
+    let mut changed = seen("idle", &l);
+    changed.pid = Some(5150);
+    assert!(send::enter_again(Some(&target), &changed).is_none());
+    changed = seen("idle", &l);
+    changed.proc_start = Some(9500);
+    assert!(send::enter_again(Some(&target), &changed).is_none());
+    let other = found("other-session");
+    assert!(send::enter_again(Some(&target), &seen("idle", &other)).is_none());
+    changed = seen("idle", &l);
+    changed.agent = None;
+    assert!(send::enter_again(Some(&target), &changed).is_none());
+}
+
+#[test]
+fn per_message_enter_state_is_once_only_and_unsure_never_retries() {
+    let l = found(SESSION);
+    let mut message = send::EnterState::new(target(), &send::Sent::Typed);
+    assert!(message.take(&seen("blocked", &l)).is_none());
+    assert!(message.take(&seen("idle", &l)).is_some());
+    assert!(message.take(&seen("idle", &l)).is_none());
+    for outcome in [send::Sent::Unsure, send::Sent::Refused("no".into())] {
+        let mut message = send::EnterState::new(target(), &outcome);
+        assert!(message.take(&seen("idle", &l)).is_none());
+    }
+    let mut next_message = send::EnterState::new(target(), &send::Sent::Typed);
+    assert!(next_message.take(&seen("working", &l)).is_some());
+}
+
+#[test]
+fn a_codex_thread_change_at_either_send_boundary_refuses_with_same_process() {
+    let l = found(SESSION);
+    let mut first = seen("working", &l);
+    first.agent = Some(Agent::Codex);
+    let t = send::first_check(Agent::Codex, SESSION, &first).unwrap();
+    let other = found("new-thread");
+    let mut final_seen = seen("working", &other);
+    final_seen.agent = Some(Agent::Codex);
+    assert_eq!(
+        send::first_check(Agent::Codex, SESSION, &final_seen),
+        Err(Refusal::Changed)
+    );
+    assert_eq!(send::check_again(&t, &final_seen), Err(Refusal::Changed));
+    assert_eq!(
+        t.session, SESSION,
+        "a fresh lookup never replaces the original target"
+    );
+    for lookup in [
+        Lookup::None,
+        Lookup::Missed("unreadable or ambiguous open files"),
+    ] {
+        let uncertain = Seen {
+            lookup: &lookup,
+            ..final_seen.clone()
+        };
+        assert_eq!(
+            send::first_check(Agent::Codex, SESSION, &uncertain),
+            Err(Refusal::Changed)
+        );
+        assert_eq!(send::check_again(&t, &uncertain), Err(Refusal::Changed));
+    }
+}

@@ -11,7 +11,7 @@ use base64::Engine;
 use herdr_proto::rpc::{CallError, Client, Stream, StreamItem};
 use kudde_chat::core::{ChatCore, Kind, Read, Row, Term};
 use kudde_chat::locate::{self, Lookup};
-use kudde_chat::send::{self, Refusal, Seen};
+use kudde_chat::send::{self, Refusal, Seen, Sent};
 use kudde_chat::{Agent, Health, Image, Item, image, tail};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -155,7 +155,7 @@ pub struct Chat {
     /// This terminal's events, subscribed on the first wait.
     events: tokio::sync::Mutex<Option<Stream>>,
     /// What the last message was typed into, for [`Chat::enter_again`].
-    sent_to: Mutex<Option<send::Target>>,
+    sent_to: Mutex<Option<send::EnterState>>,
 }
 
 impl Chat {
@@ -327,26 +327,15 @@ fn file_image(
 /// queues). Not blocked (a dialog), not unreported (a start-up prompt), not a
 /// shell (it would run the text).
 fn may_send(t: &Term) -> bool {
-    t.agent.is_some() && matches!(t.status.as_deref(), Some("idle" | "done" | "working"))
-}
-
-/// What became of a `terminal.send`.
-#[derive(Debug, PartialEq, Eq)]
-enum Sent {
-    Typed,
-    /// No reply in time, or the connection went while waiting: it may be
-    /// typed, so it is followed as sent, never given back as a draft.
-    Unsure,
-    /// The core refused it (its `if` did not hold): nothing was typed.
-    Refused(String),
+    send::may_send(t.agent, t.status.as_deref())
 }
 
 fn send_outcome(r: &Result<Value, CallError>) -> Sent {
-    match r {
-        Ok(_) => Sent::Typed,
-        Err(CallError::OutcomeUnknown | CallError::Lost) => Sent::Unsure,
-        Err(e) => Sent::Refused(e.to_string()),
-    }
+    send::send_outcome(r.as_ref().map(|_| ()).map_err(|e| match e {
+        CallError::OutcomeUnknown => send::SendError::OutcomeUnknown,
+        CallError::Lost => send::SendError::Lost,
+        CallError::Rpc { .. } => send::SendError::Refused(e.to_string()),
+    }))
 }
 
 /// Enter is pressed once more only into what the message was typed into:
@@ -358,13 +347,29 @@ fn send_outcome(r: &Result<Value, CallError>) -> Sent {
 /// Not an empty send: Claude Code keeps the message in its box after an
 /// empty paste (checked at the desk, 2026-11-18); a trailing space changes
 /// nothing the agent reads.
-fn enter_again_params(address: &str, sent_to: Option<&send::Target>, seen: &Seen) -> Option<Value> {
-    let guard = send::check_again(sent_to?, seen).ok()?;
-    let mut params = json!({"terminal": address, "text": " "});
-    if let Some(st) = guard {
+fn enter_action_params(address: &str, action: send::EnterAgain) -> Value {
+    let mut params = json!({"terminal": address, "text": action.text});
+    if let Some(st) = action.guard {
         params["if"] = json!(st);
     }
-    Some(params)
+    params
+}
+
+fn take_enter_again_params(
+    address: &str,
+    message: &mut Option<send::EnterState>,
+    seen: &Seen,
+) -> Option<Value> {
+    Some(enter_action_params(address, message.as_mut()?.take(seen)?))
+}
+
+// Keep the original adapter tests of target checks and exact wire parameters.
+#[cfg(test)]
+fn enter_again_params(address: &str, sent_to: Option<&send::Target>, seen: &Seen) -> Option<Value> {
+    Some(enter_action_params(
+        address,
+        send::enter_again(sent_to, seen)?,
+    ))
 }
 
 fn refusal(r: Refusal) -> ChatRefusal {
@@ -666,7 +671,7 @@ impl Chat {
                         .lock()
                         .unwrap()
                         .sent(&message, self.core.chat_now());
-                    *self.sent_to.lock().unwrap() = Some(target);
+                    *self.sent_to.lock().unwrap() = Some(send::EnterState::new(target, &sent));
                     if sent == Sent::Typed {
                         ChatSent::Typed
                     } else {
@@ -691,9 +696,9 @@ impl Chat {
             let Ok((t, start, l)) = self.check(&c).await else {
                 return false;
             };
-            let Some(params) = enter_again_params(
+            let Some(params) = take_enter_again_params(
                 &self.address,
-                self.sent_to.lock().unwrap().as_ref(),
+                &mut self.sent_to.lock().unwrap(),
                 &seen(&t, start, &l),
             ) else {
                 return false;
@@ -1127,6 +1132,29 @@ mod tests {
             None,
             "exited into the shell"
         );
+    }
+
+    #[test]
+    fn the_adapter_consumes_one_guarded_enter_attempt_and_never_retries_unsure() {
+        let lookup = Lookup::Empty {
+            session: "s1".into(),
+        };
+        let seen = Seen {
+            agent: Some(Agent::Claude),
+            pid: Some(7),
+            proc_start: Some(100),
+            status: Some("idle"),
+            lookup: &lookup,
+        };
+        let target = send::first_check(Agent::Claude, "s1", &seen).unwrap();
+        let mut message = Some(send::EnterState::new(target.clone(), &Sent::Typed));
+        assert_eq!(
+            take_enter_again_params("t3", &mut message, &seen),
+            Some(json!({"terminal": "t3", "text": " ", "if": "idle"}))
+        );
+        assert_eq!(take_enter_again_params("t3", &mut message, &seen), None);
+        let mut unsure = Some(send::EnterState::new(target, &Sent::Unsure));
+        assert_eq!(take_enter_again_params("t3", &mut unsure, &seen), None);
     }
 
     #[test]
